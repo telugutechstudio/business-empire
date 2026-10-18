@@ -1,6 +1,6 @@
 // Service worker: lets Business Empire install as an app and run offline.
 // Network-first, so updates show up right away; the cache is the offline fallback.
-const CACHE = 'tycoon-empire-v9';
+const CACHE = 'tycoon-empire-v10';
 const ASSETS = [
   './',
   'index.html',
@@ -27,7 +27,16 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   // Live game data (leaderboard, cloud save...) always comes from the network
-  if (new URL(e.request.url).pathname.startsWith('/api/')) return;
+  const url = new URL(e.request.url);
+  if (url.pathname.startsWith('/api/')) return;
+  // Icons and fonts never change: serve from cache first (fast, saves mobile data)
+  if (url.pathname.startsWith('/icons/') || /fonts\.(gstatic|googleapis)\.com$/.test(url.hostname)) {
+    e.respondWith(caches.match(e.request).then(hit => hit || fetch(e.request).then(res => {
+      if (res.ok || res.type === 'opaque') { const copy = res.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); }
+      return res;
+    })));
+    return;
+  }
   e.respondWith(
     fetch(e.request)
       .then(res => {

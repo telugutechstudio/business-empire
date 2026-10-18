@@ -73,9 +73,8 @@ body.warping #app { animation: warpzoom 1.2s ease-out; }
   grid-area: top;
   display: flex; align-items: center; gap: 16px;
   padding: 10px 20px;
-  background: linear-gradient(180deg, rgba(23, 28, 52, .92), rgba(23, 28, 52, .65));
+  background: linear-gradient(180deg, rgba(23, 28, 52, .97), rgba(23, 28, 52, .88));
   border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(8px);
 }
 .brand { display: flex; align-items: center; gap: 10px; min-width: 200px; text-align: left; }
 .brand-logo .i3d { width: 46px; height: 46px; animation: planetSpin 12s linear infinite; }
@@ -109,9 +108,9 @@ body.warping #app { animation: warpzoom 1.2s ease-out; }
   grid-area: nav;
   display: flex; flex-direction: column; gap: 3px;
   padding: 12px 10px;
-  background: rgba(17, 21, 40, .7);
+  background: rgba(17, 21, 40, .92);
   border-right: 1px solid var(--border);
-  overflow-y: auto; backdrop-filter: blur(8px);
+  overflow-y: auto;
 }
 .tab-btn {
   position: relative;
@@ -252,7 +251,7 @@ h3.sec { font-size: 19px; margin: 18px 0 2px; }
   background: linear-gradient(180deg, #7af0b4 0%, #2fd27a 45%, #179a55 100%);
   box-shadow: inset 0 2px 0 rgba(255, 255, 255, .35);
 }
-.bar-shine { position: absolute; inset: 0; background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, .25) 50%, transparent 60%); background-size: 250% 100%; animation: shine 2.6s linear infinite; pointer-events: none; }
+.bar-shine { position: absolute; top: 0; bottom: 0; left: 0; width: 35%; background: linear-gradient(105deg, transparent, rgba(255, 255, 255, .22), transparent); transform: translateX(-120%); animation: shineMove 2.6s linear infinite; pointer-events: none; }
 .bar.fast .bar-fill {
   transform: scaleX(1) !important;
   background: repeating-linear-gradient(45deg, #48e094 0 12px, #22b86a 12px 24px);
@@ -272,7 +271,7 @@ h3.sec { font-size: 19px; margin: 18px 0 2px; }
   box-shadow: 0 4px 0 #b06200, 0 8px 14px rgba(255, 159, 28, .25);
   transition: transform .08s;
 }
-.buy::after { content: ''; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .55) 50%, transparent 65%); background-size: 250% 100%; animation: shine 3s linear infinite; }
+.buy::after { content: ''; position: absolute; top: 0; bottom: 0; left: 0; width: 35%; background: linear-gradient(105deg, transparent, rgba(255, 255, 255, .5), transparent); transform: translateX(-120%); animation: shineMove 3s linear infinite; pointer-events: none; }
 .buy:active { transform: translateY(3px); box-shadow: 0 1px 0 #b06200; }
 .buy.cant, .btn.cant { filter: grayscale(.9) brightness(.6); cursor: not-allowed; }
 .buy.cant::after { display: none; }
@@ -610,7 +609,7 @@ body[data-fest="sankranti"] .fest-float { animation-name: festRise; top: auto; b
 .toast.gem { border-left-color: #7fe3ff; }
 .toast.bad { border-left-color: var(--red); }
 .toast.out { opacity: 0; transform: translateX(30px); transition: .3s; }
-.modal { position: fixed; inset: 0; z-index: 80; background: rgba(5, 6, 14, .72); display: grid; place-items: center; padding: 16px; backdrop-filter: blur(4px); }
+.modal { position: fixed; inset: 0; z-index: 80; background: rgba(5, 6, 14, .82); display: grid; place-items: center; padding: 16px; }
 .modal-card {
   background: linear-gradient(180deg, var(--card2), var(--panel)); border: 1px solid var(--border);
   border-radius: 22px; padding: 22px; width: min(460px, 100%); max-height: 92vh; overflow-y: auto; overflow-x: hidden; text-align: center;
@@ -634,6 +633,7 @@ body[data-fest="sankranti"] .fest-float { animation-name: festRise; top: auto; b
 @keyframes floatUp { from { opacity: 1; transform: translateY(0) scale(1); } to { opacity: 0; transform: translateY(-50px) scale(1.2); } }
 @keyframes stripes { from { background-position: 0 0; } to { background-position: 34px 0; } }
 @keyframes shine { from { background-position: 150% 0; } to { background-position: -100% 0; } }
+@keyframes shineMove { from { transform: translateX(-120%); } to { transform: translateX(320%); } }
 @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.25); } }
 @keyframes nudge { 0%, 100% { box-shadow: inset -6px -10px 18px rgba(0, 0, 0, .55), 0 0 0 0 rgba(255, 200, 61, .6); } 50% { box-shadow: inset -6px -10px 18px rgba(0, 0, 0, .55), 0 0 0 10px rgba(255, 200, 61, 0); } }
 @keyframes caseBob { 0%, 100% { transform: translateY(0) rotate(-8deg) scale(1); } 50% { transform: translateY(-12px) rotate(8deg) scale(1.08); } }
@@ -718,3 +718,8 @@ body[data-fest="sankranti"] .fest-float { animation-name: festRise; top: auto; b
 
 /* Shown only when JavaScript is off (also read by search engines) */
 .noscript { position: relative; z-index: 5; max-width: 720px; margin: 40px auto; padding: 20px; background: var(--card); border-radius: 16px; }
+
+/* Battery saver: no space background, decorations play once instead of looping */
+body.lowfx .nebula, body.lowfx #stars, body.lowfx .bar-shine, body.lowfx .buy::after, body.lowfx .wheel-lights, body.lowfx .fest-float { display: none; }
+body.lowfx *, body.lowfx *::before, body.lowfx *::after { animation-iteration-count: 1 !important; }
+body.lowfx .loader, body.lowfx .bar.fast .bar-fill, body.lowfx .tut-hand { animation-iteration-count: infinite !important; }

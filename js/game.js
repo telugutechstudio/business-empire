@@ -4,12 +4,15 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '2.7';
+const GAME_VERSION = '2.8';
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
 let S = null; // game state, initialised below
 const SUF = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc', 'UDc', 'DDc', 'TDc', 'QaDc', 'QiDc', 'SxDc', 'SpDc', 'OcDc', 'NoDc', 'Vg', 'UVg', 'DVg', 'TVg', 'QaVg', 'QiVg', 'SxVg', 'SpVg', 'OcVg', 'NoVg', 'Tg'];
 const REDUCED_MOTION = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Decorative effects (stars, confetti, flying coins...) are skipped in battery saver mode
+function fxOff() { return REDUCED_MOTION || !!(S && S.settings && S.settings.lowfx); }
+function applyLowFx() { document.body.classList.toggle('lowfx', fxOff()); Stars.clear(); }
 
 /* ---------------------------- LANGUAGE ------------------------------ */
 function isTe() { return !!(S && S.settings && S.settings.lang === 'te'); }
@@ -26,8 +29,8 @@ function applyStaticText() {
 }
 
 /* ---------------------------- 3D ICONS ------------------------------ */
-// Microsoft Fluent 3D emoji (MIT), pinned to one commit. Falls back to the plain emoji if an image fails.
-const FLUENT = 'https://cdn.jsdelivr.net/gh/microsoft/fluentui-emoji@1ffb34c752ecf5d402f04cfb4b392c77f57c54bc/assets/';
+// Microsoft Fluent 3D emoji (MIT), resized to 160px WebP and served from icons/3d/<key>.webp.
+// The names below are the Fluent asset names they came from. Falls back to the plain emoji if an image fails.
 const ICONS = {
   tea: ['Teacup without handle', '🍵'], truck: ['Delivery truck', '🚚'], coffee: ['Hot beverage', '☕'], bakery: ['Croissant', '🥐'],
   gym: ['Person lifting weights', '🏋️', 1], hotel: ['Hotel', '🏨'], tech: ['Laptop', '💻'], studio: ['Clapper board', '🎬'],
@@ -61,16 +64,10 @@ const ICONS = {
   starplain: ['Star', '⭐'], hole: ['Hole', '🕳️'], dna: ['Dna', '🧬'], wand: ['Magic wand', '🪄'], shooting: ['Shooting star', '🌠'],
   sunface: ['Sun with face', '🌞'], nightstars: ['Night with stars', '🌃'],
 };
-function iconUrl(key) {
-  const d = ICONS[key];
-  if (!d) return '';
-  const snake = d[0].toLowerCase().replace(/ /g, '_');
-  const dir = encodeURIComponent(d[0]);
-  return d[2] ? `${FLUENT}${dir}/Default/3D/${snake}_3d_default.png` : `${FLUENT}${dir}/3D/${snake}_3d.png`;
-}
+function iconUrl(key) { return ICONS[key] ? `icons/3d/${key}.webp` : ''; }
 function emo(key) { return (ICONS[key] || [])[1] || '❔'; }
 function ico(key, cls = '') {
-  return `<span class="i3d ${cls}" data-e="${emo(key)}"><img src="${iconUrl(key)}" alt="" draggable="false" onerror="this.parentNode.classList.add('fail')"></span>`;
+  return `<span class="i3d ${cls}" data-e="${emo(key)}"><img src="${iconUrl(key)}" alt="" draggable="false" decoding="async" onerror="this.parentNode.classList.add('fail')"></span>`;
 }
 function hydrateIcons(root = document) {
   root.querySelectorAll('[data-ico]').forEach(el => { el.outerHTML = ico(el.dataset.ico, el.className); });
@@ -293,7 +290,7 @@ function defaultState() {
     tour: { week: '', base: 0, posted: false, pending: '', rewarded: {} },
     stats: { clicks: 0, briefcases: 0, prestiges: 0, upgradesBought: 0, playTime: 0, bestRun: 0, missionsDone: 0, spins: 0, dailyClaims: 0, shares: 0 },
     boosts: { hype: 0, hypeCd: 0, rush: 0, golden: 0 },
-    settings: { sound: true, music: true, notify: false, notifyAsked: false, notation: 'suffix', buyMode: '1', lang: defaultLang() },
+    settings: { sound: true, music: true, lowfx: !!(navigator.connection && navigator.connection.saveData), notify: false, notifyAsked: false, notation: 'suffix', buyMode: '1', lang: defaultLang() },
     lastSave: Date.now(),
     created: Date.now(),
   });
@@ -804,13 +801,14 @@ function doSpin(paid) {
   const wheel = $('wheel');
   if (wheel) { wheel.style.transition = 'transform 5s cubic-bezier(.12,.75,.12,1)'; wheel.style.transform = `rotate(${wheelAngle}deg)`; }
   document.querySelectorAll('[data-act=spin-go],[data-act=spin-paid]').forEach(b => { b.disabled = true; });
+  const prize = SPIN_PRIZES[k], msg = prize.give();
+  save();
   // Ticking sound while the wheel slows down
   let t = 0;
   for (let d = 60; t < 4600; d *= 1.09) { t += d; setTimeout(() => sfx('tick'), t); }
   setTimeout(() => {
     spinning = false;
-    const p = SPIN_PRIZES[k];
-    const msg = p.give();
+    const p = prize;
     sfx(p.big ? 'win' : 'big');
     toast(`🎡 ${msg}`, 'gem');
     confetti($('wheel'), p.big ? 260 : 90);
@@ -1497,8 +1495,9 @@ function claimFestival() {
 let floaterAcc = 0;
 function festivalFloaters(dt) {
   const a = activeFestival();
-  document.body.dataset.fest = a ? a.fest.id : '';
-  if (!a || REDUCED_MOTION || document.hidden) return;
+  const fid = a ? a.fest.id : '';
+  if (document.body.dataset.fest !== fid) document.body.dataset.fest = fid;
+  if (!a || fxOff() || document.hidden) return;
   if ((floaterAcc += dt) < 4) return;
   floaterAcc = 0;
   const icons = FEST_FLOATERS[a.fest.id] || [a.fest.icon];
@@ -1583,7 +1582,7 @@ function updatePetTimer() {
   if (petFeedReady()) renderTab(); else b.textContent = petFeedLabel();
 }
 function heartBurst(el) {
-  if (REDUCED_MOTION || !el) return;
+  if (fxOff() || !el) return;
   const c = centerOf(el);
   for (let k = 0; k < 4; k++) {
     const h = document.createElement('div');
@@ -1715,7 +1714,7 @@ const Stars = (() => {
     stars = Array.from({ length: n }, () => ({ x: Math.random() * w, y: Math.random() * h, z: rand(0.2, 1), t: rand(0, 6.28), c: Math.floor(rand(0, 3)) }));
   }
   function draw(dt) {
-    if (!ctx) return;
+    if (!ctx || fxOff()) return;
     ctx.clearRect(0, 0, w, h);
     const warp = Math.max(0, (warpUntil - performance.now()) / 1200);
     for (const s of stars) {
@@ -1747,7 +1746,8 @@ const Stars = (() => {
   window.addEventListener('pointermove', e => { px = e.clientX / innerWidth - 0.5; py = e.clientY / innerHeight - 0.5; }, { passive: true });
   resize();
   return {
-    draw: REDUCED_MOTION ? () => {} : draw,
+    draw,
+    clear() { if (ctx) ctx.clearRect(0, 0, w, h); },
     setWorld(id) { colors = THEMES[id] || THEMES.earth; },
     warp() { warpUntil = performance.now() + 1200; },
   };
@@ -1784,7 +1784,7 @@ const FX = (() => {
     else { running = false; ctx.clearRect(0, 0, cv.width, cv.height); }
   }
   function add(list) {
-    if (!ctx || REDUCED_MOTION) return;
+    if (!ctx || fxOff()) return;
     parts.push(...list);
     if (parts.length > 600) parts = parts.slice(-600);
     if (!running) loop(performance.now());
@@ -1816,7 +1816,7 @@ function sparkBurst(el, n = 12) { const c = centerOf(el); FX.sparks(c.x, c.y, n)
 
 let flyingCoins = 0, lastBump = 0;
 function flyCoins(fromEl, n = 3) {
-  if (REDUCED_MOTION || !fromEl || activeTab !== 'business') return;
+  if (fxOff() || !fromEl || activeTab !== 'business') return;
   const target = $('cash');
   const from = centerOf(fromEl), to = centerOf(target);
   for (let k = 0; k < n && flyingCoins < 24; k++) {
@@ -1942,7 +1942,7 @@ function initTilt() {
   if (REDUCED_MOTION) return;
   const list = $('bizList');
   list.addEventListener('pointermove', e => {
-    if (e.pointerType !== 'mouse') return;
+    if (e.pointerType !== 'mouse' || fxOff()) return;
     const card = e.target.closest('.biz');
     if (!card) return;
     const r = card.getBoundingClientRect();
@@ -2192,6 +2192,7 @@ function renderSettings() {
       ${rowHtml('speech', tr('Language', 'భాష'), tr('Play in English or Telugu.', 'ఇంగ్లీష్ లేదా తెలుగులో ఆడండి.'),
         `<div class="seg-toggle"><button class="${isTe() ? '' : 'on'}" data-act="lang" data-id="en">English</button><button class="${isTe() ? 'on' : ''}" data-act="lang" data-id="te">తెలుగు</button></div>`, 'setting')}
       ${notifyRowHtml()}
+      ${rowHtml('bolt', tr('Battery saver', 'బ్యాటరీ సేవర్'), tr('Fewer animations and effects. Saves battery on phones.', 'తక్కువ యానిమేషన్లు. ఫోన్ బ్యాటరీ ఆదా అవుతుంది.'), `<button class="btn ${S.settings.lowfx ? 'gold' : 'ghost'}" data-act="lowfx">${S.settings.lowfx ? tr('On', 'ఆన్') : tr('Off', 'ఆఫ్')}</button>`, 'setting')}
       ${rowHtml('notes', tr('Music', 'మ్యూజిక్'), tr('A different tune on every world.', 'ప్రతి ప్రపంచానికి వేరే పాట.'), `<button class="btn ghost" data-act="music">${S.settings.music ? tr('On', 'ఆన్') : tr('Off', 'ఆఫ్')}</button>`, 'setting')}
       ${rowHtml('grad', tr('Tutorial', 'ట్యుటోరియల్'), tr('Show the step-by-step guide again.', 'స్టెప్-బై-స్టెప్ గైడ్ మళ్ళీ చూపించు.'), `<button class="btn ghost" data-act="tut-replay">${tr('Replay', 'మళ్ళీ చూడు')}</button>`, 'setting')}
       ${cloudBox}
@@ -2341,6 +2342,7 @@ document.addEventListener('click', e => {
     case 'mskip': skipMission(id); renderTab(); break;
     case 'lang': setLang(id); break;
     case 'music': toggleMusic(); break;
+    case 'lowfx': S.settings.lowfx = !S.settings.lowfx; applyLowFx(); renderTab(); save(); break;
     case 'notify-on': closeModal(); enableNotifications(); break;
     case 'notify-off': disableNotifications(); break;
     case 'notify-help': modal(notifyHelpHtml()); break;
@@ -2463,8 +2465,12 @@ function tick(dt) {
 
 let last = performance.now(), textAcc = 0, slowAcc = 0, saveAcc = 0, newsAcc = 0;
 function frame(now) {
-  const dt = Math.min((now - last) / 1000, 86400);
+  requestAnimationFrame(frame);
+  if (now - last < (fxOff() ? 64 : 31)) return; // ~30 fps, ~15 fps in battery saver
+  let dt = Math.min((now - last) / 1000, 86400);
   last = now;
+  // Back from a long time in the background: pay it like offline time (same cap) instead of one giant tick
+  if (dt > 60) { resumeAfterAway(dt); dt = 0.05; }
   tick(dt);
   updateBizBars();
   Stars.draw(Math.min(dt, 0.05));
@@ -2492,7 +2498,6 @@ function frame(now) {
   }
   if (newsAcc >= 14) { newsAcc = 0; rotateHeadline(); }
   if (saveAcc >= 10) { saveAcc = 0; save(); }
-  requestAnimationFrame(frame);
 }
 
 /* ---------------------------- BOOT ---------------------------------- */
@@ -2503,6 +2508,17 @@ function offlineHtml(away, counted, amt) {
     <div class="stat-big">${money(amt)}</div>
     <div class="modal-actions"><button class="btn" data-act="offline-ok">${tr('Collect', 'తీసుకోండి')}</button>
     <button class="btn blue ${S.gems < 5 ? 'cant' : ''}" data-act="offline-x2">${tr('Double it', 'రెట్టింపు')} · 💎5</button></div>`;
+}
+function resumeAfterAway(away) {
+  const B = S.boosts;
+  for (const k of ['hype', 'hypeCd', 'rush', 'golden']) B[k] = Math.max(0, B[k] - away);
+  marketEvent = null;
+  const counted = Math.min(away, OFFLINE_CAPS[S.offlineLvl]);
+  const amt = incomePerSec(true, false) * counted * petBonus('offline');
+  if (amt <= 0) return;
+  earn(amt);
+  pendingOffline = amt;
+  queueModal(() => offlineHtml(away, counted, amt));
 }
 function offlineEarnings() {
   const away = (Date.now() - S.lastSave) / 1000;
@@ -2532,6 +2548,7 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 
 const hadSave = load();
 hydrateIcons();
+applyLowFx();
 applyStaticText();
 applyWorld(S.world);
 ensureMissions();
