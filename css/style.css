@@ -720,7 +720,11 @@ body[data-fest="sankranti"] .fest-float { animation-name: festRise; top: auto; b
   .tab-btn .i3d { width: 28px; height: 28px; }
   .tab-btn.active { box-shadow: inset 0 3px 0 var(--gold); }
   .dot { left: auto; right: 12px; top: 3px; }
-  .boostbar { padding: 8px 12px 0; gap: 6px; }
+  .boostbar { padding: 8px 12px 2px; gap: 6px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .boostbar::-webkit-scrollbar { display: none; }
+  .boostbar > * { flex: none; }
+  .chips { flex-wrap: nowrap; }
+  .chip { white-space: nowrap; }
   .hype { padding: 4px 10px 4px 6px; font-size: 14px; }
   .hype .i3d { width: 24px; height: 24px; }
   .hype small { display: none; }
@@ -762,3 +766,15 @@ body[data-fest="sankranti"] .fest-float { animation-name: festRise; top: auto; b
 body.lowfx .nebula, body.lowfx #stars, body.lowfx .bar-shine, body.lowfx .buy::after, body.lowfx .wheel-lights, body.lowfx .fest-float { display: none; }
 body.lowfx *, body.lowfx *::before, body.lowfx *::after { animation-iteration-count: 1 !important; }
 body.lowfx .loader, body.lowfx .bar.fast .bar-fill, body.lowfx .tut-hand { animation-iteration-count: infinite !important; }
+
+/* Pets on phones (kept last so it wins over the base pet styles) */
+@media (max-width: 760px) {
+  .pet-status { flex-wrap: wrap; }
+  .pet-status .info { min-width: 180px; }
+  .pet-status .btn { width: 100%; }
+  .pet-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .pet-card { padding: 12px 8px; }
+  .pet-pic { width: 76px; height: 76px; }
+  .pet-pic .i3d { width: 56px; height: 56px; }
+  .pet-card .btn { width: 100%; padding: 8px 6px; font-size: 13px; }
+}
