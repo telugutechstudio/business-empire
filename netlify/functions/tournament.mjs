@@ -49,7 +49,7 @@ export default async (req) => {
   const id = String(body.id || '');
   const name = cleanName(body.name);
   const score = Number(body.score);
-  const world = ['earth', 'moon', 'mars'].includes(body.world) ? body.world : 'earth';
+  const world = ['earth', 'moon', 'mars', 'galaxy'].includes(body.world) ? body.world : 'earth';
   if (!validId(id) || !name || !Number.isFinite(score) || score < 0 || score > 1e300) return json({ error: 'invalid entry' }, 400);
 
   const key = `week-${current}`;

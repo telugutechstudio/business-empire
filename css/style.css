@@ -21,6 +21,7 @@
 }
 body[data-world="moon"] { --bg: #0d0f17; --neb1: #4a5070; --neb2: #23283d; --accent: #dfe6ff; }
 body[data-world="mars"] { --bg: #170806; --neb1: #8a2a12; --neb2: #4a1530; --accent: #ff9a5c; }
+body[data-world="galaxy"] { --bg: #0a0518; --neb1: #6a1fa8; --neb2: #0f5a7a; --accent: #d9a8ff; }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
@@ -372,6 +373,7 @@ h3.sec { font-size: 19px; margin: 18px 0 2px; }
 .world-card.w-earth { background: linear-gradient(135deg, #2c3f9a, #13285a 60%, #0d1a3a); }
 .world-card.w-moon { background: linear-gradient(135deg, #5d6584, #2c3149 60%, #171a28); }
 .world-card.w-mars { background: linear-gradient(135deg, #b4472a, #5a1c1c 60%, #2a0d10); }
+.world-card.w-galaxy { background: linear-gradient(135deg, #7a2ac0, #2a1a6a 55%, #0a2a4a); }
 .world-card.here { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold), var(--shadow); }
 .world-card.locked .planet { filter: grayscale(.85) brightness(.6); }
 .planet .i3d { width: 100px; height: 100px; animation: planetSpin 14s linear infinite; filter: drop-shadow(0 0 18px rgba(255, 255, 255, .25)); }

@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '2.5';
+const GAME_VERSION = '2.6';
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
 let S = null; // game state, initialised below
@@ -57,6 +57,9 @@ const ICONS = {
   fox: ['Fox', '🦊'], owl: ['Owl', '🦉'], unicorn: ['Unicorn', '🦄'], dragon: ['Dragon', '🐉'], lion: ['Lion', '🦁'], tiger: ['Tiger face', '🐯'],
   peacock: ['Peacock', '🦚'], turtle: ['Turtle', '🐢'], heart: ['Red heart', '❤️'], sparkheart: ['Sparkling heart', '💖'], bone: ['Bone', '🦴'],
   paws: ['Paw prints', '🐾'], bowl: ['Bowl with spoon', '🥣'],
+  dizzy: ['Dizzy', '💫'], alienm: ['Alien monster', '👾'], crystal: ['Crystal ball', '🔮'], atom: ['Atom symbol', '⚛️'], magnet: ['Magnet', '🧲'],
+  starplain: ['Star', '⭐'], hole: ['Hole', '🕳️'], dna: ['Dna', '🧬'], wand: ['Magic wand', '🪄'], shooting: ['Shooting star', '🌠'],
+  sunface: ['Sun with face', '🌞'], nightstars: ['Night with stars', '🌃'],
 };
 function iconUrl(key) {
   const d = ICONS[key];
@@ -102,6 +105,13 @@ const WORLDS = [
     ['volcano', 'Olympus Tours', 'ఒలింపస్ టూర్స్', 'volcano', 'Lava Leo'], ['zoo', 'Alien Zoo', 'ఏలియన్ జూ', 'alien', 'Zorg'],
     ['crystal', 'Crystal Mine', 'స్ఫటిక గని', 'gem', 'Gemma Ray'], ['terra', 'Terraformer', 'టెర్రాఫార్మర్', 'tree', 'Forest Fang'],
     ['comet', 'Comet Catchers', 'తోకచుక్క వేటగాళ్లు', 'comet', 'Halley Hu'], ['bank', 'Galaxy Bank', 'గెలాక్సీ బ్యాంక్', 'galaxy', 'Cosmo Cruz']] },
+  { id: 'galaxy', name: 'Galaxy', te: 'గెలాక్సీ', icon: 'shooting', mult: 50, unlockAt: 1e24,
+    desc: ['The final frontier. Everything earns x50.', 'చివరి సరిహద్దు. ఇక్కడ అన్నీ x50 సంపాదిస్తాయి.'], biz: [
+    ['dust', 'Stardust Shop', 'నక్షత్ర ధూళి షాప్', 'dizzy', 'Nova Nia'], ['food', 'Alien Food Court', 'ఏలియన్ ఫుడ్ కోర్ట్', 'alienm', 'Gloop'],
+    ['orb', 'Crystal Ball Readers', 'క్రిస్టల్ బాల్ జ్యోతిష్యం', 'crystal', 'Madame Orb'], ['atom', 'Atom Reactor', 'అణు రియాక్టర్', 'atom', 'Proton Pat'],
+    ['grav', 'Gravity Gym', 'గ్రావిటీ జిమ్', 'magnet', 'Newton Ned'], ['starf', 'Star Factory', 'నక్షత్రాల ఫ్యాక్టరీ', 'starplain', 'Stella Star'],
+    ['worm', 'Wormhole Travel', 'వార్మ్‌హోల్ ట్రావెల్', 'hole', 'Warp Wu'], ['dna', 'DNA Labs', 'DNA ల్యాబ్స్', 'dna', 'Helix Hana'],
+    ['magic', 'Magic Academy', 'మ్యాజిక్ అకాడమీ', 'wand', 'Merlin Moe'], ['ubank', 'Universe Bank', 'విశ్వ బ్యాంక్', 'sunface', 'Cosmo King']] },
 ].map(w => Object.assign(w, {
   biz: w.biz.map(([id, name, te, icon, manager], i) => {
     const [baseCost, costMult, time, revenue, managerCost] = BIZ_CURVE[i];
@@ -199,6 +209,7 @@ const ACHIEVEMENTS = (() => {
     .forEach(([n, en, te], k) => add(`earn_${k}`, 'coin', 3 + k * 2, () => tr(en, te),
       () => tr(`Earn ${money(n)} lifetime`, `మొత్తం ${money(n)} సంపాదించండి`), () => S.lifetime >= n));
   add('world_moon', 'moon', 15, () => tr('Moonwalker', 'మూన్‌వాకర్'), () => tr('Unlock the Moon', 'చంద్రుడిని అన్‌లాక్ చేయండి'), () => !!S.worldsUnlocked.moon);
+  add('world_galaxy', 'shooting', 60, () => tr('Galaxy Ruler', 'గెలాక్సీ పాలకుడు'), () => tr('Unlock the Galaxy', 'గెలాక్సీని అన్‌లాక్ చేయండి'), () => !!S.worldsUnlocked.galaxy);
   add('world_mars', 'mars', 30, () => tr('Red Planet Boss', 'అంగారక బాస్'), () => tr('Unlock Mars', 'అంగారకుడిని అన్‌లాక్ చేయండి'), () => !!S.worldsUnlocked.mars);
   [1, 5, 10].forEach(n => add(`mgr_${n}`, 'manager', n === 10 ? 10 : 3, () => tr(`Hiring Spree ${n}`, `నియామకాలు ${n}`),
     () => tr(`Have ${n} managers in one world`, `ఒకే ప్రపంచంలో ${n} మేనేజర్లు`), () => S.biz.filter(b => b.manager).length >= n));
@@ -236,6 +247,7 @@ const HEADLINES = [
   ['Film studio announces sequel to a movie nobody has seen yet.', 'ఇంకా ఎవరూ చూడని సినిమాకు సీక్వెల్ ప్రకటించిన ఫిల్మ్ స్టూడియో.'],
   ['Space Agency confirms Moon is "a great location for a cheese mine".', 'చంద్రుడు చీజ్ గనికి సరైన చోటు అని స్పేస్ ఏజెన్సీ ప్రకటన.'],
   ['Scientists confirm: Mars sand sells better with gift wrap.', 'గిఫ్ట్ ప్యాక్ చేస్తే అంగారక ఇసుక బాగా అమ్ముడవుతుందట!'],
+  ['Galaxy news: wormhole traffic jam delays 3 billion tourists.', 'గెలాక్సీ వార్తలు: వార్మ్‌హోల్ ట్రాఫిక్ జామ్‌లో 300 కోట్ల టూరిస్టులు!'],
   ['Rumor: golden briefcases spotted around the city. Keep your eyes open!', 'పుకారు: నగరంలో బంగారు బ్రీఫ్‌కేసులు కనిపిస్తున్నాయి. జాగ్రత్తగా చూడండి!'],
   ['Lucky Wheel jackpot hit by a tea stall owner. Again.', 'లక్కీ వీల్ జాక్‌పాట్ మళ్ళీ టీ స్టాల్ ఓనర్‌కే!'],
   ['Investors say: "Restarting with more capital is a power move."', 'ఇన్వెస్టర్లు: "ఎక్కువ పెట్టుబడితో మళ్ళీ మొదలుపెట్టడం తెలివైన పని."'],
@@ -1222,6 +1234,9 @@ const Music = (() => {
     mars: { bpm: 122, wave: 'square', echo: 0.22,
       chords: [[62, 65, 69], [58, 62, 65], [60, 64, 67], [57, 61, 64]],
       lead: [74, _, 74, 77, _, 74, 72, _, 70, _, 70, 74, _, 72, 70, _, 72, _, 72, 76, _, 74, 72, _, 73, _, _, 69, _, _, _, _] },
+    galaxy: { bpm: 92, wave: 'triangle', echo: 0.32,
+      chords: [[64, 67, 71], [60, 64, 67], [55, 59, 62], [62, 66, 69]],
+      lead: [79, _, 76, _, 83, _, _, 79, 76, _, 72, _, 76, _, _, _, 74, _, 79, _, 83, _, 81, 79, 78, _, _, 74, _, _, _, _] },
   };
   let ctx = null, master = null, echo = null, noise = null, timer = null, step = 0, nextTime = 0, song = SONGS.earth;
   const freq = m => 440 * Math.pow(2, (m - 69) / 12);
@@ -1591,6 +1606,7 @@ const Stars = (() => {
     earth: ['#ffffff', '#b9c6ff', '#ffe9a8'],
     moon: ['#ffffff', '#d7dcef', '#a9b3d6'],
     mars: ['#ffe2c7', '#ffb08a', '#ff8a5c'],
+    galaxy: ['#f0e0ff', '#9fd0ff', '#ff9ef0'],
   };
   let stars = [], colors = THEMES.earth, w = 0, h = 0, dpr = 1, warpUntil = 0, px = 0, py = 0, shoot = null;
   function resize() {
