@@ -4,6 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
+const GAME_VERSION = '1.1';
 let S = null; // game state, initialised below
 const SUF = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc', 'UDc', 'DDc', 'TDc', 'QaDc', 'QiDc', 'SxDc', 'SpDc', 'OcDc', 'NoDc', 'Vg', 'UVg', 'DVg', 'TVg', 'QaVg', 'QiVg', 'SxVg', 'SpVg', 'OcVg', 'NoVg', 'Tg'];
 
@@ -792,7 +793,7 @@ function renderStats() {
     <table class="stats-table">${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
 }
 function renderSettings() {
-  return `<h2>⚙️ Settings</h2><p class="sub">Progress saves automatically in this browser every few seconds.</p>
+  return `<h2>⚙️ Settings</h2><p class="sub">Progress saves automatically in this browser every few seconds. · Version ${GAME_VERSION}</p>
     <div class="list">
       <div class="row setting"><div class="info"><div class="title">🔊 Sound effects</div></div><button class="btn ghost" data-act="sound">${S.settings.sound ? 'On' : 'Off'}</button></div>
       <div class="row setting"><div class="info"><div class="title">🔢 Number format</div><div class="desc">${S.settings.notation === 'sci' ? 'Scientific (1.23e15)' : 'Suffixes (1.23 Qa)'}</div></div><button class="btn ghost" data-act="notation">Switch</button></div>
