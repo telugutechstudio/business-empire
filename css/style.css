@@ -500,6 +500,20 @@ a.btn { text-decoration: none; display: inline-block; }
 .share-bar .btn .i3d { width: 22px; height: 22px; }
 .hype.share { background: linear-gradient(180deg, #6fe0c0, #1fa58a); box-shadow: 0 4px 0 #0f6b58, 0 8px 16px rgba(31, 165, 138, .3); }
 
+/* Weekly tournament */
+.lb-tabs { display: flex; width: 100%; margin-bottom: 12px; }
+.lb-tabs button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.lb-tabs .i3d { width: 22px; height: 22px; }
+.tour-banner { display: flex; gap: 14px; align-items: center; padding: 14px; margin-bottom: 12px; border-radius: var(--radius);
+  background: linear-gradient(135deg, #6a4a10, #3a2690); border: 1px solid var(--gold); box-shadow: 0 0 22px rgba(255, 200, 61, .25); animation: rowIn .35s backwards; }
+.tour-ico { width: 64px; height: 64px; animation: float 2.6s ease-in-out infinite; }
+.tour-banner .info { flex: 1; }
+.tour-banner .title { font-weight: 700; font-size: 19px; }
+.tour-banner .desc { color: #f0dcb0; font-size: 13.5px; }
+.prizes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.prize { display: inline-flex; align-items: center; gap: 3px; background: rgba(10, 13, 28, .6); border: 1px solid rgba(255, 200, 61, .4); border-radius: 999px; padding: 2px 9px; font-size: 12.5px; }
+.prize .i3d { width: 20px; height: 20px; }
+
 /* Friends challenge */
 .chal-card {
   display: flex; align-items: center; gap: 14px; margin-bottom: 12px; padding: 14px;

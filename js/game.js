@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '2.4';
+const GAME_VERSION = '2.5';
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
 let S = null; // game state, initialised below
@@ -219,6 +219,8 @@ const ACHIEVEMENTS = (() => {
   [[1, 'Pet Parent', 'పెట్ పేరెంట్'], [5, 'Pet Lover', 'పెట్ ప్రేమికుడు'], [9, 'Zoo Keeper', 'జూ కీపర్']].forEach(([n, en, te]) => add(`pet_${n}`, 'paws', n === 9 ? 25 : 5,
     () => tr(en, te), () => tr(`Adopt ${n} pet(s)`, `${n} పెట్(లు) తీసుకోండి`), () => Object.keys(S.pets.owned).length >= n));
   add('pet_max', 'dragon', 15, () => tr('Best Friends', 'బెస్ట్ ఫ్రెండ్స్'), () => tr('Get a pet to level 10', 'ఒక పెట్‌ను లెవెల్ 10 చేయండి'), () => Object.values(S.pets.owned).some(l => l >= 10));
+  add('tour_top3', 'medal', 15, () => tr('Podium Finish', 'పోడియం'), () => tr('Finish top 3 in a weekly tournament', 'వారపు టోర్నమెంట్‌లో టాప్ 3'), () => (S.stats.tourTop3 || 0) >= 1);
+  add('tour_win', 'trophy', 30, () => tr('Tournament Champion', 'టోర్నమెంట్ ఛాంపియన్'), () => tr('Win a weekly tournament', 'వారపు టోర్నమెంట్ గెలవండి'), () => (S.stats.tourWins || 0) >= 1);
   add('chal_win', 'swords', 10, () => tr('Challenge Champion', 'ఛాలెంజ్ ఛాంపియన్'), () => tr('Beat a friend\'s challenge', 'స్నేహితుడి ఛాలెంజ్ గెలవండి'), () => !!(S.challenge && S.challenge.won));
   add('share_1', 'letter', 5, () => tr('Spread the Word', 'అందరికీ చెప్పండి'), () => tr('Share the game with a friend', 'గేమ్‌ను స్నేహితుడితో షేర్ చేయండి'), () => (S.stats.shares || 0) >= 1);
   [10, 25, 50].forEach(n => add(`upg_${n}`, 'up', 5, () => tr(`Upgrader ${n}`, `అప్‌గ్రేడర్ ${n}`),
@@ -276,6 +278,7 @@ function defaultState() {
     festivals: {},
     challenge: null,
     pets: { owned: {}, fedAt: 0 },
+    tour: { week: '', base: 0, posted: false, pending: '', rewarded: {} },
     stats: { clicks: 0, briefcases: 0, prestiges: 0, upgradesBought: 0, playTime: 0, bestRun: 0, missionsDone: 0, spins: 0, dailyClaims: 0, shares: 0 },
     boosts: { hype: 0, hypeCd: 0, rush: 0, golden: 0 },
     settings: { sound: true, music: true, notation: 'suffix', buyMode: '1', lang: defaultLang() },
@@ -317,6 +320,7 @@ function mergeState(saved) {
   out.player = Object.assign({ id: '', name: '' }, saved.player || {});
   out.cloud = Object.assign({ code: '', lastSync: 0 }, saved.cloud || {});
   out.festivals = saved.festivals || {};
+  out.tour = Object.assign({ week: '', base: 0, posted: false, pending: '', rewarded: {} }, saved.tour || {});
   out.pets = Object.assign({ owned: {}, fedAt: 0 }, saved.pets || {});
   out.challenge = saved.challenge && typeof saved.challenge === 'object' ? saved.challenge : null;
   // Players from before the tutorial existed don't need it
@@ -941,7 +945,83 @@ function joinLeaderboard() {
   sfx('big');
   toast(tr(`🏆 Welcome to the leaderboard, ${name}!`, `🏆 లీడర్‌బోర్డ్‌కు స్వాగతం, ${name}!`), 'good');
   lbFetch(true);
+  tourFetch(true);
   renderTab();
+}
+
+/* ---------------------------- WEEKLY TOURNAMENT -------------------- */
+// Weeks run Monday to Sunday (UTC), matching the server. Score = lifetime earnings gained this week.
+const TOUR_URL = '/api/tournament';
+const TOUR_PRIZES = [100, 60, 40], TOUR_TOP10 = 20, TOUR_PLAYED = 5;
+let lbView = 'week', tourData = null, tourState = 'idle', tourLastSent = 0, tourLastScore = -1;
+function tourWeekStart(now = Date.now()) {
+  const d = new Date(now);
+  const midnight = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  return midnight - ((new Date(midnight).getUTCDay() + 6) % 7) * 86400000;
+}
+function tourWeekKey() { return new Date(tourWeekStart()).toISOString().slice(0, 10); }
+function tourEndsIn() { return (tourWeekStart() + 7 * 86400000 - Date.now()) / 1000; }
+function tourScore() { return Math.max(0, Math.floor(S.lifetime - S.tour.base)); }
+function tourPrize(rank) { return !rank ? 0 : rank <= 3 ? TOUR_PRIZES[rank - 1] : rank <= 10 ? TOUR_TOP10 : TOUR_PLAYED; }
+// When a new week starts, remember last week so its prize can be claimed, then count from zero again
+function checkTourWeek() {
+  const wk = tourWeekKey();
+  if (S.tour.week === wk) return;
+  if (S.tour.week && S.tour.posted) S.tour.pending = S.tour.week;
+  S.tour.week = wk;
+  S.tour.base = S.lifetime;
+  S.tour.posted = false;
+  tourData = null; tourLastScore = -1;
+  if (S.tour.pending) claimTourReward();
+}
+async function claimTourReward() {
+  const week = S.tour.pending;
+  if (!week || S.tour.rewarded[week]) { S.tour.pending = ''; return; }
+  try {
+    const res = await fetch(`${TOUR_URL}?week=${week}&id=${encodeURIComponent(S.player.id)}`);
+    if (!res.ok || !(res.headers.get('content-type') || '').includes('json')) return;
+    const d = await res.json();
+    if (S.tour.rewarded[week]) return;
+    S.tour.rewarded[week] = true;
+    S.tour.pending = '';
+    const gems = tourPrize(d.myRank);
+    if (gems) {
+      S.gems += gems;
+      if (d.myRank === 1) S.stats.tourWins = (S.stats.tourWins || 0) + 1;
+      if (d.myRank <= 3) S.stats.tourTop3 = (S.stats.tourTop3 || 0) + 1;
+      const medal = d.myRank === 1 ? 'gold' : d.myRank === 2 ? 'silver' : d.myRank === 3 ? 'bronze' : 'medal';
+      queueModal(() => `${ico(medal, 'big-ico')}<h3>${tr('Tournament results!', 'టోర్నమెంట్ ఫలితాలు!')}</h3>
+        <p>${tr(`Last week you finished <b>#${d.myRank}</b> of ${fmtInt(d.players)} players.`, `గత వారం ${fmtInt(d.players)} మందిలో మీరు <b>#${d.myRank}</b> స్థానంలో నిలిచారు.`)}</p>
+        <div class="stat-big">+💎${gems}</div>
+        <div class="modal-actions"><button class="btn gold" data-act="close">${tr('Awesome!', 'సూపర్!')}</button></div>`);
+      confetti(null, d.myRank <= 3 ? 260 : 100);
+      sfx('win');
+    }
+    save();
+  } catch (e) { /* try again next time */ }
+}
+async function tourFetch(post) {
+  ensurePlayerId();
+  checkTourWeek();
+  if (post) { tourLastSent = Date.now(); tourLastScore = tourScore(); }
+  if (!tourData) tourState = 'loading';
+  try {
+    const res = post
+      ? await fetch(TOUR_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: S.player.id, name: S.player.name, score: tourScore(), world: S.world }) })
+      : await fetch(`${TOUR_URL}?id=${encodeURIComponent(S.player.id)}`);
+    if (!res.ok || !(res.headers.get('content-type') || '').includes('json')) throw new Error('status ' + res.status);
+    tourData = await res.json();
+    tourState = 'ok';
+    if (post) S.tour.posted = true;
+  } catch (e) {
+    tourState = 'offline';
+  }
+  if (activeTab === 'leaderboard') renderTab();
+}
+function updateTourLive() {
+  const e = $('tourEnds'); if (e) e.textContent = fmtDur(tourEndsIn());
+  const m = $('tourMine'); if (m) m.textContent = money(tourScore());
 }
 
 /* ---------------------------- CLOUD SAVE ---------------------------- */
@@ -1771,7 +1851,7 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.tab').forEach(s => s.classList.toggle('active', s.id === 'tab-' + tab));
   $('main').scrollTop = 0;
-  if (tab === 'leaderboard') lbFetch(!!S.player.name && S.lifetime > lbLastScore);
+  if (tab === 'leaderboard') { lbFetch(!!S.player.name && S.lifetime > lbLastScore); tourFetch(!!S.player.name && tourScore() > tourLastScore); }
   renderTab();
 }
 function renderTab() {
@@ -1867,8 +1947,22 @@ function renderWorlds() {
       'మొత్తం సంపాదనతో కొత్త ప్రపంచాలు అన్‌లాక్ చేయండి. ప్రతి ప్రపంచానికి సొంత వ్యాపారాలు. మీరు ఉన్న ప్రపంచం మాత్రమే సంపాదిస్తుంది.')) +
     `<div class="worlds">${cardsHtml}</div>`;
 }
+function lbRowsHtml(top) {
+  return top.map(p => {
+    const medal = p.rank === 1 ? ico('gold') : p.rank === 2 ? ico('silver') : p.rank === 3 ? ico('bronze') : `<b class="rank-n">#${p.rank}</b>`;
+    return `<div class="lb-row ${p.me ? 'me' : ''} ${p.rank <= 3 ? 'top' : ''}"><div class="lb-rank">${medal}</div>
+      <div class="lb-name">${esc(p.name)}${p.me ? ` <span class="badge">${tr('You', 'మీరు')}</span>` : ''}</div>
+      <div class="lb-world">${ico(worldDef(p.world).icon)}</div><div class="lb-score">${money(p.score)}</div></div>`;
+  }).join('') || `<p class="sub">${tr('No players yet. Be the first!', 'ఇంకా ప్లేయర్లు లేరు. మీరే మొదటివారు అవ్వండి!')}</p>`;
+}
+function lbOfflineHtml() {
+  return `<div class="join-card">${ico('earth', 'big-ico')}<h3>${tr('Leaderboard is offline', 'లీడర్‌బోర్డ్ ఆఫ్‌లైన్‌లో ఉంది')}</h3>
+    <p class="sub">${tr('The leaderboard works on the online version of the game. Check your internet and try again.', 'లీడర్‌బోర్డ్ ఆన్‌లైన్ గేమ్‌లోనే పనిచేస్తుంది. ఇంటర్నెట్ చూసి మళ్ళీ ప్రయత్నించండి.')}</p>
+    <button class="btn" data-act="lb-refresh">${tr('Try again', 'మళ్ళీ ప్రయత్నించు')}</button></div>`;
+}
+function lbLoadingHtml() { return `<div class="join-card"><div class="loader"></div><p class="sub">${tr('Loading players…', 'ప్లేయర్లు లోడ్ అవుతున్నారు…')}</p></div>`; }
 function renderLeaderboard() {
-  const sub = tr('Compete with players around the world. Your score is your lifetime earnings.', 'ప్రపంచవ్యాప్తంగా ప్లేయర్లతో పోటీ పడండి. మీ స్కోర్ = మీ మొత్తం సంపాదన.');
+  const sub = tr('Compete with players around the world: a new tournament every week, plus the all-time board.', 'ప్రపంచవ్యాప్తంగా ప్లేయర్లతో పోటీ: ప్రతి వారం కొత్త టోర్నమెంట్, ఇంకా ఆల్-టైమ్ బోర్డు.');
   if (!S.player.name) {
     return header('trophy', tr('Leaderboard', 'లీడర్‌బోర్డ్'), sub) +
       `<div class="join-card">${ico('person', 'big-ico')}
@@ -1877,27 +1971,27 @@ function renderLeaderboard() {
         <button class="btn gold" data-act="lb-join">${tr('Join leaderboard', 'లీడర్‌బోర్డ్‌లో చేరండి')}</button>
         <p class="sub">${tr('Only your name, score and current world are shared.', 'మీ పేరు, స్కోర్, ప్రస్తుత ప్రపంచం మాత్రమే షేర్ అవుతాయి.')}</p></div>`;
   }
+  const tabs = `<div class="seg-toggle lb-tabs"><button class="${lbView === 'week' ? 'on' : ''}" data-act="lb-view" data-id="week">${ico('swords')} ${tr('Weekly', 'వారపు టోర్నమెంట్')}</button>
+    <button class="${lbView === 'all' ? 'on' : ''}" data-act="lb-view" data-id="all">${ico('earth')} ${tr('All-time', 'ఆల్-టైమ్')}</button></div>`;
+  const meBar = (rank, players, scoreLabel) => `<div class="lb-me">${ico('person')}<div><b>${esc(S.player.name)}</b><br><small>${tr(`Rank ${rank} of ${fmtInt(players)}`, `${fmtInt(players)} లో ర్యాంక్ ${rank}`)} · ${scoreLabel}</small></div>
+    <div class="lb-actions"><button class="btn ghost" data-act="lb-rename">${tr('Rename', 'పేరు మార్చు')}</button><button class="btn" data-act="lb-refresh">${tr('Refresh', 'రిఫ్రెష్')}</button></div></div>`;
   let body;
-  if (lbState === 'offline') {
-    body = `<div class="join-card">${ico('earth', 'big-ico')}<h3>${tr('Leaderboard is offline', 'లీడర్‌బోర్డ్ ఆఫ్‌లైన్‌లో ఉంది')}</h3>
-      <p class="sub">${tr('The leaderboard works on the online version of the game. Check your internet and try again.', 'లీడర్‌బోర్డ్ ఆన్‌లైన్ గేమ్‌లోనే పనిచేస్తుంది. ఇంటర్నెట్ చూసి మళ్ళీ ప్రయత్నించండి.')}</p>
-      <button class="btn" data-act="lb-refresh">${tr('Try again', 'మళ్ళీ ప్రయత్నించు')}</button></div>`;
-  } else if (!lbData) {
-    body = `<div class="join-card"><div class="loader"></div><p class="sub">${tr('Loading players…', 'ప్లేయర్లు లోడ్ అవుతున్నారు…')}</p></div>`;
+  if (lbView === 'week') {
+    const prizes = [['gold', TOUR_PRIZES[0]], ['silver', TOUR_PRIZES[1]], ['bronze', TOUR_PRIZES[2]]].map(([m, g]) => `<span class="prize">${ico(m)} 💎${g}</span>`).join('') +
+      `<span class="prize">${tr('Top 10', 'టాప్ 10')} 💎${TOUR_TOP10}</span><span class="prize">${tr('Everyone', 'అందరికీ')} 💎${TOUR_PLAYED}</span>`;
+    const banner = `<div class="tour-banner">${ico('trophy', 'tour-ico')}<div class="info"><div class="title">${tr('Weekly Tournament', 'వారపు టోర్నమెంట్')}</div>
+      <div class="desc">${tr('Earn the most money this week to win. Ends in', 'ఈ వారం ఎక్కువ సంపాదించినవారు గెలుస్తారు. ముగింపు')} <b id="tourEnds">${fmtDur(tourEndsIn())}</b></div>
+      <div class="prizes">${prizes}</div></div></div>`;
+    if (tourState === 'offline') body = banner + lbOfflineHtml();
+    else if (!tourData) body = banner + lbLoadingHtml();
+    else body = banner + meBar(tourData.myRank ? '#' + tourData.myRank : '—', tourData.players, `${tr('This week', 'ఈ వారం')}: <b id="tourMine">${money(tourScore())}</b>`) + `<div class="lb-list">${lbRowsHtml(tourData.top)}</div>`;
   } else {
-    const rows = lbData.top.map(p => {
-      const medal = p.rank === 1 ? ico('gold') : p.rank === 2 ? ico('silver') : p.rank === 3 ? ico('bronze') : `<b class="rank-n">#${p.rank}</b>`;
-      return `<div class="lb-row ${p.me ? 'me' : ''} ${p.rank <= 3 ? 'top' : ''}"><div class="lb-rank">${medal}</div>
-        <div class="lb-name">${esc(p.name)}${p.me ? ` <span class="badge">${tr('You', 'మీరు')}</span>` : ''}</div>
-        <div class="lb-world">${ico(worldDef(p.world).icon)}</div><div class="lb-score">${money(p.score)}</div></div>`;
-    }).join('') || `<p class="sub">${tr('No players yet. Be the first!', 'ఇంకా ప్లేయర్లు లేరు. మీరే మొదటివారు అవ్వండి!')}</p>`;
-    const rank = lbData.myRank ? '#' + lbData.myRank : '—';
-    body = `<div class="lb-me">${ico('person')}<div><b>${esc(S.player.name)}</b><br><small>${tr(`Rank ${rank} of ${fmtInt(lbData.players)}`, `${fmtInt(lbData.players)} లో ర్యాంక్ ${rank}`)}</small></div>
-      <div class="lb-actions"><button class="btn ghost" data-act="lb-rename">${tr('Rename', 'పేరు మార్చు')}</button><button class="btn" data-act="lb-refresh">${tr('Refresh', 'రిఫ్రెష్')}</button></div></div>
-      <div class="lb-list">${rows}</div>`;
+    if (lbState === 'offline') body = lbOfflineHtml();
+    else if (!lbData) body = lbLoadingHtml();
+    else body = meBar(lbData.myRank ? '#' + lbData.myRank : '—', lbData.players, `${tr('Lifetime', 'మొత్తం')}: <b>${money(S.lifetime)}</b>`) + `<div class="lb-list">${lbRowsHtml(lbData.top)}</div>`;
   }
   const online = playersToday ? `<div class="players-today">${ico('people')} ${tr(`<b>${fmtInt(playersToday)}</b> players today`, `ఈ రోజు <b>${fmtInt(playersToday)}</b> మంది ఆడారు`)}</div>` : '';
-  return header('trophy', tr('Leaderboard', 'లీడర్‌బోర్డ్'), tr('Top bosses by lifetime earnings. Your score updates every minute.', 'మొత్తం సంపాదన బట్టి టాప్ బాస్‌లు. మీ స్కోర్ ప్రతి నిమిషం అప్‌డేట్ అవుతుంది.')) + online + body;
+  return header('trophy', tr('Leaderboard', 'లీడర్‌బోర్డ్'), sub) + online + tabs + body;
 }
 function renderShop() {
   const rows = GEM_SHOP.map(g => {
@@ -2115,7 +2209,8 @@ document.addEventListener('click', e => {
     case 'travel': travelTo(id); break;
     case 'unlock-world': unlockWorld(id); break;
     case 'lb-join': joinLeaderboard(); break;
-    case 'lb-refresh': lbFetch(S.lifetime > lbLastScore); renderTab(); break;
+    case 'lb-refresh': lbFetch(S.lifetime > lbLastScore); tourFetch(tourScore() > tourLastScore); renderTab(); break;
+    case 'lb-view': lbView = id === 'all' ? 'all' : 'week'; renderTab(); break;
     case 'lb-rename': S.player.name = ''; renderTab(); break;
     case 'mclaim': claimMission(id); renderTab(); break;
     case 'mskip': skipMission(id); renderTab(); break;
@@ -2257,6 +2352,10 @@ function frame(now) {
     if (activeTab === 'stats') renderTab();
     if (activeTab === 'pets') updatePetTimer();
     if (activeTab === 'missions') updateMissionProgress();
+    checkTourWeek();
+    if (activeTab === 'leaderboard') updateTourLive();
+    const tourWait = tourState === 'offline' ? 300000 : 60000;
+    if (S.player.name && Date.now() - tourLastSent > tourWait && tourScore() > tourLastScore) tourFetch(true);
     const lbWait = lbState === 'offline' ? 300000 : 60000;
     if (S.player.name && Date.now() - lbLastSent > lbWait && S.lifetime > lbLastScore) lbFetch(true);
     if (S.cloud.code && Date.now() - cloudLastAuto > 120000) cloudSave(false);
@@ -2315,6 +2414,8 @@ if (hadSave) offlineEarnings();
 else modal(welcomeHtml());
 if (canClaimDaily()) queueModal(dailyHtml);
 { const f = activeFestival(); if (f && !S.festivals[f.key]) queueModal(festivalHtml); }
+checkTourWeek();
+if (S.tour.pending) claimTourReward();
 pendingChallenge = readChallengeParam();
 if (pendingChallenge && !(S.challenge && !S.challenge.won && S.challenge.score === pendingChallenge.score && S.challenge.name === pendingChallenge.name)) queueModal(challengeInviteHtml);
 updateMusicBtn();
