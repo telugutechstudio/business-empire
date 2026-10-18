@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Business Empire</title>
+  <meta name="description" content="Idle business game: build businesses, hire managers, attract investors and grow an empire.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#181d33">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Business Empire">
+</head>
+<body>
+<div id="app">
+  <header class="topbar">
+    <div class="brand"><span class="brand-logo">🏙️</span><span class="brand-name">Business<b>Empire</b></span></div>
+    <div class="cash-wrap">
+      <div id="cash" class="cash">0</div>
+      <div id="ips" class="ips">0 / sec</div>
+    </div>
+    <div class="currencies">
+      <div class="pill inv" title="Investors (each boosts all profits)"><span>👔</span><b id="investors">0</b><small id="investorBonus">+0%</small></div>
+      <div class="pill gem" title="Gems"><span>💎</span><b id="gems">0</b></div>
+    </div>
+  </header>
+
+  <nav class="side" id="nav">
+    <button class="tab-btn active" data-act="tab" data-tab="business"><span>🏢</span><em>Businesses</em></button>
+    <button class="tab-btn" data-act="tab" data-tab="missions"><span>📋</span><em>Missions</em><i class="dot" id="dot-missions"></i></button>
+    <button class="tab-btn" data-act="tab" data-tab="managers"><span>🤵</span><em>Managers</em><i class="dot" id="dot-managers"></i></button>
+    <button class="tab-btn" data-act="tab" data-tab="upgrades"><span>⬆️</span><em>Upgrades</em><i class="dot" id="dot-upgrades"></i></button>
+    <button class="tab-btn" data-act="tab" data-tab="investors"><span>👔</span><em>Investors</em><i class="dot" id="dot-investors"></i></button>
+    <button class="tab-btn" data-act="tab" data-tab="shop"><span>💎</span><em>Gem Shop</em></button>
+    <button class="tab-btn" data-act="tab" data-tab="awards"><span>🏆</span><em>Awards</em></button>
+    <button class="tab-btn" data-act="tab" data-tab="stats"><span>📊</span><em>Stats</em></button>
+    <button class="tab-btn" data-act="tab" data-tab="settings"><span>⚙️</span><em>Settings</em></button>
+  </nav>
+
+  <div class="boostbar" id="boostbar">
+    <button class="hype" id="hypeBtn" data-act="hype">📣 Hype! <small>x2 for 2m</small></button>
+    <button class="hype daily" data-act="daily">🎁 Daily<i class="dot" id="dot-daily"></i></button>
+    <button class="hype install hidden" id="installBtn" data-act="install">📲 Install</button>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <main id="main">
+    <section class="tab active" id="tab-business">
+      <div class="buymode" id="buymode">
+        <span>Buy</span>
+        <button data-act="buymode" data-mode="1">x1</button>
+        <button data-act="buymode" data-mode="10">x10</button>
+        <button data-act="buymode" data-mode="100">x100</button>
+        <button data-act="buymode" data-mode="next">Next</button>
+        <button data-act="buymode" data-mode="max">Max</button>
+      </div>
+      <div id="bizList" class="biz-list"></div>
+    </section>
+    <section class="tab" id="tab-missions"></section>
+    <section class="tab" id="tab-managers"></section>
+    <section class="tab" id="tab-upgrades"></section>
+    <section class="tab" id="tab-investors"></section>
+    <section class="tab" id="tab-shop"></section>
+    <section class="tab" id="tab-awards"></section>
+    <section class="tab" id="tab-stats"></section>
+    <section class="tab" id="tab-settings"></section>
+  </main>
+
+  <div class="ticker"><span class="ticker-label">NEWS</span><div class="ticker-track"><span id="tickerText">Welcome, boss! Tap the Tea Stall to start earning.</span></div></div>
+</div>
+
+<button id="briefcase" class="briefcase hidden" data-act="briefcase" aria-label="Golden briefcase">💼</button>
+<div id="toasts" class="toasts"></div>
+<div id="modal" class="modal hidden"><div class="modal-card" id="modalBody"></div></div>
+
+<script src="js/game.js"></script>
+</body>
+</html>
