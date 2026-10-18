@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '3.0';
+const GAME_VERSION = '3.1';
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
 let S = null; // game state, initialised below
@@ -1521,6 +1521,58 @@ function festivalFloaters(dt) {
   setTimeout(() => el.remove(), 15000);
 }
 
+/* ---------------------------- REWARDED ADS -------------------------- */
+// Google H5 Games Ads ("watch a video for a boost"). Off until ADS_CLIENT holds an approved
+// AdSense publisher ID like 'ca-pub-1234567890123456'. Set ADS_TEST to false once ads are live.
+const ADS_CLIENT = '';
+const ADS_TEST = true;
+const AD_REWARD_SECS = 1800;
+let adsReady = false, pendingShowAd = null;
+function initAds() {
+  if (!ADS_CLIENT) return;
+  const s = document.createElement('script');
+  s.async = true;
+  s.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js';
+  s.setAttribute('data-ad-client', ADS_CLIENT);
+  s.setAttribute('data-ad-frequency-hint', '60s');
+  if (ADS_TEST) s.setAttribute('data-adbreak-test', 'on');
+  document.head.appendChild(s);
+  window.adsbygoogle = window.adsbygoogle || [];
+  window.adBreak = window.adConfig = o => window.adsbygoogle.push(o);
+  window.adConfig({ preloadAdBreaks: 'on', sound: 'on', onReady: () => { adsReady = true; $('adBtn').classList.remove('hidden'); } });
+}
+function watchAd() {
+  if (!adsReady) { toast(tr('No video right now. Try again later.', 'ఇప్పుడు వీడియో లేదు. తర్వాత ప్రయత్నించండి.'), 'bad'); return; }
+  let rewarded = false;
+  window.adBreak({
+    type: 'reward', name: 'x2-boost',
+    beforeAd: () => Music.stop(),
+    afterAd: () => Music.start(),
+    beforeReward: showAdFn => {
+      pendingShowAd = showAdFn;
+      modal(`${ico('tv', 'big-ico')}<h3>${tr('Free x2 boost', 'ఫ్రీ x2 బూస్ట్')}</h3>
+        <p>${tr('Watch a short video to get <b>x2 profits for 30 minutes</b>.', 'చిన్న వీడియో చూసి <b>30 నిమిషాలు x2 లాభాలు</b> పొందండి.')}</p>
+        <div class="modal-actions"><button class="btn ghost" data-act="close">${tr('No thanks', 'వద్దు')}</button><button class="btn gold" data-act="ad-go">${tr('Watch video', 'వీడియో చూడు')}</button></div>`);
+    },
+    adDismissed: () => toast(tr('Watch the whole video to get the boost.', 'బూస్ట్ కోసం వీడియో మొత్తం చూడండి.'), 'bad'),
+    adViewed: () => {
+      rewarded = true;
+      S.boosts.rush += AD_REWARD_SECS;
+      S.stats.adsWatched = (S.stats.adsWatched || 0) + 1;
+      sfx('win');
+      toast(tr('📺 Thanks! x2 profits for 30 minutes.', '📺 ధన్యవాదాలు! 30 నిమిషాలు x2 లాభాలు.'), 'gem');
+      confetti(null, 100);
+      save();
+    },
+    adBreakDone: info => {
+      pendingShowAd = null;
+      if (!rewarded && info && info.breakStatus && !['viewed', 'dismissed', 'ignored'].includes(info.breakStatus)) {
+        toast(tr('No video right now. Try again later.', 'ఇప్పుడు వీడియో లేదు. తర్వాత ప్రయత్నించండి.'), 'bad');
+      }
+    },
+  });
+}
+
 /* ---------------------------- SCRATCH CARD ------------------------- */
 // One free card a day (more for gems). The prize is picked when the card is made and saved,
 // so closing the card or reloading never changes it. Three matching symbols show the prize.
@@ -2422,6 +2474,7 @@ function renderSettings() {
       ${rowHtml('disk', tr('Save now', 'ఇప్పుడు సేవ్'), '', `<button class="btn ghost" data-act="save">${tr('Save', 'సేవ్')}</button>`, 'setting')}
       ${rowHtml('refresh', tr('Export / Import save', 'సేవ్ ఎక్స్‌పోర్ట్ / ఇంపోర్ట్'), tr('Move your progress with a long text code.', 'పొడవాటి టెక్స్ట్ కోడ్‌తో ప్రోగ్రెస్ తరలించండి.'),
         `<div class="btn-pair"><button class="btn ghost" data-act="export">${tr('Export', 'ఎక్స్‌పోర్ట్')}</button><button class="btn ghost" data-act="import">${tr('Import', 'ఇంపోర్ట్')}</button></div>`, 'setting')}
+      ${rowHtml('shield', tr('Privacy policy', 'గోప్యతా విధానం'), tr('What the game stores and why.', 'గేమ్ ఏమి సేవ్ చేస్తుంది, ఎందుకు.'), `<a class="btn ghost" href="privacy.html" target="_blank" rel="noopener">${tr('Open', 'తెరువు')}</a>`, 'setting')}
       ${rowHtml('trash', tr('Hard reset', 'పూర్తి రీసెట్'), tr('Wipes ALL progress including investors, worlds and gems.', 'ఇన్వెస్టర్లు, ప్రపంచాలు, జెమ్స్‌తో సహా అంతా తొలగిస్తుంది.'), `<button class="btn red" data-act="reset">${tr('Reset', 'రీసెట్')}</button>`, 'setting')}
     </div>`;
 }
@@ -2568,6 +2621,8 @@ document.addEventListener('click', e => {
     case 'notify-help': modal(notifyHelpHtml()); break;
     case 'notify-later': closeModal(); save(); break;
     case 'scratch': openScratch(); break;
+    case 'ad': watchAd(); break;
+    case 'ad-go': { const f = pendingShowAd; pendingShowAd = null; closeModal(); if (f) f(); break; }
     case 'scratch-buy': buyScratch(); break;
     case 'scratch-reveal': revealScratch(); break;
     case 'stock-buy': buyStock(+el.dataset.k, +el.dataset.f); renderTab(); break;
@@ -2794,6 +2849,7 @@ pendingChallenge = readChallengeParam();
 if (pendingChallenge && !(S.challenge && !S.challenge.won && S.challenge.score === pendingChallenge.score && S.challenge.name === pendingChallenge.name)) queueModal(challengeInviteHtml);
 updateMusicBtn();
 pingPlayers();
+initAds();
 // Browsers only allow sound after the player touches the page
 document.addEventListener('pointerdown', () => Music.start(), { once: true });
 window.addEventListener('beforeunload', save);

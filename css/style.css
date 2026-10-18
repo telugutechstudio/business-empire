@@ -501,6 +501,8 @@ a.btn { text-decoration: none; display: inline-block; }
 .share-bar .btn .i3d { width: 22px; height: 22px; }
 .hype.share { background: linear-gradient(180deg, #6fe0c0, #1fa58a); box-shadow: 0 4px 0 #0f6b58, 0 8px 16px rgba(31, 165, 138, .3); }
 
+.hype.ad { background: linear-gradient(180deg, #7ee0ff, #1f9ad1); box-shadow: 0 4px 0 #11628a, 0 8px 16px rgba(31, 154, 209, .3); }
+
 /* Scratch card */
 .hype.scratch { background: linear-gradient(180deg, #ffb26b, #e0602f); box-shadow: 0 4px 0 #9a3a14, 0 8px 16px rgba(224, 96, 47, .3); }
 .scratch-card { position: relative; width: min(320px, 82vw); aspect-ratio: 3 / 2; margin: 12px auto 4px; border-radius: 16px; overflow: hidden;
