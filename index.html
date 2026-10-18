@@ -36,6 +36,7 @@
     <div class="currencies">
       <div class="pill inv" title="Investors (each boosts all profits)"><span data-ico="necktie"></span><b id="investors">0</b><small id="investorBonus">+0%</small></div>
       <div class="pill gem" title="Gems"><span data-ico="gem"></span><b id="gems">0</b></div>
+      <button class="music-btn" id="musicBtn" data-act="music" aria-label="Music"><span data-ico="notes"></span></button>
     </div>
   </header>
 
@@ -91,6 +92,12 @@
 
 <button id="briefcase" class="briefcase hidden" data-act="briefcase" aria-label="Golden briefcase"><span data-ico="briefcase"></span></button>
 <canvas id="fx" aria-hidden="true"></canvas>
+<div id="tutHand" class="tut-hand hidden" aria-hidden="true"><span data-ico="hand"></span></div>
+<div id="tutor" class="tutor hidden" role="status">
+  <span data-ico="grad" class="tutor-ico"></span>
+  <div id="tutorText" class="tutor-text"></div>
+  <div class="tutor-btns"><button class="btn gold hidden" id="tutorNext" data-act="tut-next">Finish</button><button class="btn ghost" id="tutorSkip" data-act="tut-skip">Skip</button></div>
+</div>
 <div id="toasts" class="toasts"></div>
 <div id="modal" class="modal hidden"><div class="modal-card" id="modalBody"></div></div>
 

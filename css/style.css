@@ -500,6 +500,44 @@ a.btn { text-decoration: none; display: inline-block; }
 .share-bar .btn .i3d { width: 22px; height: 22px; }
 .hype.share { background: linear-gradient(180deg, #6fe0c0, #1fa58a); box-shadow: 0 4px 0 #0f6b58, 0 8px 16px rgba(31, 165, 138, .3); }
 
+/* Music button */
+.music-btn { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(180deg, var(--card2), var(--card)); border: 1px solid var(--border); }
+.music-btn .i3d { width: 26px; height: 26px; animation: float 2.4s ease-in-out infinite; }
+.music-btn.off .i3d { filter: grayscale(1); opacity: .45; animation: none; }
+.music-btn.off::after { content: ''; position: absolute; width: 26px; height: 3px; background: var(--red); transform: rotate(-45deg); border-radius: 2px; }
+.music-btn { position: relative; }
+
+/* Tutorial */
+.tut-focus { position: relative; z-index: 30; box-shadow: 0 0 0 3px var(--gold), 0 0 26px 6px rgba(255, 200, 61, .65) !important; animation: tutGlow 1.2s ease-in-out infinite !important; border-radius: 14px; }
+.tut-hand { position: fixed; z-index: 70; pointer-events: none; animation: tutPoint .9s ease-in-out infinite; transition: left .3s, top .3s; }
+.tut-hand .i3d { width: 44px; height: 44px; }
+.tutor {
+  position: fixed; z-index: 70; left: 50%; bottom: 60px; transform: translateX(-50%); width: min(560px, calc(100vw - 24px));
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+  background: linear-gradient(135deg, #3a2a8a, #1b3f63); border: 2px solid var(--gold); border-radius: 18px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .55); animation: pop3d .4s ease-out;
+}
+.tutor-ico { width: 46px; height: 46px; flex: none; animation: float 2.6s ease-in-out infinite; }
+.tutor-text { flex: 1; font-size: 15px; line-height: 1.35; }
+.tutor-text b { color: var(--gold); display: block; font-size: 12px; }
+.tutor-btns { display: flex; flex-direction: column; gap: 6px; }
+.tutor-btns .btn { padding: 6px 12px; font-size: 13px; }
+
+/* Festivals */
+.chip.fest { display: inline-flex; align-items: center; gap: 4px; border-color: #ff9a3c; color: #ffd7a8; background: linear-gradient(90deg, rgba(255, 140, 40, .25), rgba(28, 34, 64, .9)); cursor: pointer; box-shadow: 0 0 14px rgba(255, 154, 60, .35); }
+.chip.fest .i3d { width: 20px; height: 20px; animation: wiggle 1.5s infinite; }
+.fest-gift { display: flex; gap: 12px; align-items: center; justify-content: center; background: #0b0e1c; border: 1px dashed var(--gold); border-radius: 14px; padding: 10px; margin-top: 8px; }
+.fest-gift .i3d { width: 44px; height: 44px; }
+.fest-float { position: fixed; top: -70px; z-index: 2; pointer-events: none; opacity: .85; animation: festFall linear forwards; }
+.fest-float .i3d { width: 46px; height: 46px; }
+body[data-fest="sankranti"] .fest-float { animation-name: festRise; top: auto; bottom: -70px; }
+.players-today { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 12px; padding: 6px 12px; border-radius: 999px; background: rgba(47, 210, 122, .12); border: 1px solid var(--green2); color: #bff5d6; }
+.players-today .i3d { width: 24px; height: 24px; }
+@keyframes tutGlow { 0%, 100% { box-shadow: 0 0 0 3px var(--gold), 0 0 18px 4px rgba(255, 200, 61, .5); } 50% { box-shadow: 0 0 0 5px var(--gold), 0 0 34px 10px rgba(255, 200, 61, .8); } }
+@keyframes tutPoint { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(10px); } }
+@keyframes festFall { from { transform: translate(0, 0) rotate(-15deg); } to { transform: translate(var(--drift), calc(100vh + 140px)) rotate(15deg); } }
+@keyframes festRise { from { transform: translate(0, 0) rotate(-10deg); } to { transform: translate(var(--drift), calc(-100vh - 140px)) rotate(10deg); } }
+
 /* ---------- Briefcase / toasts / modal ---------- */
 .briefcase { position: fixed; z-index: 40; filter: drop-shadow(0 0 18px rgba(255, 200, 61, .95)); animation: caseBob 1.2s ease-in-out infinite; }
 .briefcase .i3d { width: 64px; height: 64px; }
@@ -613,5 +651,8 @@ a.btn { text-decoration: none; display: inline-block; }
   .lb-rank .i3d { width: 32px; height: 32px; }
   .lb-me { flex-wrap: wrap; }
   .lb-actions { margin-left: 0; width: 100%; }
-  .toasts { left: 12px; right: 12px; bottom: 130px; align-items: stretch; }
+  .toasts { left: 12px; right: 12px; top: 112px; bottom: auto; align-items: stretch; }
+  .tutor { bottom: 128px; }
+  .music-btn { width: 34px; height: 34px; }
+  .currencies { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; max-width: 150px; }
 }

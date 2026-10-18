@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '2.1';
+const GAME_VERSION = '2.2';
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
 let S = null; // game state, initialised below
@@ -49,6 +49,10 @@ const ICONS = {
   flag: ['Chequered flag', '🏁'], runner: ['Person running', '🏃', 1], trash: ['Wastebasket', '🗑️'], crescent: ['Crescent moon', '🌙'],
   speech: ['Speech balloon', '💬'], cloud: ['Cloud', '☁️'], link: ['Link', '🔗'], outbox: ['Outbox tray', '📤'], inbox: ['Inbox tray', '📥'],
   key: ['Key', '🔑'], letter: ['Love letter', '💌'],
+  kite: ['Kite', '🪁'], diya: ['Diya lamp', '🪔'], xmas: ['Christmas tree', '🎄'], fireworks: ['Fireworks', '🎆'], sparkler: ['Sparkler', '🎇'],
+  elephant: ['Elephant', '🐘'], bow: ['Bow and arrow', '🏹'], mango: ['Mango', '🥭'], lotus: ['Lotus', '🪷'], hibiscus: ['Hibiscus', '🌺'],
+  note: ['Musical note', '🎵'], notes: ['Musical notes', '🎶'], hand: ['Backhand index pointing down', '👇', 1], people: ['Busts in silhouette', '👥'],
+  calendar: ['Spiral calendar', '🗓️'], grad: ['Graduation cap', '🎓'],
 };
 function iconUrl(key) {
   const d = ICONS[key];
@@ -260,9 +264,11 @@ function defaultState() {
     spin: { freeAt: 0 },
     player: { id: '', name: '' },
     cloud: { code: '', lastSync: 0 },
+    tutorial: { step: 0, done: false },
+    festivals: {},
     stats: { clicks: 0, briefcases: 0, prestiges: 0, upgradesBought: 0, playTime: 0, bestRun: 0, missionsDone: 0, spins: 0, dailyClaims: 0, shares: 0 },
     boosts: { hype: 0, hypeCd: 0, rush: 0, golden: 0 },
-    settings: { sound: true, notation: 'suffix', buyMode: '1', lang: defaultLang() },
+    settings: { sound: true, music: true, notation: 'suffix', buyMode: '1', lang: defaultLang() },
     lastSave: Date.now(),
     created: Date.now(),
   });
@@ -300,6 +306,9 @@ function mergeState(saved) {
   out.spin = Object.assign({ freeAt: 0 }, saved.spin || {});
   out.player = Object.assign({ id: '', name: '' }, saved.player || {});
   out.cloud = Object.assign({ code: '', lastSync: 0 }, saved.cloud || {});
+  out.festivals = saved.festivals || {};
+  // Players from before the tutorial existed don't need it
+  out.tutorial = saved.tutorial ? Object.assign({ step: 0, done: false }, saved.tutorial) : { step: 0, done: (+saved.lifetime || 0) > 5000 };
   out.world = WORLDS.some(w => w.id === saved.world) ? saved.world : 'earth';
   out.worldsUnlocked = Object.assign({ earth: true }, saved.worldsUnlocked || {});
   out.worldRuns = {};
@@ -388,6 +397,7 @@ function globalMult(temp = true) {
   for (const u of UPGRADES) if (u.target === -1 && S.upgrades[u.id]) m *= u.mult;
   for (const u of INVESTOR_UPGRADES) if (u.type === 'profit' && S.investorUpgrades[u.id]) m *= u.mult;
   m *= Math.pow(2, S.gemGolden);
+  if (activeFestival()) m *= 2;
   const lo = minOwned();
   for (const g of GLOBAL_MILESTONES) if (lo >= g) m *= 2;
   if (temp) {
@@ -600,6 +610,7 @@ function applyWorld(id) {
   const wn = $('worldName');
   if (wn) wn.textContent = nm(WORLD);
   Stars.setWorld(WORLD.id);
+  Music.setWorld(WORLD.id);
 }
 function unlockWorld(id) {
   const w = worldDef(id);
@@ -1032,6 +1043,266 @@ function copyText(text) {
   else done();
 }
 
+/* ---------------------------- MUSIC --------------------------------- */
+// Background music made live with WebAudio (no audio files): a 4-bar loop per world.
+const Music = (() => {
+  const _ = null;
+  const SONGS = {
+    earth: { bpm: 108, wave: 'triangle', echo: 0.18,
+      chords: [[60, 64, 67], [57, 60, 64], [53, 57, 60], [55, 59, 62]],
+      lead: [72, _, 76, _, 79, _, 76, 74, 72, _, 69, _, 72, _, 76, _, 77, _, 76, _, 74, _, 72, _, 74, _, 71, _, 67, _, _, _] },
+    moon: { bpm: 78, wave: 'sine', echo: 0.38,
+      chords: [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]],
+      lead: [76, _, _, _, 72, _, _, _, 77, _, _, _, 76, _, _, _, 79, _, _, _, 76, _, _, _, 74, _, _, _, _, _, _, _] },
+    mars: { bpm: 122, wave: 'square', echo: 0.22,
+      chords: [[62, 65, 69], [58, 62, 65], [60, 64, 67], [57, 61, 64]],
+      lead: [74, _, 74, 77, _, 74, 72, _, 70, _, 70, 74, _, 72, 70, _, 72, _, 72, 76, _, 74, 72, _, 73, _, _, 69, _, _, _, _] },
+  };
+  let ctx = null, master = null, echo = null, noise = null, timer = null, step = 0, nextTime = 0, song = SONGS.earth;
+  const freq = m => 440 * Math.pow(2, (m - 69) / 12);
+  function setup() {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    ctx = actx;
+    master = ctx.createGain();
+    master.gain.value = 0.11;
+    master.connect(ctx.destination);
+    echo = ctx.createDelay(1);
+    const fb = ctx.createGain();
+    fb.gain.value = 0.3;
+    echo.connect(fb).connect(echo);
+    echo.connect(master);
+    noise = ctx.createBuffer(1, ctx.sampleRate * 0.2, ctx.sampleRate);
+    const data = noise.getChannelData(0);
+    for (let k = 0; k < data.length; k++) data[k] = Math.random() * 2 - 1;
+  }
+  function tone(t, midi, dur, type, vol, toEcho) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq(midi), t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g);
+    if (type === 'square') {
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 1400;
+      g.connect(lp); lp.connect(master); if (toEcho) lp.connect(echo);
+    } else { g.connect(master); if (toEcho) g.connect(echo); }
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  function kick(t) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.frequency.setValueAtTime(130, t);
+    o.frequency.exponentialRampToValueAtTime(40, t + 0.15);
+    g.gain.setValueAtTime(0.5, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+    o.connect(g).connect(master);
+    o.start(t); o.stop(t + 0.22);
+  }
+  function hat(t, vol) {
+    const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = noise; f.type = 'highpass'; f.frequency.value = 7000;
+    g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    s.connect(f).connect(g).connect(master);
+    s.start(t); s.stop(t + 0.06);
+  }
+  function playStep(t) {
+    const eighth = 60 / song.bpm / 2;
+    const bar = Math.floor(step / 8) % 4, pos = step % 8;
+    const chord = song.chords[bar];
+    if (pos === 0) chord.forEach(n => tone(t, n, eighth * 8, 'sine', 0.05, false));       // pad
+    if (pos === 0 || pos === 4) tone(t, chord[0] - 24, eighth * 3, 'triangle', 0.18, false); // bass
+    tone(t, chord[pos % 3] + 12, eighth * 0.9, song.wave, 0.025, false);                  // arpeggio
+    const ln = song.lead[step % 32];
+    if (ln) tone(t, ln, eighth * 1.8, song.wave, 0.07, true);                              // melody
+    if (song !== SONGS.moon) { if (pos === 0 || pos === 4) kick(t); if (pos % 2 === 1) hat(t, 0.05); }
+    else if (pos === 0) hat(t, 0.03);
+  }
+  function schedule() {
+    while (nextTime < ctx.currentTime + 0.25) {
+      playStep(nextTime);
+      nextTime += 60 / song.bpm / 2;
+      step = (step + 1) % 32;
+    }
+  }
+  return {
+    start() {
+      if (!S.settings.music || document.hidden) return;
+      try {
+        if (!ctx) setup();
+        ctx.resume();
+        if (timer) return;
+        echo.delayTime.value = song.echo;
+        nextTime = ctx.currentTime + 0.1;
+        timer = setInterval(schedule, 60);
+      } catch (e) { /* audio unavailable */ }
+    },
+    stop() { clearInterval(timer); timer = null; },
+    setWorld(id) { song = SONGS[id] || SONGS.earth; if (echo) echo.delayTime.value = song.echo; },
+    get playing() { return !!timer; },
+  };
+})();
+function toggleMusic() {
+  S.settings.music = !S.settings.music;
+  if (S.settings.music) Music.start(); else Music.stop();
+  updateMusicBtn();
+  if (activeTab === 'settings') renderTab();
+  save();
+}
+function updateMusicBtn() {
+  const b = $('musicBtn');
+  if (b) { b.classList.toggle('off', !S.settings.music); b.title = S.settings.music ? tr('Music on', 'మ్యూజిక్ ఆన్') : tr('Music off', 'మ్యూజిక్ ఆఫ్'); }
+}
+
+/* ---------------------------- FESTIVALS ----------------------------- */
+// Lunar festival dates are listed per year; fixed ones use MM-DD. Each runs for a few days around the date.
+const FESTIVALS = [
+  { id: 'newyear',   icon: 'fireworks', name: ['New Year', 'నూతన సంవత్సరం'], dates: ['01-01'], before: 1, after: 1,
+    greet: ['Happy New Year!', 'నూతన సంవత్సర శుభాకాంక్షలు!'] },
+  { id: 'sankranti', icon: 'kite',      name: ['Sankranti', 'సంక్రాంతి'], dates: ['01-14'], before: 1, after: 2,
+    greet: ['Happy Sankranti!', 'సంక్రాంతి శుభాకాంక్షలు!'] },
+  { id: 'ugadi',     icon: 'mango',     name: ['Ugadi', 'ఉగాది'], dates: ['2026-03-19', '2027-04-07', '2028-03-27'], before: 2, after: 2,
+    greet: ['Happy Ugadi!', 'ఉగాది శుభాకాంక్షలు!'] },
+  { id: 'ganesh',    icon: 'elephant',  name: ['Vinayaka Chavithi', 'వినాయక చవితి'], dates: ['2026-09-14', '2027-09-04', '2028-08-23'], before: 2, after: 3,
+    greet: ['Happy Vinayaka Chavithi!', 'వినాయక చవితి శుభాకాంక్షలు!'] },
+  { id: 'dasara',    icon: 'bow',       name: ['Dasara', 'దసరా'], dates: ['2026-10-20', '2027-10-09', '2028-09-27'], before: 3, after: 3,
+    greet: ['Happy Dasara!', 'దసరా శుభాకాంక్షలు!'] },
+  { id: 'diwali',    icon: 'diya',      name: ['Diwali', 'దీపావళి'], dates: ['2026-11-08', '2027-10-29', '2028-10-17'], before: 3, after: 2,
+    greet: ['Happy Diwali!', 'దీపావళి శుభాకాంక్షలు!'] },
+  { id: 'christmas', icon: 'xmas',      name: ['Christmas', 'క్రిస్మస్'], dates: ['12-25'], before: 2, after: 2,
+    greet: ['Merry Christmas!', 'క్రిస్మస్ శుభాకాంక్షలు!'] },
+];
+const FEST_FLOATERS = { newyear: ['fireworks', 'sparkler', 'party'], sankranti: ['kite', 'kite', 'sun'], ugadi: ['mango', 'hibiscus', 'seedling'],
+  ganesh: ['elephant', 'lotus', 'hibiscus'], dasara: ['bow', 'hibiscus', 'diya'], diwali: ['diya', 'sparkler', 'fireworks'], christmas: ['xmas', 'gift', 'star'] };
+let festCache = { min: -1, value: null };
+function activeFestival() {
+  const min = Math.floor(Date.now() / 60000);
+  if (festCache.min === min) return festCache.value;
+  const now = new Date(), y = now.getFullYear();
+  let found = null;
+  for (const f of FESTIVALS) {
+    for (const d of f.dates) {
+      const list = d.length === 5 ? [y - 1, y, y + 1].map(yy => `${yy}-${d}`) : [d];
+      for (const ds of list) {
+        const [yy, mm, dd] = ds.split('-').map(Number);
+        const start = new Date(yy, mm - 1, dd - f.before), end = new Date(yy, mm - 1, dd + f.after + 1);
+        if (now >= start && now < end) { found = { fest: f, key: `${f.id}-${yy}`, end }; break; }
+      }
+      if (found) break;
+    }
+    if (found) break;
+  }
+  festCache = { min, value: found };
+  return found;
+}
+function festivalHtml() {
+  const a = activeFestival();
+  if (!a) return '';
+  const f = a.fest, claimed = !!S.festivals[a.key];
+  const left = fmtDur((a.end - Date.now()) / 1000);
+  return `${ico(f.icon, 'big-ico')}<h3>${tr(...f.greet)}</h3>
+    <p>${tr(`The <b>${f.name[0]}</b> festival is on! <b>All profits x2</b> for ${left}.`, `<b>${f.name[1]}</b> పండుగ వచ్చింది! ${left} వరకు <b>అన్ని లాభాలు x2</b>.`)}</p>
+    <div class="fest-gift">${ico('gift')}<div><b>${tr('Festival gift', 'పండుగ కానుక')}</b><br>💎 25 + ${tr('30 min income', '30 నిమి ఆదాయం')}</div></div>
+    <div class="modal-actions">${claimed ? `<button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button>`
+      : `<button class="btn gold" data-act="fest-claim">${tr('Claim gift!', 'కానుక తీసుకోండి!')}</button>`}</div>`;
+}
+function claimFestival() {
+  const a = activeFestival();
+  if (!a || S.festivals[a.key]) return;
+  S.festivals[a.key] = Date.now();
+  S.gems += 25;
+  earn(bonusCash(1800));
+  sfx('win');
+  toast(`${emo(a.fest.icon)} ${tr(...a.fest.greet)} +25 💎`, 'gem');
+  confetti(null, 220);
+  save();
+}
+let floaterAcc = 0;
+function festivalFloaters(dt) {
+  const a = activeFestival();
+  document.body.dataset.fest = a ? a.fest.id : '';
+  if (!a || REDUCED_MOTION || document.hidden) return;
+  if ((floaterAcc += dt) < 4) return;
+  floaterAcc = 0;
+  const icons = FEST_FLOATERS[a.fest.id] || [a.fest.icon];
+  const el = document.createElement('div');
+  el.className = 'fest-float';
+  el.innerHTML = ico(icons[Math.floor(Math.random() * icons.length)]);
+  el.style.left = rand(2, 92) + 'vw';
+  el.style.setProperty('--drift', rand(-60, 60) + 'px');
+  el.style.animationDuration = rand(9, 14) + 's';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 15000);
+}
+
+/* ---------------------------- TUTORIAL ------------------------------ */
+// Short guided start. Each step points at one thing and moves on when the player has done it.
+const TUTORIAL = [
+  { target: () => cards[0] && cards[0].el.querySelector('.biz-icon'), done: () => S.stats.clicks >= 1,
+    text: ['Tap your Tea Stall to make money!', 'డబ్బు సంపాదించడానికి మీ టీ స్టాల్ ట్యాప్ చేయండి!'] },
+  { target: () => cards[0] && cards[0].buyBtn, done: () => S.biz[0].owned >= 3,
+    text: ['Buy more Tea Stalls — more stalls, more money.', 'ఇంకా టీ స్టాల్స్ కొనండి — ఎక్కువ స్టాల్స్, ఎక్కువ డబ్బు.'] },
+  { target: () => cards[1] && (S.cash >= costFor(1, 1) ? cards[1].buyBtn : cards[0].el.querySelector('.biz-icon')), done: () => S.biz[1].owned >= 1,
+    text: ['Save 60 cash and unlock the Food Truck!', '60 క్యాష్ కూడబెట్టి ఫుడ్ ట్రక్ అన్‌లాక్ చేయండి!'] },
+  { target: () => activeTab === 'managers' ? document.querySelector('#tab-managers [data-act=hire]') : document.querySelector('.tab-btn[data-tab=managers]'),
+    done: () => S.biz.some(b => b.manager),
+    text: ['Hire a manager (1K) — they run your business for you, even offline!', 'మేనేజర్‌ను నియమించండి (1K) — మీ బదులు వ్యాపారం నడుపుతారు, ఆఫ్‌లైన్‌లో కూడా!'] },
+  { target: () => document.querySelector('.tab-btn[data-tab=missions]'), done: () => false, finish: true,
+    text: ['Great job, boss! Do Missions, claim Daily rewards and spin the wheel for gems.', 'సూపర్ బాస్! మిషన్లు చేయండి, డైలీ రివార్డ్ తీసుకోండి, జెమ్స్ కోసం వీల్ తిప్పండి.'] },
+];
+let tutFocus = null;
+function updateTutorial() {
+  const box = $('tutor');
+  const off = S.tutorial.done || S.world !== 'earth' || !$('modal').classList.contains('hidden');
+  if (off) { box.classList.add('hidden'); setTutFocus(null); return; }
+  let st = TUTORIAL[S.tutorial.step];
+  while (st && st.done()) { S.tutorial.step++; st = TUTORIAL[S.tutorial.step]; sfx('cash'); }
+  if (!st) { S.tutorial.done = true; box.classList.add('hidden'); setTutFocus(null); return; }
+  // On the wrong tab, point back at Businesses first
+  const onRightTab = st.finish || activeTab === 'business' || (S.tutorial.step === 3 && activeTab === 'managers');
+  const target = onRightTab ? st.target() : document.querySelector('.tab-btn[data-tab=business]');
+  setTutFocus(target);
+  box.classList.remove('hidden');
+  setHTML($('tutorText'), `<b>${tr('Step', 'స్టెప్')} ${S.tutorial.step + 1}/${TUTORIAL.length}</b> ${tr(...st.text)}`);
+  $('tutorNext').classList.toggle('hidden', !st.finish);
+  $('tutorNext').textContent = tr('Finish', 'పూర్తి');
+  $('tutorSkip').textContent = tr('Skip', 'స్కిప్');
+  placeHand(target);
+}
+function setTutFocus(el) {
+  if (tutFocus === el) return;
+  if (tutFocus) tutFocus.classList.remove('tut-focus');
+  tutFocus = el;
+  if (el) el.classList.add('tut-focus');
+}
+function placeHand(target) {
+  const hand = $('tutHand');
+  if (!target || !target.getBoundingClientRect().width) { hand.classList.add('hidden'); return; }
+  const r = target.getBoundingClientRect();
+  hand.classList.remove('hidden');
+  hand.style.left = (r.left + r.width / 2 - 22) + 'px';
+  hand.style.top = (r.top - 50) + 'px';
+}
+function endTutorial() {
+  S.tutorial.done = true;
+  updateTutorial();
+  $('tutHand').classList.add('hidden');
+  save();
+}
+
+/* ---------------------------- PLAYER COUNT -------------------------- */
+let playersToday = null;
+async function pingPlayers() {
+  try {
+    const res = await fetch('/api/players', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: S.player.id }) });
+    if (!res.ok || !(res.headers.get('content-type') || '').includes('json')) return;
+    const out = await res.json();
+    playersToday = out.today;
+    if (activeTab === 'leaderboard') renderTab();
+  } catch (e) { /* offline */ }
+}
+
 /* ---------------------------- FX: STARS, COINS, CONFETTI ------------ */
 const Stars = (() => {
   const cv = document.getElementById('stars');
@@ -1425,7 +1696,8 @@ function renderLeaderboard() {
       <div class="lb-actions"><button class="btn ghost" data-act="lb-rename">${tr('Rename', 'పేరు మార్చు')}</button><button class="btn" data-act="lb-refresh">${tr('Refresh', 'రిఫ్రెష్')}</button></div></div>
       <div class="lb-list">${rows}</div>`;
   }
-  return header('trophy', tr('Leaderboard', 'లీడర్‌బోర్డ్'), tr('Top bosses by lifetime earnings. Your score updates every minute.', 'మొత్తం సంపాదన బట్టి టాప్ బాస్‌లు. మీ స్కోర్ ప్రతి నిమిషం అప్‌డేట్ అవుతుంది.')) + body;
+  const online = playersToday ? `<div class="players-today">${ico('people')} ${tr(`<b>${fmtInt(playersToday)}</b> players today`, `ఈ రోజు <b>${fmtInt(playersToday)}</b> మంది ఆడారు`)}</div>` : '';
+  return header('trophy', tr('Leaderboard', 'లీడర్‌బోర్డ్'), tr('Top bosses by lifetime earnings. Your score updates every minute.', 'మొత్తం సంపాదన బట్టి టాప్ బాస్‌లు. మీ స్కోర్ ప్రతి నిమిషం అప్‌డేట్ అవుతుంది.')) + online + body;
 }
 function renderShop() {
   const rows = GEM_SHOP.map(g => {
@@ -1501,6 +1773,8 @@ function renderSettings() {
     `<div class="list">
       ${rowHtml('speech', tr('Language', 'భాష'), tr('Play in English or Telugu.', 'ఇంగ్లీష్ లేదా తెలుగులో ఆడండి.'),
         `<div class="seg-toggle"><button class="${isTe() ? '' : 'on'}" data-act="lang" data-id="en">English</button><button class="${isTe() ? 'on' : ''}" data-act="lang" data-id="te">తెలుగు</button></div>`, 'setting')}
+      ${rowHtml('notes', tr('Music', 'మ్యూజిక్'), tr('A different tune on every world.', 'ప్రతి ప్రపంచానికి వేరే పాట.'), `<button class="btn ghost" data-act="music">${S.settings.music ? tr('On', 'ఆన్') : tr('Off', 'ఆఫ్')}</button>`, 'setting')}
+      ${rowHtml('grad', tr('Tutorial', 'ట్యుటోరియల్'), tr('Show the step-by-step guide again.', 'స్టెప్-బై-స్టెప్ గైడ్ మళ్ళీ చూపించు.'), `<button class="btn ghost" data-act="tut-replay">${tr('Replay', 'మళ్ళీ చూడు')}</button>`, 'setting')}
       ${cloudBox}
       ${rowHtml('letter', tr('Share the game', 'గేమ్ షేర్ చేయండి'), tr('Invite friends on WhatsApp and more.', 'WhatsApp లో స్నేహితులను ఆహ్వానించండి.'), `<button class="btn gold" data-act="share">${tr('Share', 'షేర్')}</button>`, 'setting')}
       ${rowHtml('phone', tr('Install as app', 'యాప్‌గా ఇన్‌స్టాల్'), tr('Add Business Empire to your phone or PC home screen. Works offline.', 'ఫోన్/PC హోమ్ స్క్రీన్‌కు యాడ్ చేయండి. ఆఫ్‌లైన్‌లో కూడా పనిచేస్తుంది.'), `<button class="btn gold" data-act="install">${tr('Install', 'ఇన్‌స్టాల్')}</button>`, 'setting')}
@@ -1549,6 +1823,8 @@ function updateHeader() {
   if (S.boosts.rush > 0) chips.push(`<span class="chip blue">⚡ x2 · ${fmtClock(S.boosts.rush)}</span>`);
   if (S.boosts.golden > 0) chips.push(`<span class="chip gold">✨ x5 · ${fmtClock(S.boosts.golden)}</span>`);
   if (marketEvent) chips.push(`<span class="chip hot">📈 ${emo(BUSINESSES[marketEvent.biz].icon)} x3 · ${fmtClock(marketEvent.remaining)}</span>`);
+  const fest = activeFestival();
+  if (fest) chips.push(`<button class="chip fest" data-act="festival">${ico(fest.fest.icon)} ${tr(...fest.fest.name)} x2</button>`);
   chips.push(`<span class="chip total">${tr('Total', 'మొత్తం')} x${fmt(globalMult())}</span>`);
   setHTML($('chips'), chips.join(''));
 
@@ -1642,6 +1918,11 @@ document.addEventListener('click', e => {
     case 'mclaim': claimMission(id); renderTab(); break;
     case 'mskip': skipMission(id); renderTab(); break;
     case 'lang': setLang(id); break;
+    case 'music': toggleMusic(); break;
+    case 'festival': if (activeFestival()) modal(festivalHtml()); break;
+    case 'fest-claim': claimFestival(); closeModal(); break;
+    case 'tut-skip': case 'tut-next': endTutorial(); break;
+    case 'tut-replay': S.tutorial = { step: 0, done: false }; switchTab('business'); toast(tr('📖 Tutorial restarted!', '📖 ట్యుటోరియల్ మళ్ళీ మొదలైంది!'), 'good'); break;
     case 'share': shareGame(); break;
     case 'share-done': shareDone(); closeModal(); break;
     case 'share-copy': copyText(location.origin + '/'); shareDone(); break;
@@ -1757,8 +2038,9 @@ function frame(now) {
   tick(dt);
   updateBizBars();
   Stars.draw(Math.min(dt, 0.05));
+  festivalFloaters(Math.min(dt, 1));
   textAcc += dt; slowAcc += dt; saveAcc += dt; newsAcc += dt;
-  if (textAcc >= 0.1) { textAcc = 0; updateHeader(); if (activeTab === 'business') updateBizText(); }
+  if (textAcc >= 0.1) { textAcc = 0; updateHeader(); if (activeTab === 'business') updateBizText(); updateTutorial(); }
   if (slowAcc >= 0.5) {
     slowAcc = 0;
     refreshAffordability();
@@ -1824,9 +2106,15 @@ updateDots();
 if (hadSave) offlineEarnings();
 else modal(welcomeHtml());
 if (canClaimDaily()) queueModal(dailyHtml);
+{ const f = activeFestival(); if (f && !S.festivals[f.key]) queueModal(festivalHtml); }
+updateMusicBtn();
+pingPlayers();
+// Browsers only allow sound after the player touches the page
+document.addEventListener('pointerdown', () => Music.start(), { once: true });
 window.addEventListener('beforeunload', save);
 document.addEventListener('visibilitychange', () => {
-  if (!document.hidden) return;
+  if (!document.hidden) { Music.start(); return; }
+  Music.stop();
   save();
   if (S.cloud.code && Date.now() - cloudLastAuto > 15000) cloudSave(false);
 });

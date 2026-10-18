@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="te">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Player Stats</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+Tammudu+2:wght@400;600;700&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg: #0b0e1e; --card: #1c2240; --border: #323b6b; --text: #eef1ff; --muted: #9aa2c8; --gold: #ffc83d; --green: #2fd27a; --blue: #4da3ff; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: radial-gradient(800px 400px at 80% -10%, #3a2690, transparent 70%), var(--bg); color: var(--text);
+      font-family: 'Fredoka', 'Baloo Tammudu 2', system-ui, sans-serif; min-height: 100vh; }
+    main { max-width: 900px; margin: 0 auto; padding: 24px 16px 40px; }
+    h1 { margin: 0 0 4px; font-size: 28px; }
+    .sub { color: var(--muted); margin: 0 0 20px; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 18px; }
+    .card { background: linear-gradient(160deg, #262e55, var(--card)); border: 1px solid var(--border); border-radius: 16px; padding: 16px; }
+    .card .n { font-size: 34px; font-weight: 700; color: var(--gold); }
+    .card .l { color: var(--muted); font-size: 14px; }
+    .chart { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 16px; }
+    .chart h2 { margin: 0 0 10px; font-size: 18px; }
+    .legend { display: flex; gap: 16px; color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+    .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+    svg { width: 100%; height: auto; display: block; }
+    .err { color: #ffb0b8; }
+    a { color: var(--blue); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>📊 Business Empire — Players</h1>
+  <p class="sub">ఎంత మంది ఆడుతున్నారు · How many people are playing</p>
+  <div class="cards">
+    <div class="card"><div class="n" id="today">…</div><div class="l">Today / ఈ రోజు ఆడినవారు</div></div>
+    <div class="card"><div class="n" id="newToday">…</div><div class="l">New today / ఈ రోజు కొత్తవారు</div></div>
+    <div class="card"><div class="n" id="week">…</div><div class="l">Last 7 days / గత 7 రోజులు (daily total)</div></div>
+    <div class="card"><div class="n" id="total">…</div><div class="l">All players ever / మొత్తం ప్లేయర్లు</div></div>
+  </div>
+  <div class="chart">
+    <h2>Last 30 days / గత 30 రోజులు</h2>
+    <div class="legend"><span><i style="background:#4da3ff"></i>Players / ప్లేయర్లు</span><span><i style="background:#2fd27a"></i>New / కొత్తవారు</span></div>
+    <div id="chart"></div>
+  </div>
+  <p class="sub" style="margin-top:14px">Days are in UTC. A player is one browser or phone. · <a href="/">Play the game</a></p>
+</main>
+<script>
+(async () => {
+  const $ = id => document.getElementById(id);
+  try {
+    const res = await fetch('/api/players', { cache: 'no-store' });
+    if (!res.ok) throw new Error('status ' + res.status);
+    const d = await res.json();
+    $('today').textContent = d.today;
+    $('newToday').textContent = d.newToday;
+    $('total').textContent = d.total;
+    $('week').textContent = d.days.slice(-7).reduce((a, x) => a + x.active, 0);
+
+    const W = 860, H = 260, pad = 30, n = d.days.length;
+    const max = Math.max(5, ...d.days.map(x => x.active));
+    const bw = (W - pad * 2) / n;
+    let bars = '';
+    d.days.forEach((x, k) => {
+      const hA = (H - pad * 2) * x.active / max, hN = (H - pad * 2) * x.new / max;
+      const bx = pad + k * bw + 2;
+      bars += `<rect x="${bx}" y="${H - pad - hA}" width="${bw - 4}" height="${hA}" rx="3" fill="#4da3ff"><title>${x.day}: ${x.active} players, ${x.new} new</title></rect>`;
+      bars += `<rect x="${bx + (bw - 4) * 0.25}" y="${H - pad - hN}" width="${(bw - 4) * 0.5}" height="${hN}" rx="2" fill="#2fd27a"/>`;
+      if (k % 5 === 0 || k === n - 1) bars += `<text x="${bx + (bw - 4) / 2}" y="${H - 10}" fill="#9aa2c8" font-size="11" text-anchor="middle">${x.day.slice(5)}</text>`;
+    });
+    const grid = [0.25, 0.5, 0.75, 1].map(f => {
+      const y = H - pad - (H - pad * 2) * f;
+      return `<line x1="${pad}" x2="${W - pad}" y1="${y}" y2="${y}" stroke="#323b6b"/><text x="4" y="${y + 4}" fill="#9aa2c8" font-size="11">${Math.round(max * f)}</text>`;
+    }).join('');
+    $('chart').innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Players per day">${grid}${bars}</svg>`;
+  } catch (e) {
+    $('chart').innerHTML = '<p class="err">Could not load stats. This page works on the online site only.</p>';
+  }
+})();
+</script>
+</body>
+</html>
