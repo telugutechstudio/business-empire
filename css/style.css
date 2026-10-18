@@ -513,6 +513,36 @@ a.btn { text-decoration: none; display: inline-block; }
 .chal-ico { width: 56px; height: 56px; animation: wiggle 2.5s ease-in-out infinite; }
 .chal-card .mbar div { background: linear-gradient(90deg, #ff6fa0, var(--gold)); }
 
+/* Pets */
+.pet-status { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 14px; border-radius: var(--radius);
+  background: linear-gradient(135deg, #1f5a3d, #1f2f5c); border: 1px solid #3fae74; animation: rowIn .35s backwards; }
+.pet-status.hungry { background: linear-gradient(135deg, #5c2a1f, #2a1f5c); border-color: #e0703f; }
+.pet-status > .i3d { width: 46px; height: 46px; animation: hop 1.6s infinite; }
+.pet-status .info { flex: 1; }
+.pet-status .btn .i3d { width: 22px; height: 22px; }
+.pet-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; }
+.pet-card {
+  display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; padding: 14px 12px;
+  background: linear-gradient(160deg, var(--card2), var(--card)); border: 1px solid var(--border); border-radius: 18px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, .35); animation: rowIn .35s backwards;
+}
+.pet-card .title { font-weight: 700; font-size: 17px; }
+.pet-card .desc { color: var(--muted); font-size: 13px; min-height: 2.4em; }
+.pet-pic { width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center;
+  background: radial-gradient(circle at 35% 30%, #4a5aa8, #1b2048); box-shadow: inset -6px -10px 18px rgba(0, 0, 0, .5), 0 8px 16px rgba(0, 0, 0, .4); }
+.pet-pic .i3d { width: 72px; height: 72px; animation: petBounce 2s ease-in-out infinite; }
+.pet-card.owned { border-color: #6b5bd0; }
+.pet-card.owned .pet-pic { background: radial-gradient(circle at 35% 30%, #7a6af0, #2a2068); }
+.pet-card.locked .pet-pic .i3d { filter: grayscale(.8) brightness(.6); animation: none; }
+.pet-card.hungry .pet-pic .i3d { animation: petSad 2.4s ease-in-out infinite; filter: saturate(.6); }
+.pet-card:hover .pet-pic .i3d { animation: hop .6s; }
+.pet-lvl { width: 100%; font-size: 12px; color: #c0c7ee; }
+.heart-fly { position: fixed; z-index: 86; pointer-events: none; animation: heartUp 1.4s ease-out forwards; opacity: 0; }
+.heart-fly .i3d { width: 30px; height: 30px; }
+@keyframes petBounce { 0%, 100% { transform: translateY(0) scale(1, 1); } 40% { transform: translateY(-8px) scale(.96, 1.04); } 60% { transform: translateY(0) scale(1.05, .95); } }
+@keyframes petSad { 0%, 100% { transform: rotate(-4deg) translateY(2px); } 50% { transform: rotate(4deg) translateY(2px); } }
+@keyframes heartUp { 0% { opacity: 0; transform: translateY(0) scale(.5); } 20% { opacity: 1; transform: translateY(-15px) scale(1.1); } 100% { opacity: 0; transform: translateY(-90px) scale(.8); } }
+
 /* Music button */
 .music-btn { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(180deg, var(--card2), var(--card)); border: 1px solid var(--border); }
 .music-btn .i3d { width: 26px; height: 26px; animation: float 2.4s ease-in-out infinite; }

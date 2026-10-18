@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '2.3';
+const GAME_VERSION = '2.4';
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
 let S = null; // game state, initialised below
@@ -216,6 +216,9 @@ const ACHIEVEMENTS = (() => {
     () => tr(`Spin the Lucky Wheel ${n} time(s)`, `లక్కీ వీల్‌ను ${n} సార్లు తిప్పండి`), () => (S.stats.spins || 0) >= n));
   add('lb_join', 'trophy', 5, () => tr('On the Board', 'బోర్డు మీద'), () => tr('Join the online leaderboard', 'ఆన్‌లైన్ లీడర్‌బోర్డ్‌లో చేరండి'), () => !!S.player.name);
   add('cloud_on', 'cloud', 5, () => tr('Head in the Clouds', 'క్లౌడ్‌లో సేఫ్'), () => tr('Turn on cloud save', 'క్లౌడ్ సేవ్ ఆన్ చేయండి'), () => !!S.cloud.code);
+  [[1, 'Pet Parent', 'పెట్ పేరెంట్'], [5, 'Pet Lover', 'పెట్ ప్రేమికుడు'], [9, 'Zoo Keeper', 'జూ కీపర్']].forEach(([n, en, te]) => add(`pet_${n}`, 'paws', n === 9 ? 25 : 5,
+    () => tr(en, te), () => tr(`Adopt ${n} pet(s)`, `${n} పెట్(లు) తీసుకోండి`), () => Object.keys(S.pets.owned).length >= n));
+  add('pet_max', 'dragon', 15, () => tr('Best Friends', 'బెస్ట్ ఫ్రెండ్స్'), () => tr('Get a pet to level 10', 'ఒక పెట్‌ను లెవెల్ 10 చేయండి'), () => Object.values(S.pets.owned).some(l => l >= 10));
   add('chal_win', 'swords', 10, () => tr('Challenge Champion', 'ఛాలెంజ్ ఛాంపియన్'), () => tr('Beat a friend\'s challenge', 'స్నేహితుడి ఛాలెంజ్ గెలవండి'), () => !!(S.challenge && S.challenge.won));
   add('share_1', 'letter', 5, () => tr('Spread the Word', 'అందరికీ చెప్పండి'), () => tr('Share the game with a friend', 'గేమ్‌ను స్నేహితుడితో షేర్ చేయండి'), () => (S.stats.shares || 0) >= 1);
   [10, 25, 50].forEach(n => add(`upg_${n}`, 'up', 5, () => tr(`Upgrader ${n}`, `అప్‌గ్రేడర్ ${n}`),
@@ -272,6 +275,7 @@ function defaultState() {
     tutorial: { step: 0, done: false },
     festivals: {},
     challenge: null,
+    pets: { owned: {}, fedAt: 0 },
     stats: { clicks: 0, briefcases: 0, prestiges: 0, upgradesBought: 0, playTime: 0, bestRun: 0, missionsDone: 0, spins: 0, dailyClaims: 0, shares: 0 },
     boosts: { hype: 0, hypeCd: 0, rush: 0, golden: 0 },
     settings: { sound: true, music: true, notation: 'suffix', buyMode: '1', lang: defaultLang() },
@@ -313,6 +317,7 @@ function mergeState(saved) {
   out.player = Object.assign({ id: '', name: '' }, saved.player || {});
   out.cloud = Object.assign({ code: '', lastSync: 0 }, saved.cloud || {});
   out.festivals = saved.festivals || {};
+  out.pets = Object.assign({ owned: {}, fedAt: 0 }, saved.pets || {});
   out.challenge = saved.challenge && typeof saved.challenge === 'object' ? saved.challenge : null;
   // Players from before the tutorial existed don't need it
   out.tutorial = saved.tutorial ? Object.assign({ step: 0, done: false }, saved.tutorial) : { step: 0, done: (+saved.lifetime || 0) > 5000 };
@@ -405,6 +410,7 @@ function globalMult(temp = true) {
   for (const u of INVESTOR_UPGRADES) if (u.type === 'profit' && S.investorUpgrades[u.id]) m *= u.mult;
   m *= Math.pow(2, S.gemGolden);
   if (activeFestival()) m *= 2;
+  m *= petBonus('profit');
   const lo = minOwned();
   for (const g of GLOBAL_MILESTONES) if (lo >= g) m *= 2;
   if (temp) {
@@ -1315,6 +1321,121 @@ function festivalFloaters(dt) {
   setTimeout(() => el.remove(), 15000);
 }
 
+/* ---------------------------- PETS ---------------------------------- */
+// Pets give lasting bonuses. Feed them at least once a day, or a hungry pet only gives half its bonus.
+const PETS = [
+  { id: 'dog',     icon: 'dog',     name: ['Puppy', 'కుక్కపిల్ల'],   kind: 'profit',  per: 0.10, cost: { cash: 1e4 } },
+  { id: 'cat',     icon: 'cat',     name: ['Kitty', 'పిల్లి'],        kind: 'profit',  per: 0.15, cost: { cash: 1e7 } },
+  { id: 'rabbit',  icon: 'rabbit',  name: ['Bunny', 'కుందేలు'],       kind: 'profit',  per: 0.20, cost: { gems: 30 } },
+  { id: 'owl',     icon: 'owl',     name: ['Wise Owl', 'గుడ్లగూబ'],    kind: 'offline', per: 0.25, cost: { cash: 1e10 } },
+  { id: 'panda',   icon: 'panda',   name: ['Panda', 'పాండా'],         kind: 'profit',  per: 0.30, cost: { cash: 1e13 } },
+  { id: 'peacock', icon: 'peacock', name: ['Peacock', 'నెమలి'],       kind: 'gems',    per: 1,    cost: { gems: 80 } },
+  { id: 'tiger',   icon: 'tiger',   name: ['Tiger', 'పులి'],          kind: 'profit',  per: 0.50, cost: { cash: 1e18 } },
+  { id: 'unicorn', icon: 'unicorn', name: ['Unicorn', 'యూనికార్న్'],  kind: 'profit',  per: 0.75, cost: { gems: 200 } },
+  { id: 'dragon',  icon: 'dragon',  name: ['Dragon', 'డ్రాగన్'],      kind: 'profit',  per: 1.50, cost: { gems: 500 } },
+];
+const PET_MAX_LVL = 10;
+const PET_HUNGRY_AFTER = 24 * 3600 * 1000;
+const PET_FEED_EVERY = 4 * 3600 * 1000;
+function petLvl(id) { return S.pets.owned[id] || 0; }
+function petsHungry() { return Date.now() - S.pets.fedAt > PET_HUNGRY_AFTER; }
+function petFeedReady() { return Date.now() - S.pets.fedAt >= PET_FEED_EVERY; }
+function petLevelCost(lvl) { return 5 * lvl; }
+function petBonus(kind) {
+  const happy = petsHungry() ? 0.5 : 1;
+  let m = 1;
+  for (const p of PETS) if (p.kind === kind && petLvl(p.id)) m *= 1 + p.per * petLvl(p.id) * happy;
+  return m;
+}
+function petDesc(p, lvl = Math.max(1, petLvl(p.id))) {
+  const pct = Math.round(p.per * lvl * 100);
+  if (p.kind === 'offline') return tr(`Offline earnings +${pct}%`, `ఆఫ్‌లైన్ సంపాదన +${pct}%`);
+  if (p.kind === 'gems') return tr(`+${lvl} gems every time you feed`, `తినిపించిన ప్రతిసారి +${lvl} జెమ్స్`);
+  return tr(`All profits +${pct}%`, `అన్ని లాభాలు +${pct}%`);
+}
+function buyPet(id) {
+  const p = PETS.find(x => x.id === id);
+  if (!p || petLvl(id)) return;
+  if (p.cost.cash ? S.cash < p.cost.cash : S.gems < p.cost.gems) { sfx('err'); return; }
+  if (p.cost.cash) S.cash -= p.cost.cash; else S.gems -= p.cost.gems;
+  if (!Object.keys(S.pets.owned).length) S.pets.fedAt = Date.now();
+  S.pets.owned[id] = 1;
+  sfx('win');
+  toast(tr(`${emo(p.icon)} ${p.name[0]} joined your family!`, `${emo(p.icon)} ${p.name[1]} మీ కుటుంబంలో చేరింది!`), 'good');
+  confetti(document.querySelector(`[data-pet="${id}"]`), 120);
+}
+function levelPet(id) {
+  const lvl = petLvl(id), cost = petLevelCost(lvl);
+  if (!lvl || lvl >= PET_MAX_LVL || S.gems < cost) { sfx('err'); return; }
+  S.gems -= cost;
+  S.pets.owned[id] = lvl + 1;
+  const p = PETS.find(x => x.id === id);
+  sfx('big');
+  toast(tr(`${emo(p.icon)} ${p.name[0]} reached level ${lvl + 1}!`, `${emo(p.icon)} ${p.name[1]} లెవెల్ ${lvl + 1} చేరింది!`), 'good');
+  sparkBurst(document.querySelector(`[data-pet="${id}"]`), 24);
+}
+function feedPets() {
+  if (!Object.keys(S.pets.owned).length || !petFeedReady()) { sfx('err'); return; }
+  S.pets.fedAt = Date.now();
+  let gems = 0;
+  for (const p of PETS) if (p.kind === 'gems' && petLvl(p.id)) gems += petLvl(p.id);
+  S.gems += gems;
+  S.stats.feeds = (S.stats.feeds || 0) + 1;
+  sfx('win');
+  toast(tr(`🦴 Your pets are happy!${gems ? ` +${gems} 💎` : ''}`, `🦴 మీ పెట్స్ సంతోషంగా ఉన్నాయి!${gems ? ` +${gems} 💎` : ''}`), 'good');
+  document.querySelectorAll('.pet-card.owned').forEach(el => heartBurst(el));
+}
+function petFeedLabel() { return `${tr('Feed in', 'తినిపించడానికి')} ${fmtClock((PET_FEED_EVERY - (Date.now() - S.pets.fedAt)) / 1000)}`; }
+function updatePetTimer() {
+  const b = $('petFeedBtn');
+  if (!b) return;
+  if (petFeedReady()) renderTab(); else b.textContent = petFeedLabel();
+}
+function heartBurst(el) {
+  if (REDUCED_MOTION || !el) return;
+  const c = centerOf(el);
+  for (let k = 0; k < 4; k++) {
+    const h = document.createElement('div');
+    h.className = 'heart-fly';
+    h.innerHTML = ico('heart');
+    h.style.left = (c.x + rand(-30, 30)) + 'px';
+    h.style.top = (c.y + rand(-10, 10)) + 'px';
+    h.style.animationDelay = (k * 0.12) + 's';
+    document.body.appendChild(h);
+    setTimeout(() => h.remove(), 1800);
+  }
+}
+function renderPets() {
+  const ownedCount = Object.keys(S.pets.owned).length;
+  const hungry = petsHungry();
+  const status = !ownedCount ? tr('Adopt your first pet below!', 'కింద మీ మొదటి పెట్‌ను తీసుకోండి!')
+    : hungry ? tr('😢 Your pets are hungry — their bonus is halved. Feed them!', '😢 మీ పెట్స్‌కు ఆకలిగా ఉంది — బోనస్ సగం అయింది. తినిపించండి!')
+    : tr('😊 Your pets are happy. Feed them every day to keep the full bonus.', '😊 మీ పెట్స్ సంతోషంగా ఉన్నాయి. పూర్తి బోనస్ కోసం రోజూ తినిపించండి.');
+  const feedBtn = ownedCount ? (petFeedReady()
+    ? `<button class="btn gold" data-act="pet-feed">${ico('bone')} ${tr('Feed pets', 'తినిపించు')}</button>`
+    : `<button class="btn ghost" id="petFeedBtn" disabled>${petFeedLabel()}</button>`) : '';
+  const cardsHtml = PETS.map(p => {
+    const lvl = petLvl(p.id);
+    let action;
+    if (!lvl) {
+      action = p.cost.cash
+        ? `<button class="btn" data-act="pet-buy" data-id="${p.id}" data-cost="${p.cost.cash}">${tr('Adopt', 'తీసుకో')} ${money(p.cost.cash)}</button>`
+        : `<button class="btn blue" data-act="pet-buy" data-id="${p.id}" data-gems="${p.cost.gems}">${tr('Adopt', 'తీసుకో')} 💎${p.cost.gems}</button>`;
+    } else if (lvl < PET_MAX_LVL) {
+      action = `<button class="btn purple" data-act="pet-lvl" data-id="${p.id}" data-gems="${petLevelCost(lvl)}">${tr('Level up', 'లెవెల్ అప్')} 💎${petLevelCost(lvl)}</button>`;
+    } else action = `<span class="badge">⭐ ${tr('Max level', 'గరిష్ట లెవెల్')}</span>`;
+    const stars = lvl ? `<div class="pet-lvl">${tr('Level', 'లెవెల్')} ${lvl}/${PET_MAX_LVL}<div class="mbar"><div style="width:${lvl / PET_MAX_LVL * 100}%"></div></div></div>` : '';
+    return `<div class="pet-card ${lvl ? 'owned' : 'locked'} ${lvl && hungry ? 'hungry' : ''}" data-pet="${p.id}">
+      <div class="pet-pic">${ico(p.icon)}</div>
+      <div class="title">${tr(...p.name)}</div>
+      <div class="desc">${petDesc(p)}</div>${stars}${action}</div>`;
+  }).join('');
+  const total = petBonus('profit');
+  return header('paws', tr('Pets', 'పెట్స్'), tr(`Pets boost your empire in every world. Pet profit bonus: <b>x${fmt(total)}</b>`, `పెట్స్ అన్ని ప్రపంచాల్లో మీ సామ్రాజ్యాన్ని పెంచుతాయి. పెట్ లాభం బోనస్: <b>x${fmt(total)}</b>`)) +
+    `<div class="pet-status ${hungry && ownedCount ? 'hungry' : ''}">${ico(hungry && ownedCount ? 'bowl' : 'sparkheart')}<div class="info">${status}</div>${feedBtn}</div>
+    <div class="pet-grid">${cardsHtml}</div>`;
+}
+
 /* ---------------------------- TUTORIAL ------------------------------ */
 // Short guided start. Each step points at one thing and moves on when the player has done it.
 const TUTORIAL = [
@@ -1655,7 +1776,7 @@ function switchTab(tab) {
 }
 function renderTab() {
   const fn = { missions: renderMissions, managers: renderManagers, upgrades: renderUpgrades, investors: renderInvestors,
-    worlds: renderWorlds, leaderboard: renderLeaderboard, shop: renderShop, awards: renderAwards, stats: renderStats, settings: renderSettings }[activeTab];
+    worlds: renderWorlds, pets: renderPets, leaderboard: renderLeaderboard, shop: renderShop, awards: renderAwards, stats: renderStats, settings: renderSettings }[activeTab];
   if (fn) $('tab-' + activeTab).innerHTML = fn();
   refreshAffordability();
 }
@@ -1883,6 +2004,8 @@ function updateDots() {
   $('dot-worlds').classList.toggle('on', WORLDS.some(w => !S.worldsUnlocked[w.id] && S.lifetime >= w.unlockAt));
   $('dot-daily').classList.toggle('on', canClaimDaily());
   $('dot-spin').classList.toggle('on', spinReady());
+  const hasPets = Object.keys(S.pets.owned).length > 0;
+  $('dot-pets').classList.toggle('on', hasPets ? (petsHungry() && petFeedReady()) : PETS.some(p => p.cost.cash ? S.cash >= p.cost.cash : false));
 }
 
 /* ---------------------------- UI: HEADER / BOOSTS ------------------- */
@@ -1998,6 +2121,9 @@ document.addEventListener('click', e => {
     case 'mskip': skipMission(id); renderTab(); break;
     case 'lang': setLang(id); break;
     case 'music': toggleMusic(); break;
+    case 'pet-buy': buyPet(id); renderTab(); break;
+    case 'pet-lvl': levelPet(id); renderTab(); break;
+    case 'pet-feed': feedPets(); renderTab(); break;
     case 'festival': if (activeFestival()) modal(festivalHtml()); break;
     case 'fest-claim': claimFestival(); closeModal(); break;
     case 'tut-skip': case 'tut-next': endTutorial(); break;
@@ -2129,6 +2255,7 @@ function frame(now) {
     checkMissions();
     checkChallenge();
     if (activeTab === 'stats') renderTab();
+    if (activeTab === 'pets') updatePetTimer();
     if (activeTab === 'missions') updateMissionProgress();
     const lbWait = lbState === 'offline' ? 300000 : 60000;
     if (S.player.name && Date.now() - lbLastSent > lbWait && S.lifetime > lbLastScore) lbFetch(true);
@@ -2152,7 +2279,7 @@ function offlineEarnings() {
   const away = (Date.now() - S.lastSave) / 1000;
   if (away < 30) return;
   const counted = Math.min(away, OFFLINE_CAPS[S.offlineLvl]);
-  const amt = incomePerSec(true, false) * counted;
+  const amt = incomePerSec(true, false) * counted * petBonus('offline');
   if (amt <= 0) return;
   earn(amt);
   pendingOffline = amt;
