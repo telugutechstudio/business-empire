@@ -4,9 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Business Empire</title>
-  <meta name="description" content="Idle business game: build businesses, hire managers, attract investors and grow an empire.">
+  <meta name="description" content="Idle business game: build businesses, hire managers, spin the lucky wheel, travel to the Moon and Mars and climb the leaderboard.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <link rel="manifest" href="manifest.webmanifest">
@@ -18,36 +19,45 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Business Empire">
 </head>
-<body>
+<body data-world="earth">
+<canvas id="stars" aria-hidden="true"></canvas>
+<div class="nebula" aria-hidden="true"></div>
+
 <div id="app">
   <header class="topbar">
-    <div class="brand"><span class="brand-logo">🏙️</span><span class="brand-name">Business<b>Empire</b></span></div>
+    <button class="brand" data-act="tab" data-tab="worlds" title="Worlds">
+      <span class="brand-logo" id="worldIco"></span>
+      <span class="brand-name">Business<b>Empire</b><small id="worldName">Earth</small></span>
+    </button>
     <div class="cash-wrap">
-      <div id="cash" class="cash">0</div>
+      <div class="cash-row"><span data-ico="coin" class="cash-coin"></span><div id="cash" class="cash">0</div></div>
       <div id="ips" class="ips">0 / sec</div>
     </div>
     <div class="currencies">
-      <div class="pill inv" title="Investors (each boosts all profits)"><span>👔</span><b id="investors">0</b><small id="investorBonus">+0%</small></div>
-      <div class="pill gem" title="Gems"><span>💎</span><b id="gems">0</b></div>
+      <div class="pill inv" title="Investors (each boosts all profits)"><span data-ico="necktie"></span><b id="investors">0</b><small id="investorBonus">+0%</small></div>
+      <div class="pill gem" title="Gems"><span data-ico="gem"></span><b id="gems">0</b></div>
     </div>
   </header>
 
   <nav class="side" id="nav">
-    <button class="tab-btn active" data-act="tab" data-tab="business"><span>🏢</span><em>Businesses</em></button>
-    <button class="tab-btn" data-act="tab" data-tab="missions"><span>📋</span><em>Missions</em><i class="dot" id="dot-missions"></i></button>
-    <button class="tab-btn" data-act="tab" data-tab="managers"><span>🤵</span><em>Managers</em><i class="dot" id="dot-managers"></i></button>
-    <button class="tab-btn" data-act="tab" data-tab="upgrades"><span>⬆️</span><em>Upgrades</em><i class="dot" id="dot-upgrades"></i></button>
-    <button class="tab-btn" data-act="tab" data-tab="investors"><span>👔</span><em>Investors</em><i class="dot" id="dot-investors"></i></button>
-    <button class="tab-btn" data-act="tab" data-tab="shop"><span>💎</span><em>Gem Shop</em></button>
-    <button class="tab-btn" data-act="tab" data-tab="awards"><span>🏆</span><em>Awards</em></button>
-    <button class="tab-btn" data-act="tab" data-tab="stats"><span>📊</span><em>Stats</em></button>
-    <button class="tab-btn" data-act="tab" data-tab="settings"><span>⚙️</span><em>Settings</em></button>
+    <button class="tab-btn active" data-act="tab" data-tab="business"><span data-ico="office"></span><em>Businesses</em></button>
+    <button class="tab-btn" data-act="tab" data-tab="missions"><span data-ico="clipboard"></span><em>Missions</em><i class="dot" id="dot-missions"></i></button>
+    <button class="tab-btn" data-act="tab" data-tab="managers"><span data-ico="manager"></span><em>Managers</em><i class="dot" id="dot-managers"></i></button>
+    <button class="tab-btn" data-act="tab" data-tab="upgrades"><span data-ico="up"></span><em>Upgrades</em><i class="dot" id="dot-upgrades"></i></button>
+    <button class="tab-btn" data-act="tab" data-tab="investors"><span data-ico="necktie"></span><em>Investors</em><i class="dot" id="dot-investors"></i></button>
+    <button class="tab-btn" data-act="tab" data-tab="worlds"><span data-ico="earth"></span><em>Worlds</em><i class="dot" id="dot-worlds"></i></button>
+    <button class="tab-btn" data-act="tab" data-tab="leaderboard"><span data-ico="trophy"></span><em>Leaderboard</em></button>
+    <button class="tab-btn" data-act="tab" data-tab="shop"><span data-ico="gem"></span><em>Gem Shop</em></button>
+    <button class="tab-btn" data-act="tab" data-tab="awards"><span data-ico="medal"></span><em>Awards</em></button>
+    <button class="tab-btn" data-act="tab" data-tab="stats"><span data-ico="bars"></span><em>Stats</em></button>
+    <button class="tab-btn" data-act="tab" data-tab="settings"><span data-ico="gear"></span><em>Settings</em></button>
   </nav>
 
   <div class="boostbar" id="boostbar">
-    <button class="hype" id="hypeBtn" data-act="hype">📣 Hype! <small>x2 for 2m</small></button>
-    <button class="hype daily" data-act="daily">🎁 Daily<i class="dot" id="dot-daily"></i></button>
-    <button class="hype install hidden" id="installBtn" data-act="install">📲 Install</button>
+    <button class="hype" id="hypeBtn" data-act="hype">Hype!</button>
+    <button class="hype daily" data-act="daily"><span data-ico="gift"></span> Daily<i class="dot" id="dot-daily"></i></button>
+    <button class="hype spin" data-act="spin"><span data-ico="wheel"></span> Spin<i class="dot" id="dot-spin"></i></button>
+    <button class="hype install hidden" id="installBtn" data-act="install"><span data-ico="phone"></span> Install</button>
     <div class="chips" id="chips"></div>
   </div>
 
@@ -67,6 +77,8 @@
     <section class="tab" id="tab-managers"></section>
     <section class="tab" id="tab-upgrades"></section>
     <section class="tab" id="tab-investors"></section>
+    <section class="tab" id="tab-worlds"></section>
+    <section class="tab" id="tab-leaderboard"></section>
     <section class="tab" id="tab-shop"></section>
     <section class="tab" id="tab-awards"></section>
     <section class="tab" id="tab-stats"></section>
@@ -76,7 +88,8 @@
   <div class="ticker"><span class="ticker-label">NEWS</span><div class="ticker-track"><span id="tickerText">Welcome, boss! Tap the Tea Stall to start earning.</span></div></div>
 </div>
 
-<button id="briefcase" class="briefcase hidden" data-act="briefcase" aria-label="Golden briefcase">💼</button>
+<button id="briefcase" class="briefcase hidden" data-act="briefcase" aria-label="Golden briefcase"><span data-ico="briefcase"></span></button>
+<canvas id="fx" aria-hidden="true"></canvas>
 <div id="toasts" class="toasts"></div>
 <div id="modal" class="modal hidden"><div class="modal-card" id="modalBody"></div></div>
 

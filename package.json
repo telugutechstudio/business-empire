@@ -1,0 +1,9 @@
+{
+  "name": "business-empire",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Idle business game. Static site + one Netlify function for the online leaderboard.",
+  "dependencies": {
+    "@netlify/blobs": "11.1.3"
+  }
+}
