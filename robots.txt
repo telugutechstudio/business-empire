@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /stats.html
+Disallow: /api/
+
+Sitemap: https://ajo-business-empire.netlify.app/sitemap.xml

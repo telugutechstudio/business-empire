@@ -669,3 +669,6 @@ body[data-fest="sankranti"] .fest-float { animation-name: festRise; top: auto; b
   .music-btn { width: 34px; height: 34px; }
   .currencies { flex-direction: row; flex-wrap: wrap; justify-content: flex-end; max-width: 150px; }
 }
+
+/* Shown only when JavaScript is off (also read by search engines) */
+.noscript { position: relative; z-index: 5; max-width: 720px; margin: 40px auto; padding: 20px; background: var(--card); border-radius: 16px; }
