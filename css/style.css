@@ -27,7 +27,7 @@ html, body { margin: 0; height: 100%; }
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Fredoka', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: 'Fredoka', 'Baloo Tammudu 2', system-ui, -apple-system, 'Segoe UI', sans-serif;
   -webkit-tap-highlight-color: transparent;
   user-select: none;
   overflow: hidden;
@@ -465,6 +465,40 @@ textarea {
   width: 100%; min-height: 120px; background: #0b0e1c; color: var(--text); user-select: text;
   border: 1px solid var(--border); border-radius: 10px; padding: 10px; font-family: monospace; font-size: 12px;
 }
+
+/* Language toggle */
+.seg-toggle { display: inline-flex; background: #0a0d1c; border: 1px solid var(--border); border-radius: 12px; padding: 3px; gap: 3px; }
+.seg-toggle button { padding: 7px 14px; border-radius: 9px; color: var(--muted); font-weight: 600; }
+.seg-toggle button.on { background: linear-gradient(180deg, #ffe07a, var(--gold2)); color: #3a2600; box-shadow: 0 2px 0 #b06200; }
+.seg-toggle.big { margin: 8px auto 2px; }
+.seg-toggle.big button { padding: 9px 22px; font-size: 16px; }
+html[lang="te"] body { line-height: 1.45; }
+html[lang="te"] .tab-btn em, html[lang="te"] .biz-tag { font-size: .92em; }
+
+/* Cloud save */
+.cloud-box {
+  background: linear-gradient(135deg, #1d3a6b, #23285a); border: 1px solid #3d63a8; border-radius: var(--radius);
+  padding: 14px; box-shadow: 0 6px 16px rgba(0, 0, 0, .3); display: grid; gap: 10px; animation: rowIn .35s backwards;
+}
+.cloud-head { display: flex; gap: 12px; align-items: center; }
+.cloud-head > .i3d { width: 48px; height: 48px; animation: float 3s ease-in-out infinite; }
+.cloud-head .title { font-weight: 600; }
+.cloud-head .desc, .code-label { color: #c0cdee; font-size: 13.5px; }
+.code-show {
+  font-family: ui-monospace, Consolas, monospace; font-size: 24px; letter-spacing: 3px; text-align: center; font-weight: 700;
+  background: #0a0d1c; border: 2px dashed #4d7fd0; border-radius: 12px; padding: 10px; color: #9fd0ff; user-select: all;
+}
+.code-in {
+  width: 100%; padding: 12px; border-radius: 12px; border: 2px solid var(--border); background: #0a0d1c; color: var(--text);
+  font-family: ui-monospace, Consolas, monospace; font-size: 20px; letter-spacing: 2px; text-align: center; text-transform: uppercase; user-select: text; outline: none;
+}
+.code-in:focus { border-color: var(--gold); }
+.warn { color: #ffb0b8 !important; font-size: 14px; }
+.btn-pair.wrap { flex-wrap: wrap; }
+a.btn { text-decoration: none; display: inline-block; }
+.share-bar { margin-top: 14px; }
+.share-bar .btn .i3d { width: 22px; height: 22px; }
+.hype.share { background: linear-gradient(180deg, #6fe0c0, #1fa58a); box-shadow: 0 4px 0 #0f6b58, 0 8px 16px rgba(31, 165, 138, .3); }
 
 /* ---------- Briefcase / toasts / modal ---------- */
 .briefcase { position: fixed; z-index: 40; filter: drop-shadow(0 0 18px rgba(255, 200, 61, .95)); animation: caseBob 1.2s ease-in-out infinite; }

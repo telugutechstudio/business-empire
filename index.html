@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+Tammudu+2:wght@400;500;600;700&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#181d33">
@@ -40,36 +40,37 @@
   </header>
 
   <nav class="side" id="nav">
-    <button class="tab-btn active" data-act="tab" data-tab="business"><span data-ico="office"></span><em>Businesses</em></button>
-    <button class="tab-btn" data-act="tab" data-tab="missions"><span data-ico="clipboard"></span><em>Missions</em><i class="dot" id="dot-missions"></i></button>
-    <button class="tab-btn" data-act="tab" data-tab="managers"><span data-ico="manager"></span><em>Managers</em><i class="dot" id="dot-managers"></i></button>
-    <button class="tab-btn" data-act="tab" data-tab="upgrades"><span data-ico="up"></span><em>Upgrades</em><i class="dot" id="dot-upgrades"></i></button>
-    <button class="tab-btn" data-act="tab" data-tab="investors"><span data-ico="necktie"></span><em>Investors</em><i class="dot" id="dot-investors"></i></button>
-    <button class="tab-btn" data-act="tab" data-tab="worlds"><span data-ico="earth"></span><em>Worlds</em><i class="dot" id="dot-worlds"></i></button>
-    <button class="tab-btn" data-act="tab" data-tab="leaderboard"><span data-ico="trophy"></span><em>Leaderboard</em></button>
-    <button class="tab-btn" data-act="tab" data-tab="shop"><span data-ico="gem"></span><em>Gem Shop</em></button>
-    <button class="tab-btn" data-act="tab" data-tab="awards"><span data-ico="medal"></span><em>Awards</em></button>
-    <button class="tab-btn" data-act="tab" data-tab="stats"><span data-ico="bars"></span><em>Stats</em></button>
-    <button class="tab-btn" data-act="tab" data-tab="settings"><span data-ico="gear"></span><em>Settings</em></button>
+    <button class="tab-btn active" data-act="tab" data-tab="business"><span data-ico="office"></span><em data-t="Businesses|వ్యాపారాలు">Businesses</em></button>
+    <button class="tab-btn" data-act="tab" data-tab="missions"><span data-ico="clipboard"></span><em data-t="Missions|మిషన్లు">Missions</em><i class="dot" id="dot-missions"></i></button>
+    <button class="tab-btn" data-act="tab" data-tab="managers"><span data-ico="manager"></span><em data-t="Managers|మేనేజర్లు">Managers</em><i class="dot" id="dot-managers"></i></button>
+    <button class="tab-btn" data-act="tab" data-tab="upgrades"><span data-ico="up"></span><em data-t="Upgrades|అప్‌గ్రేడ్‌లు">Upgrades</em><i class="dot" id="dot-upgrades"></i></button>
+    <button class="tab-btn" data-act="tab" data-tab="investors"><span data-ico="necktie"></span><em data-t="Investors|ఇన్వెస్టర్లు">Investors</em><i class="dot" id="dot-investors"></i></button>
+    <button class="tab-btn" data-act="tab" data-tab="worlds"><span data-ico="earth"></span><em data-t="Worlds|ప్రపంచాలు">Worlds</em><i class="dot" id="dot-worlds"></i></button>
+    <button class="tab-btn" data-act="tab" data-tab="leaderboard"><span data-ico="trophy"></span><em data-t="Leaderboard|లీడర్‌బోర్డ్">Leaderboard</em></button>
+    <button class="tab-btn" data-act="tab" data-tab="shop"><span data-ico="gem"></span><em data-t="Gem Shop|జెమ్ షాప్">Gem Shop</em></button>
+    <button class="tab-btn" data-act="tab" data-tab="awards"><span data-ico="medal"></span><em data-t="Awards|అవార్డులు">Awards</em></button>
+    <button class="tab-btn" data-act="tab" data-tab="stats"><span data-ico="bars"></span><em data-t="Stats|గణాంకాలు">Stats</em></button>
+    <button class="tab-btn" data-act="tab" data-tab="settings"><span data-ico="gear"></span><em data-t="Settings|సెట్టింగ్‌లు">Settings</em></button>
   </nav>
 
   <div class="boostbar" id="boostbar">
     <button class="hype" id="hypeBtn" data-act="hype">Hype!</button>
-    <button class="hype daily" data-act="daily"><span data-ico="gift"></span> Daily<i class="dot" id="dot-daily"></i></button>
-    <button class="hype spin" data-act="spin"><span data-ico="wheel"></span> Spin<i class="dot" id="dot-spin"></i></button>
-    <button class="hype install hidden" id="installBtn" data-act="install"><span data-ico="phone"></span> Install</button>
+    <button class="hype daily" data-act="daily"><span data-ico="gift"></span> <span data-t="Daily|డైలీ">Daily</span><i class="dot" id="dot-daily"></i></button>
+    <button class="hype spin" data-act="spin"><span data-ico="wheel"></span> <span data-t="Spin|స్పిన్">Spin</span><i class="dot" id="dot-spin"></i></button>
+    <button class="hype install hidden" id="installBtn" data-act="install"><span data-ico="phone"></span> <span data-t="Install|ఇన్‌స్టాల్">Install</span></button>
+    <button class="hype share" data-act="share"><span data-ico="letter"></span> <span data-t="Share|షేర్">Share</span></button>
     <div class="chips" id="chips"></div>
   </div>
 
   <main id="main">
     <section class="tab active" id="tab-business">
       <div class="buymode" id="buymode">
-        <span>Buy</span>
+        <span data-t="Buy|కొను">Buy</span>
         <button data-act="buymode" data-mode="1">x1</button>
         <button data-act="buymode" data-mode="10">x10</button>
         <button data-act="buymode" data-mode="100">x100</button>
-        <button data-act="buymode" data-mode="next">Next</button>
-        <button data-act="buymode" data-mode="max">Max</button>
+        <button data-act="buymode" data-mode="next" data-t="Next|తర్వాత">Next</button>
+        <button data-act="buymode" data-mode="max" data-t="Max|గరిష్టం">Max</button>
       </div>
       <div id="bizList" class="biz-list"></div>
     </section>
@@ -85,7 +86,7 @@
     <section class="tab" id="tab-settings"></section>
   </main>
 
-  <div class="ticker"><span class="ticker-label">NEWS</span><div class="ticker-track"><span id="tickerText">Welcome, boss! Tap the Tea Stall to start earning.</span></div></div>
+  <div class="ticker"><span class="ticker-label" data-t="NEWS|వార్తలు">NEWS</span><div class="ticker-track"><span id="tickerText" data-t="Welcome, boss! Tap the Tea Stall to start earning.|స్వాగతం బాస్! సంపాదించడానికి టీ స్టాల్ ట్యాప్ చేయండి.">Welcome, boss! Tap the Tea Stall to start earning.</span></div></div>
 </div>
 
 <button id="briefcase" class="briefcase hidden" data-act="briefcase" aria-label="Golden briefcase"><span data-ico="briefcase"></span></button>

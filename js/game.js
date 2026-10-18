@@ -1,14 +1,29 @@
 'use strict';
 /* =====================================================================
-   BUSINESS EMPIRE — idle business game
+   BUSINESS EMPIRE — idle business game (English + తెలుగు)
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '2.0';
+const GAME_VERSION = '2.1';
 const LB_URL = '/api/leaderboard';
+const CLOUD_URL = '/api/cloud';
 let S = null; // game state, initialised below
 const SUF = ['', 'K', 'M', 'B', 'T', 'Qa', 'Qi', 'Sx', 'Sp', 'Oc', 'No', 'Dc', 'UDc', 'DDc', 'TDc', 'QaDc', 'QiDc', 'SxDc', 'SpDc', 'OcDc', 'NoDc', 'Vg', 'UVg', 'DVg', 'TVg', 'QaVg', 'QiVg', 'SxVg', 'SpVg', 'OcVg', 'NoVg', 'Tg'];
 const REDUCED_MOTION = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------------------------- LANGUAGE ------------------------------ */
+function isTe() { return !!(S && S.settings && S.settings.lang === 'te'); }
+// Pick the English or Telugu version of a piece of text
+function tr(en, te) { return isTe() ? te : en; }
+// Data objects carry an optional `te` name next to `name`
+function nm(obj) { return isTe() && obj.te ? obj.te : obj.name; }
+function applyStaticText() {
+  document.documentElement.lang = isTe() ? 'te' : 'en';
+  document.querySelectorAll('[data-t]').forEach(el => {
+    const [en, te] = el.dataset.t.split('|');
+    el.textContent = isTe() ? te : en;
+  });
+}
 
 /* ---------------------------- 3D ICONS ------------------------------ */
 // Microsoft Fluent 3D emoji (MIT), pinned to one commit. Falls back to the plain emoji if an image fails.
@@ -32,6 +47,8 @@ const ICONS = {
   stopwatch: ['Stopwatch', '⏱️'], hourglass: ['Hourglass not done', '⏳'], person: ['Bust in silhouette', '👤'], pencil: ['Pencil', '✏️'],
   refresh: ['Counterclockwise arrows button', '🔄'], star: ['Glowing star', '🌟'], fire: ['Fire', '🔥'], bulb: ['Light bulb', '💡'],
   flag: ['Chequered flag', '🏁'], runner: ['Person running', '🏃', 1], trash: ['Wastebasket', '🗑️'], crescent: ['Crescent moon', '🌙'],
+  speech: ['Speech balloon', '💬'], cloud: ['Cloud', '☁️'], link: ['Link', '🔗'], outbox: ['Outbox tray', '📤'], inbox: ['Inbox tray', '📥'],
+  key: ['Key', '🔑'], letter: ['Love letter', '💌'],
 };
 function iconUrl(key) {
   const d = ICONS[key];
@@ -56,25 +73,31 @@ const BIZ_CURVE = [
   [179159040, 1.09, 1536, 89579520, 5.55e8], [2149908480, 1.08, 6144, 1074954240, 1e10], [25798901760, 1.07, 36864, 29668737024, 1e11],
 ];
 const WORLDS = [
-  { id: 'earth', name: 'Earth', icon: 'earth', mult: 1, unlockAt: 0, desc: 'Where every empire begins.', biz: [
-    ['tea', 'Tea Stall', 'tea', 'Chai Charlie'], ['truck', 'Food Truck', 'truck', 'Taco Tina'], ['coffee', 'Coffee Shop', 'coffee', 'Barista Bob'],
-    ['bakery', 'Bakery', 'bakery', 'Baker Bella'], ['gym', 'Fitness Gym', 'gym', 'Coach Max'], ['hotel', 'Hotel Chain', 'hotel', 'Concierge Clara'],
-    ['tech', 'Tech Startup', 'tech', 'Hacker Hiro'], ['studio', 'Film Studio', 'studio', 'Director Dev'], ['airline', 'Airline', 'airline', 'Captain Ava'],
-    ['space', 'Space Agency', 'space', 'Commander Zed']] },
-  { id: 'moon', name: 'Moon', icon: 'moon', mult: 3, unlockAt: 1e12, desc: 'Low gravity, high profits. Everything earns x3.', biz: [
-    ['cheese', 'Moon Cheese Mine', 'cheese', 'Cheddar Chen'], ['taxi', 'UFO Taxi', 'ufo', 'Zippy Zoe'], ['huts', 'Crater Huts', 'hut', 'Dusty Dan'],
-    ['rock', 'Moon Rock Shop', 'rock', 'Rocky Raj'], ['helium', 'Helium Balloons', 'balloon', 'Floaty Fay'], ['farm', 'Dome Farm', 'seedling', 'Sprout Sam'],
-    ['solar', 'Solar Array', 'sun', 'Sunny Sol'], ['robot', 'Robot Factory', 'robot', 'Bolt-9'], ['scope', 'Star Observatory', 'telescope', 'Stella Vega'],
-    ['sat', 'Satellite Network', 'satellite', 'Orbit Omar']] },
-  { id: 'mars', name: 'Mars', icon: 'mars', mult: 10, unlockAt: 1e18, desc: 'The red frontier. Everything earns x10.', biz: [
-    ['sand', 'Red Sand Shop', 'desert', 'Sandy Sara'], ['rover', 'Rover Rentals', 'tractor', 'Rusty Rex'], ['oxygen', 'Oxygen Bar', 'bubbles', 'Airy Ana'],
-    ['ice', 'Polar Ice Mine', 'ice', 'Frosty Finn'], ['volcano', 'Olympus Tours', 'volcano', 'Lava Leo'], ['zoo', 'Alien Zoo', 'alien', 'Zorg'],
-    ['crystal', 'Crystal Mine', 'gem', 'Gemma Ray'], ['terra', 'Terraformer', 'tree', 'Forest Fang'], ['comet', 'Comet Catchers', 'comet', 'Halley Hu'],
-    ['bank', 'Galaxy Bank', 'galaxy', 'Cosmo Cruz']] },
+  { id: 'earth', name: 'Earth', te: 'భూమి', icon: 'earth', mult: 1, unlockAt: 0,
+    desc: ['Where every empire begins.', 'ప్రతి సామ్రాజ్యం ఇక్కడే మొదలవుతుంది.'], biz: [
+    ['tea', 'Tea Stall', 'టీ స్టాల్', 'tea', 'Chai Charlie'], ['truck', 'Food Truck', 'ఫుడ్ ట్రక్', 'truck', 'Taco Tina'],
+    ['coffee', 'Coffee Shop', 'కాఫీ షాప్', 'coffee', 'Barista Bob'], ['bakery', 'Bakery', 'బేకరీ', 'bakery', 'Baker Bella'],
+    ['gym', 'Fitness Gym', 'ఫిట్‌నెస్ జిమ్', 'gym', 'Coach Max'], ['hotel', 'Hotel Chain', 'హోటల్ చైన్', 'hotel', 'Concierge Clara'],
+    ['tech', 'Tech Startup', 'టెక్ స్టార్టప్', 'tech', 'Hacker Hiro'], ['studio', 'Film Studio', 'ఫిల్మ్ స్టూడియో', 'studio', 'Director Dev'],
+    ['airline', 'Airline', 'ఎయిర్‌లైన్', 'airline', 'Captain Ava'], ['space', 'Space Agency', 'స్పేస్ ఏజెన్సీ', 'space', 'Commander Zed']] },
+  { id: 'moon', name: 'Moon', te: 'చంద్రుడు', icon: 'moon', mult: 3, unlockAt: 1e12,
+    desc: ['Low gravity, high profits. Everything earns x3.', 'తక్కువ గురుత్వం, ఎక్కువ లాభం. ఇక్కడ అన్నీ x3 సంపాదిస్తాయి.'], biz: [
+    ['cheese', 'Moon Cheese Mine', 'చంద్ర చీజ్ గని', 'cheese', 'Cheddar Chen'], ['taxi', 'UFO Taxi', 'UFO టాక్సీ', 'ufo', 'Zippy Zoe'],
+    ['huts', 'Crater Huts', 'క్రేటర్ గుడిసెలు', 'hut', 'Dusty Dan'], ['rock', 'Moon Rock Shop', 'చంద్ర రాళ్ల షాప్', 'rock', 'Rocky Raj'],
+    ['helium', 'Helium Balloons', 'హీలియం బెలూన్లు', 'balloon', 'Floaty Fay'], ['farm', 'Dome Farm', 'డోమ్ వ్యవసాయం', 'seedling', 'Sprout Sam'],
+    ['solar', 'Solar Array', 'సోలార్ ప్లాంట్', 'sun', 'Sunny Sol'], ['robot', 'Robot Factory', 'రోబో ఫ్యాక్టరీ', 'robot', 'Bolt-9'],
+    ['scope', 'Star Observatory', 'నక్షత్ర వేధశాల', 'telescope', 'Stella Vega'], ['sat', 'Satellite Network', 'శాటిలైట్ నెట్‌వర్క్', 'satellite', 'Orbit Omar']] },
+  { id: 'mars', name: 'Mars', te: 'అంగారకుడు', icon: 'mars', mult: 10, unlockAt: 1e18,
+    desc: ['The red frontier. Everything earns x10.', 'ఎర్ర గ్రహం. ఇక్కడ అన్నీ x10 సంపాదిస్తాయి.'], biz: [
+    ['sand', 'Red Sand Shop', 'ఎర్ర ఇసుక షాప్', 'desert', 'Sandy Sara'], ['rover', 'Rover Rentals', 'రోవర్ రెంటల్స్', 'tractor', 'Rusty Rex'],
+    ['oxygen', 'Oxygen Bar', 'ఆక్సిజన్ బార్', 'bubbles', 'Airy Ana'], ['ice', 'Polar Ice Mine', 'ధ్రువ మంచు గని', 'ice', 'Frosty Finn'],
+    ['volcano', 'Olympus Tours', 'ఒలింపస్ టూర్స్', 'volcano', 'Lava Leo'], ['zoo', 'Alien Zoo', 'ఏలియన్ జూ', 'alien', 'Zorg'],
+    ['crystal', 'Crystal Mine', 'స్ఫటిక గని', 'gem', 'Gemma Ray'], ['terra', 'Terraformer', 'టెర్రాఫార్మర్', 'tree', 'Forest Fang'],
+    ['comet', 'Comet Catchers', 'తోకచుక్క వేటగాళ్లు', 'comet', 'Halley Hu'], ['bank', 'Galaxy Bank', 'గెలాక్సీ బ్యాంక్', 'galaxy', 'Cosmo Cruz']] },
 ].map(w => Object.assign(w, {
-  biz: w.biz.map(([id, name, icon, manager], i) => {
+  biz: w.biz.map(([id, name, te, icon, manager], i) => {
     const [baseCost, costMult, time, revenue, managerCost] = BIZ_CURVE[i];
-    return { id, name, icon, manager, baseCost, costMult, time, revenue, managerCost };
+    return { id, name, te, icon, manager, baseCost, costMult, time, revenue, managerCost };
   }),
 }));
 let WORLD = WORLDS[0];
@@ -91,53 +114,59 @@ const MILESTONES = [
 // When EVERY business reaches this level, all profits x2
 const GLOBAL_MILESTONES = [10, 25, 50, 100, 200, 300, 400, 500, 750, 1000];
 
-const UPGRADE_TIERS = ['Marketing Blitz', 'Premium Supplies', 'Franchise Deal', 'Celebrity Endorsement', 'Global Expansion', 'AI Automation', 'Total Monopoly'];
+const UPGRADE_TIERS = [
+  ['Marketing Blitz', 'మార్కెటింగ్ బ్లిట్జ్'], ['Premium Supplies', 'ప్రీమియం సరుకులు'], ['Franchise Deal', 'ఫ్రాంచైజ్ డీల్'],
+  ['Celebrity Endorsement', 'సెలబ్రిటీ ప్రచారం'], ['Global Expansion', 'ప్రపంచ విస్తరణ'], ['AI Automation', 'AI ఆటోమేషన్'], ['Total Monopoly', 'పూర్తి ఆధిపత్యం'],
+];
 function makeUpgrades(bizList) {
   const list = [];
   UPGRADE_TIERS.forEach((tier, t) => {
-    bizList.forEach((b, i) => list.push({
-      id: `u${t}_${b.id}`, name: `${b.name}: ${tier}`, target: i, mult: 3,
-      cost: 2.5e5 * Math.pow(12, i) * Math.pow(1e8, t), icon: b.icon,
-    }));
-    list.push({ id: `u${t}_all`, name: `Empire-wide ${tier}`, target: -1, mult: 3,
-      cost: 2.5e5 * Math.pow(12, 10) * Math.pow(1e8, t), icon: 'earth' });
+    bizList.forEach((b, i) => list.push({ id: `u${t}_${b.id}`, tier: t, target: i, mult: 3,
+      cost: 2.5e5 * Math.pow(12, i) * Math.pow(1e8, t), icon: b.icon }));
+    list.push({ id: `u${t}_all`, tier: t, target: -1, mult: 3, cost: 2.5e5 * Math.pow(12, 10) * Math.pow(1e8, t), icon: 'earth' });
   });
   return list.sort((a, b) => a.cost - b.cost);
+}
+function upgName(u) {
+  const tier = tr(...UPGRADE_TIERS[u.tier]);
+  return u.target === -1 ? tr(`Empire-wide ${tier}`, `సామ్రాజ్యమంతా ${tier}`) : `${nm(BUSINESSES[u.target])}: ${tier}`;
 }
 let UPGRADES = makeUpgrades(BUSINESSES);
 
 const INVESTOR_UPGRADES = [
-  { id: 'seed',    name: 'Seed Capital',        desc: 'Start every new run with 25K cash',   cost: 50,    type: 'start', value: 25e3, icon: 'seedling' },
-  { id: 'angel',   name: 'Angel Round',         desc: 'All profits x3',                      cost: 150,   type: 'profit', mult: 3, icon: 'star' },
-  { id: 'logi',    name: 'Faster Logistics',    desc: 'All businesses run 2x faster',        cost: 600,   type: 'speed', mult: 2, icon: 'truck' },
-  { id: 'seriesA', name: 'Series A',            desc: 'All profits x3',                      cost: 3000,  type: 'profit', mult: 3, icon: 'chart' },
-  { id: 'rel',     name: 'Investor Relations',  desc: 'Each investor gives +3% (was +2%)',   cost: 12000, type: 'rate', value: 0.03, icon: 'necktie' },
-  { id: 'seriesB', name: 'Series B',            desc: 'All profits x5',                      cost: 6e4,   type: 'profit', mult: 5, icon: 'office' },
-  { id: 'express', name: 'Express Everything',  desc: 'All businesses run 2x faster',        cost: 3e5,   type: 'speed', mult: 2, icon: 'bolt' },
-  { id: 'board',   name: 'Visionary Board',     desc: 'Each investor gives +5%',             cost: 2e6,   type: 'rate', value: 0.05, icon: 'bulb' },
-  { id: 'ipo',     name: 'IPO',                 desc: 'All profits x10',                     cost: 1e7,   type: 'profit', mult: 10, icon: 'bell' },
-  { id: 'empire',  name: 'Global Conglomerate', desc: 'All profits x25',                     cost: 1e9,   type: 'profit', mult: 25, icon: 'earth' },
+  { id: 'seed',    cost: 50,    type: 'start', value: 25e3, icon: 'seedling', t: ['Seed Capital', 'Start every new run with 25K cash', 'సీడ్ క్యాపిటల్', 'ప్రతి కొత్త రన్ 25K క్యాష్‌తో మొదలవుతుంది'] },
+  { id: 'angel',   cost: 150,   type: 'profit', mult: 3, icon: 'star',   t: ['Angel Round', 'All profits x3', 'ఏంజెల్ రౌండ్', 'అన్ని లాభాలు x3'] },
+  { id: 'logi',    cost: 600,   type: 'speed', mult: 2, icon: 'truck',   t: ['Faster Logistics', 'All businesses run 2x faster', 'వేగవంతమైన రవాణా', 'అన్ని వ్యాపారాలు 2x వేగంగా'] },
+  { id: 'seriesA', cost: 3000,  type: 'profit', mult: 3, icon: 'chart',  t: ['Series A', 'All profits x3', 'సిరీస్ A', 'అన్ని లాభాలు x3'] },
+  { id: 'rel',     cost: 12000, type: 'rate', value: 0.03, icon: 'necktie', t: ['Investor Relations', 'Each investor gives +3% (was +2%)', 'ఇన్వెస్టర్ రిలేషన్స్', 'ప్రతి ఇన్వెస్టర్ +3% (ఇంతకు ముందు +2%)'] },
+  { id: 'seriesB', cost: 6e4,   type: 'profit', mult: 5, icon: 'office', t: ['Series B', 'All profits x5', 'సిరీస్ B', 'అన్ని లాభాలు x5'] },
+  { id: 'express', cost: 3e5,   type: 'speed', mult: 2, icon: 'bolt',    t: ['Express Everything', 'All businesses run 2x faster', 'అంతా ఎక్స్‌ప్రెస్', 'అన్ని వ్యాపారాలు 2x వేగంగా'] },
+  { id: 'board',   cost: 2e6,   type: 'rate', value: 0.05, icon: 'bulb', t: ['Visionary Board', 'Each investor gives +5%', 'దూరదృష్టి బోర్డు', 'ప్రతి ఇన్వెస్టర్ +5%'] },
+  { id: 'ipo',     cost: 1e7,   type: 'profit', mult: 10, icon: 'bell',  t: ['IPO', 'All profits x10', 'IPO', 'అన్ని లాభాలు x10'] },
+  { id: 'empire',  cost: 1e9,   type: 'profit', mult: 25, icon: 'earth', t: ['Global Conglomerate', 'All profits x25', 'గ్లోబల్ కాంగ్లోమరేట్', 'అన్ని లాభాలు x25'] },
 ];
+function invText(u) { return isTe() ? [u.t[2], u.t[3]] : [u.t[0], u.t[1]]; }
 
 const GEM_SHOP = [
-  { id: 'rush',    icon: 'bolt',      name: 'Profit Rush',       desc: 'x2 all profits for 15 minutes (stacks time)', cost: 10 },
-  { id: 'warp1',   icon: 'hourglass', name: 'Time Warp: 1 Hour', desc: 'Instantly earn 1 hour of income',            cost: 20 },
-  { id: 'warp24',  icon: 'stopwatch', name: 'Time Warp: 1 Day',  desc: 'Instantly earn 24 hours of income',          cost: 200 },
-  { id: 'golden',  icon: 'crown',     name: 'Golden Touch',      desc: 'PERMANENT x2 all profits (max 3)',           cost: [100, 300, 900] },
-  { id: 'offline', icon: 'crescent',  name: 'Night Shift',       desc: 'Offline earnings cap: 2h → 8h → 24h',        cost: [40, 120] },
+  { id: 'rush',    icon: 'bolt',      cost: 10,            t: ['Profit Rush', 'x2 all profits for 15 minutes (stacks time)', 'ప్రాఫిట్ రష్', '15 నిమిషాలు అన్ని లాభాలు x2'] },
+  { id: 'warp1',   icon: 'hourglass', cost: 20,            t: ['Time Warp: 1 Hour', 'Instantly earn 1 hour of income', 'టైమ్ వార్ప్: 1 గంట', '1 గంట ఆదాయం వెంటనే పొందండి'] },
+  { id: 'warp24',  icon: 'stopwatch', cost: 200,           t: ['Time Warp: 1 Day', 'Instantly earn 24 hours of income', 'టైమ్ వార్ప్: 1 రోజు', '24 గంటల ఆదాయం వెంటనే పొందండి'] },
+  { id: 'golden',  icon: 'crown',     cost: [100, 300, 900], t: ['Golden Touch', 'PERMANENT x2 all profits (max 3)', 'గోల్డెన్ టచ్', 'శాశ్వతంగా అన్ని లాభాలు x2 (గరిష్టం 3)'] },
+  { id: 'offline', icon: 'crescent',  cost: [40, 120],     t: ['Night Shift', 'Offline earnings cap: 2h → 8h → 24h', 'నైట్ షిఫ్ట్', 'ఆఫ్‌లైన్ సంపాదన పరిమితి: 2గం → 8గం → 24గం'] },
 ];
 const OFFLINE_CAPS = [2 * 3600, 8 * 3600, 24 * 3600];
 
 const SPIN_PRIZES = [
-  { icon: 'coin',      label: '5 min income',   w: 22, color: '#22b86a', give: () => { const a = bonusCash(300); earn(a); return `+${money(a)} cash`; } },
-  { icon: 'gem',       label: '3 Gems',         w: 18, color: '#2f7fe0', give: () => { S.gems += 3; return '+3 gems'; } },
-  { icon: 'bolt',      label: 'x2 for 5m',      w: 16, color: '#e8920f', give: () => { S.boosts.rush += 300; return 'x2 profits for 5 minutes'; } },
-  { icon: 'coin',      label: '30 min income',  w: 12, color: '#159052', give: () => { const a = bonusCash(1800); earn(a); return `+${money(a)} cash`; } },
-  { icon: 'gem',       label: '10 Gems',        w: 10, color: '#1d5fc0', give: () => { S.gems += 10; return '+10 gems'; } },
-  { icon: 'sparkles',  label: 'x5 for 30s',     w: 12, color: '#8a4fe6', give: () => { S.boosts.golden += 30; return 'x5 profits for 30 seconds'; } },
-  { icon: 'hourglass', label: '1 hour income',  w: 7,  color: '#d9417a', give: () => { const a = bonusCash(3600); earn(a); return `+${money(a)} cash`; } },
-  { icon: 'crown',     label: 'JACKPOT 50 Gems', w: 3, color: '#d93445', big: true, give: () => { S.gems += 50; return 'JACKPOT! +50 gems'; } },
+  { icon: 'coin',      t: ['5 min income', '5 నిమి ఆదాయం'],    w: 22, color: '#22b86a', give: () => cashPrize(300) },
+  { icon: 'gem',       t: ['3 Gems', '3 జెమ్స్'],               w: 18, color: '#2f7fe0', give: () => { S.gems += 3; return tr('+3 gems', '+3 జెమ్స్'); } },
+  { icon: 'bolt',      t: ['x2 for 5m', '5 నిమి x2'],            w: 16, color: '#e8920f', give: () => { S.boosts.rush += 300; return tr('x2 profits for 5 minutes', '5 నిమిషాలు x2 లాభాలు'); } },
+  { icon: 'coin',      t: ['30 min income', '30 నిమి ఆదాయం'],  w: 12, color: '#159052', give: () => cashPrize(1800) },
+  { icon: 'gem',       t: ['10 Gems', '10 జెమ్స్'],             w: 10, color: '#1d5fc0', give: () => { S.gems += 10; return tr('+10 gems', '+10 జెమ్స్'); } },
+  { icon: 'sparkles',  t: ['x5 for 30s', '30 సె x5'],            w: 12, color: '#8a4fe6', give: () => { S.boosts.golden += 30; return tr('x5 profits for 30 seconds', '30 సెకన్లు x5 లాభాలు'); } },
+  { icon: 'hourglass', t: ['1 hour income', '1 గంట ఆదాయం'],    w: 7,  color: '#d9417a', give: () => cashPrize(3600) },
+  { icon: 'crown',     t: ['JACKPOT 50 Gems', 'జాక్‌పాట్ 50 జెమ్స్'], w: 3, color: '#d93445', big: true, give: () => { S.gems += 50; return tr('JACKPOT! +50 gems', 'జాక్‌పాట్! +50 జెమ్స్'); } },
 ];
+function cashPrize(secs) { const a = bonusCash(secs); earn(a); return tr(`+${money(a)} cash`, `+${money(a)} క్యాష్`); }
 const SPIN_COOLDOWN = 4 * 3600 * 1000;
 const SPIN_GEM_COST = 5;
 
@@ -149,41 +178,54 @@ function worldBiz(id) {
 
 const ACHIEVEMENTS = (() => {
   const list = [];
-  const titles = ['Owner', 'Mogul', 'Baron', 'Magnate', 'Legend'];
-  WORLDS[0].biz.forEach((b, i) => [25, 100, 250, 500, 1000].forEach((n, k) => list.push({
-    id: `own_${b.id}_${n}`, icon: b.icon, name: `${b.name} ${titles[k]}`, desc: `Own ${n} ${b.name}s on Earth`,
-    gems: [2, 3, 5, 8, 15][k], test: () => { const bz = worldBiz('earth'); return !!bz && bz[i].owned >= n; },
-  })));
-  [[1e3, 'First Grand'], [1e6, 'Millionaire'], [1e9, 'Billionaire'], [1e12, 'Trillionaire'], [1e15, 'Quadrillionaire'],
-   [1e18, 'Quintillionaire'], [1e24, 'Septillionaire'], [1e30, 'Nonillionaire'], [1e40, 'Off the Charts'], [1e60, 'Infinite Wealth']]
-    .forEach(([n, name], k) => list.push({ id: `earn_${k}`, icon: 'coin', name, desc: `Earn ${money(n)} lifetime`, gems: 3 + k * 2, test: () => S.lifetime >= n }));
-  list.push({ id: 'world_moon', icon: 'moon', name: 'Moonwalker', desc: 'Unlock the Moon', gems: 15, test: () => !!S.worldsUnlocked.moon });
-  list.push({ id: 'world_mars', icon: 'mars', name: 'Red Planet Boss', desc: 'Unlock Mars', gems: 30, test: () => !!S.worldsUnlocked.mars });
-  [1, 5, 10].forEach(n => list.push({ id: `mgr_${n}`, icon: 'manager', name: `Hiring Spree ${n}`, desc: `Have ${n} managers in one world`, gems: n === 10 ? 10 : 3, test: () => S.biz.filter(b => b.manager).length >= n }));
-  [1, 3, 10, 25].forEach(n => list.push({ id: `pre_${n}`, icon: 'necktie', name: `Fresh Start x${n}`, desc: `Restart with investors ${n} time(s)`, gems: 5 + n, test: () => S.stats.prestiges >= n }));
-  [1, 10, 50].forEach(n => list.push({ id: `case_${n}`, icon: 'briefcase', name: `Briefcase Hunter ${n}`, desc: `Open ${n} golden briefcases`, gems: n === 1 ? 2 : 5, test: () => S.stats.briefcases >= n }));
-  [100, 1000, 5000].forEach(n => list.push({ id: `click_${n}`, icon: 'runner', name: `Hands-On ${n}`, desc: `Run businesses by hand ${n} times`, gems: 3, test: () => S.stats.clicks >= n }));
-  [5, 25, 100].forEach(n => list.push({ id: `mis_${n}`, icon: 'clipboard', name: `Go-Getter ${n}`, desc: `Complete ${n} missions`, gems: n === 100 ? 20 : 5, test: () => S.stats.missionsDone >= n }));
-  [7, 30].forEach(n => list.push({ id: `daily_${n}`, icon: 'gift', name: `Loyal Boss ${n}`, desc: `Claim ${n} daily rewards`, gems: n === 30 ? 20 : 7, test: () => (S.stats.dailyClaims || 0) >= n }));
-  [1, 10, 50].forEach(n => list.push({ id: `spin_${n}`, icon: 'wheel', name: `Lucky Spinner ${n}`, desc: `Spin the Lucky Wheel ${n} time(s)`, gems: n === 50 ? 15 : 3, test: () => (S.stats.spins || 0) >= n }));
-  list.push({ id: 'lb_join', icon: 'trophy', name: 'On the Board', desc: 'Join the online leaderboard', gems: 5, test: () => !!S.player.name });
-  [10, 25, 50].forEach(n => list.push({ id: `upg_${n}`, icon: 'up', name: `Upgrader ${n}`, desc: `Buy ${n} upgrades`, gems: 5, test: () => S.stats.upgradesBought >= n }));
+  const add = (id, icon, gems, name, desc, test) => list.push({ id, icon, gems, name, desc, test });
+  const titles = [['Owner', 'ఓనర్'], ['Mogul', 'మొగల్'], ['Baron', 'బారన్'], ['Magnate', 'మాగ్నెట్'], ['Legend', 'లెజెండ్']];
+  WORLDS[0].biz.forEach((b, i) => [25, 100, 250, 500, 1000].forEach((n, k) => add(
+    `own_${b.id}_${n}`, b.icon, [2, 3, 5, 8, 15][k],
+    () => `${nm(b)} ${tr(...titles[k])}`,
+    () => tr(`Own ${n} ${b.name}s on Earth`, `భూమిపై ${n} ${b.te} కొనండి`),
+    () => { const bz = worldBiz('earth'); return !!bz && bz[i].owned >= n; })));
+  [[1e3, 'First Grand', 'మొదటి వెయ్యి'], [1e6, 'Millionaire', 'మిలియనీర్'], [1e9, 'Billionaire', 'బిలియనీర్'], [1e12, 'Trillionaire', 'ట్రిలియనీర్'],
+   [1e15, 'Quadrillionaire', 'క్వాడ్రిలియనీర్'], [1e18, 'Quintillionaire', 'క్విన్టిలియనీర్'], [1e24, 'Septillionaire', 'సెప్టిలియనీర్'],
+   [1e30, 'Nonillionaire', 'నానిలియనీర్'], [1e40, 'Off the Charts', 'లెక్కలకు అందని'], [1e60, 'Infinite Wealth', 'అనంత సంపద']]
+    .forEach(([n, en, te], k) => add(`earn_${k}`, 'coin', 3 + k * 2, () => tr(en, te),
+      () => tr(`Earn ${money(n)} lifetime`, `మొత్తం ${money(n)} సంపాదించండి`), () => S.lifetime >= n));
+  add('world_moon', 'moon', 15, () => tr('Moonwalker', 'మూన్‌వాకర్'), () => tr('Unlock the Moon', 'చంద్రుడిని అన్‌లాక్ చేయండి'), () => !!S.worldsUnlocked.moon);
+  add('world_mars', 'mars', 30, () => tr('Red Planet Boss', 'అంగారక బాస్'), () => tr('Unlock Mars', 'అంగారకుడిని అన్‌లాక్ చేయండి'), () => !!S.worldsUnlocked.mars);
+  [1, 5, 10].forEach(n => add(`mgr_${n}`, 'manager', n === 10 ? 10 : 3, () => tr(`Hiring Spree ${n}`, `నియామకాలు ${n}`),
+    () => tr(`Have ${n} managers in one world`, `ఒకే ప్రపంచంలో ${n} మేనేజర్లు`), () => S.biz.filter(b => b.manager).length >= n));
+  [1, 3, 10, 25].forEach(n => add(`pre_${n}`, 'necktie', 5 + n, () => tr(`Fresh Start x${n}`, `కొత్త ప్రారంభం x${n}`),
+    () => tr(`Restart with investors ${n} time(s)`, `ఇన్వెస్టర్లతో ${n} సార్లు రీస్టార్ట్ చేయండి`), () => S.stats.prestiges >= n));
+  [1, 10, 50].forEach(n => add(`case_${n}`, 'briefcase', n === 1 ? 2 : 5, () => tr(`Briefcase Hunter ${n}`, `బ్రీఫ్‌కేస్ వేటగాడు ${n}`),
+    () => tr(`Open ${n} golden briefcases`, `${n} బంగారు బ్రీఫ్‌కేసులు తెరవండి`), () => S.stats.briefcases >= n));
+  [100, 1000, 5000].forEach(n => add(`click_${n}`, 'runner', 3, () => tr(`Hands-On ${n}`, `స్వయంగా ${n}`),
+    () => tr(`Run businesses by hand ${n} times`, `వ్యాపారాలను ${n} సార్లు చేతితో నడపండి`), () => S.stats.clicks >= n));
+  [5, 25, 100].forEach(n => add(`mis_${n}`, 'clipboard', n === 100 ? 20 : 5, () => tr(`Go-Getter ${n}`, `పట్టుదల ${n}`),
+    () => tr(`Complete ${n} missions`, `${n} మిషన్లు పూర్తి చేయండి`), () => S.stats.missionsDone >= n));
+  [7, 30].forEach(n => add(`daily_${n}`, 'gift', n === 30 ? 20 : 7, () => tr(`Loyal Boss ${n}`, `నమ్మకమైన బాస్ ${n}`),
+    () => tr(`Claim ${n} daily rewards`, `${n} డైలీ రివార్డులు తీసుకోండి`), () => (S.stats.dailyClaims || 0) >= n));
+  [1, 10, 50].forEach(n => add(`spin_${n}`, 'wheel', n === 50 ? 15 : 3, () => tr(`Lucky Spinner ${n}`, `అదృష్ట స్పిన్నర్ ${n}`),
+    () => tr(`Spin the Lucky Wheel ${n} time(s)`, `లక్కీ వీల్‌ను ${n} సార్లు తిప్పండి`), () => (S.stats.spins || 0) >= n));
+  add('lb_join', 'trophy', 5, () => tr('On the Board', 'బోర్డు మీద'), () => tr('Join the online leaderboard', 'ఆన్‌లైన్ లీడర్‌బోర్డ్‌లో చేరండి'), () => !!S.player.name);
+  add('cloud_on', 'cloud', 5, () => tr('Head in the Clouds', 'క్లౌడ్‌లో సేఫ్'), () => tr('Turn on cloud save', 'క్లౌడ్ సేవ్ ఆన్ చేయండి'), () => !!S.cloud.code);
+  add('share_1', 'letter', 5, () => tr('Spread the Word', 'అందరికీ చెప్పండి'), () => tr('Share the game with a friend', 'గేమ్‌ను స్నేహితుడితో షేర్ చేయండి'), () => (S.stats.shares || 0) >= 1);
+  [10, 25, 50].forEach(n => add(`upg_${n}`, 'up', 5, () => tr(`Upgrader ${n}`, `అప్‌గ్రేడర్ ${n}`),
+    () => tr(`Buy ${n} upgrades`, `${n} అప్‌గ్రేడ్‌లు కొనండి`), () => S.stats.upgradesBought >= n));
   return list;
 })();
 
 const HEADLINES = [
-  'Local tea stall owner refuses to share secret masala recipe.',
-  'Economists baffled as one mogul buys every coffee shop in town.',
-  'Breaking: Food trucks now outnumber parking spots 3 to 1.',
-  'Gym membership surge linked to aggressive marketing. And protein croissants.',
-  'Tech startup pivots to blockchain-powered AI-driven tea delivery.',
-  'Film studio announces sequel to a movie nobody has seen yet.',
-  'Space Agency confirms Moon is "a great location for a cheese mine".',
-  'Scientists confirm: Mars sand sells better with a gift wrap.',
-  'Rumor: golden briefcases spotted around the city. Keep your eyes open!',
-  'Lucky Wheel jackpot hit by a tea stall owner. Again.',
-  'Investors say: "Restarting with more capital is a power move."',
-  'Leaderboard wars heat up as bosses race for the top spot.',
+  ['Local tea stall owner refuses to share secret masala recipe.', 'స్థానిక టీ స్టాల్ ఓనర్ రహస్య మసాలా రెసిపీ చెప్పడానికి నిరాకరణ.'],
+  ['Economists baffled as one boss buys every coffee shop in town.', 'ఊరిలో అన్ని కాఫీ షాపులు ఒక్కరే కొనడంతో ఆర్థికవేత్తలు ఆశ్చర్యం.'],
+  ['Breaking: Food trucks now outnumber parking spots 3 to 1.', 'బ్రేకింగ్: పార్కింగ్ స్థలాల కంటే ఫుడ్ ట్రక్కులే ఎక్కువ!'],
+  ['Tech startup pivots to AI-powered tea delivery.', 'టెక్ స్టార్టప్ ఇప్పుడు AI టీ డెలివరీ మొదలుపెట్టింది.'],
+  ['Film studio announces sequel to a movie nobody has seen yet.', 'ఇంకా ఎవరూ చూడని సినిమాకు సీక్వెల్ ప్రకటించిన ఫిల్మ్ స్టూడియో.'],
+  ['Space Agency confirms Moon is "a great location for a cheese mine".', 'చంద్రుడు చీజ్ గనికి సరైన చోటు అని స్పేస్ ఏజెన్సీ ప్రకటన.'],
+  ['Scientists confirm: Mars sand sells better with gift wrap.', 'గిఫ్ట్ ప్యాక్ చేస్తే అంగారక ఇసుక బాగా అమ్ముడవుతుందట!'],
+  ['Rumor: golden briefcases spotted around the city. Keep your eyes open!', 'పుకారు: నగరంలో బంగారు బ్రీఫ్‌కేసులు కనిపిస్తున్నాయి. జాగ్రత్తగా చూడండి!'],
+  ['Lucky Wheel jackpot hit by a tea stall owner. Again.', 'లక్కీ వీల్ జాక్‌పాట్ మళ్ళీ టీ స్టాల్ ఓనర్‌కే!'],
+  ['Investors say: "Restarting with more capital is a power move."', 'ఇన్వెస్టర్లు: "ఎక్కువ పెట్టుబడితో మళ్ళీ మొదలుపెట్టడం తెలివైన పని."'],
+  ['Leaderboard wars heat up as bosses race for the top spot.', 'టాప్ స్థానం కోసం బాస్‌ల మధ్య లీడర్‌బోర్డ్ యుద్ధం!'],
 ];
 
 /* ---------------------------- STATE --------------------------------- */
@@ -194,6 +236,10 @@ function newRun(startCash = 0) {
     biz: BUSINESSES.map((b, i) => ({ owned: i === 0 ? 1 : 0, progress: 0, running: false, manager: false })),
     upgrades: {},
   };
+}
+function defaultLang() {
+  const l = (navigator.languages || [navigator.language || 'en']).join(',').toLowerCase();
+  return /(^|,)te/.test(l) ? 'te' : 'en';
 }
 function defaultState() {
   return Object.assign(newRun(), {
@@ -213,9 +259,10 @@ function defaultState() {
     missions: [],
     spin: { freeAt: 0 },
     player: { id: '', name: '' },
-    stats: { clicks: 0, briefcases: 0, prestiges: 0, upgradesBought: 0, playTime: 0, bestRun: 0, missionsDone: 0, spins: 0, dailyClaims: 0 },
+    cloud: { code: '', lastSync: 0 },
+    stats: { clicks: 0, briefcases: 0, prestiges: 0, upgradesBought: 0, playTime: 0, bestRun: 0, missionsDone: 0, spins: 0, dailyClaims: 0, shares: 0 },
     boosts: { hype: 0, hypeCd: 0, rush: 0, golden: 0 },
-    settings: { sound: true, notation: 'suffix', buyMode: '1' },
+    settings: { sound: true, notation: 'suffix', buyMode: '1', lang: defaultLang() },
     lastSave: Date.now(),
     created: Date.now(),
   });
@@ -252,6 +299,7 @@ function mergeState(saved) {
   out.missions = Array.isArray(saved.missions) ? saved.missions : [];
   out.spin = Object.assign({ freeAt: 0 }, saved.spin || {});
   out.player = Object.assign({ id: '', name: '' }, saved.player || {});
+  out.cloud = Object.assign({ code: '', lastSync: 0 }, saved.cloud || {});
   out.world = WORLDS.some(w => w.id === saved.world) ? saved.world : 'earth';
   out.worldsUnlocked = Object.assign({ earth: true }, saved.worldsUnlocked || {});
   out.worldRuns = {};
@@ -292,12 +340,19 @@ function fmtClock(s) {
 }
 function fmtDur(s) {
   s = Math.floor(s);
-  if (s < 60) return s + 's';
-  if (s < 3600) return Math.floor(s / 60) + 'm ' + (s % 60) + 's';
-  if (s < 86400) return Math.floor(s / 3600) + 'h ' + Math.floor(s % 3600 / 60) + 'm';
-  return Math.floor(s / 86400) + 'd ' + Math.floor(s % 86400 / 3600) + 'h';
+  const [sx, mx, hx, dx] = isTe() ? ['సె', 'ని', 'గం', 'రో'] : ['s', 'm', 'h', 'd'];
+  if (s < 60) return s + sx;
+  if (s < 3600) return Math.floor(s / 60) + mx + ' ' + (s % 60) + sx;
+  if (s < 86400) return Math.floor(s / 3600) + hx + ' ' + Math.floor(s % 3600 / 60) + mx;
+  return Math.floor(s / 86400) + dx + ' ' + Math.floor(s % 86400 / 3600) + hx;
 }
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function randomCode(len, alphabet) {
+  const bytes = new Uint8Array(len);
+  if (window.crypto && crypto.getRandomValues) crypto.getRandomValues(bytes);
+  else bytes.forEach((_, i) => { bytes[i] = Math.random() * 256; });
+  return Array.from(bytes, b => alphabet[b % alphabet.length]).join('');
+}
 const $ = id => document.getElementById(id);
 function setHTML(el, html) { if (el._html !== html) { el._html = html; el.innerHTML = html; } }
 
@@ -417,14 +472,21 @@ function buyBiz(i) {
   if (cards[i]) { restartAnim(cards[i].iconWrap, 'levelup'); sparkBurst(cards[i].iconWrap, 10); }
   for (const m of MILESTONES) {
     if (before < m.lvl && S.biz[i].owned >= m.lvl) {
-      toast(`${emo(d.icon)} ${d.name} hit ${m.lvl}! ${m.type === 'speed' ? '⚡ Speed' : '💰 Profit'} x${m.mult}`, 'good');
+      const kind = m.type === 'speed' ? tr('⚡ Speed', '⚡ వేగం') : tr('💰 Profit', '💰 లాభం');
+      toast(tr(`${emo(d.icon)} ${nm(d)} hit ${m.lvl}! ${kind} x${m.mult}`, `${emo(d.icon)} ${nm(d)} ${m.lvl} చేరింది! ${kind} x${m.mult}`), 'good');
       sfx('big');
       confetti(cards[i] && cards[i].iconWrap, 60);
     }
   }
   const minAfter = minOwned();
-  for (const g of GLOBAL_MILESTONES) if (minBefore < g && minAfter >= g) { toast(`🌐 All businesses reached ${g}! All profits x2`, 'good'); confetti(null, 140); }
-  if (before === 0) { toast(`🎉 Unlocked ${emo(d.icon)} ${d.name}! Tap it to earn.`, 'good'); confetti(cards[i] && cards[i].iconWrap, 80); }
+  for (const g of GLOBAL_MILESTONES) if (minBefore < g && minAfter >= g) {
+    toast(tr(`🌐 All businesses reached ${g}! All profits x2`, `🌐 అన్ని వ్యాపారాలు ${g} చేరాయి! అన్ని లాభాలు x2`), 'good');
+    confetti(null, 140);
+  }
+  if (before === 0) {
+    toast(tr(`🎉 Unlocked ${emo(d.icon)} ${nm(d)}! Tap it to earn.`, `🎉 ${emo(d.icon)} ${nm(d)} అన్‌లాక్! సంపాదించడానికి ట్యాప్ చేయండి.`), 'good');
+    confetti(cards[i] && cards[i].iconWrap, 80);
+  }
 }
 function hireManager(i) {
   const d = BUSINESSES[i], b = S.biz[i];
@@ -432,7 +494,7 @@ function hireManager(i) {
   S.cash -= d.managerCost;
   b.manager = true; b.running = true;
   sfx('big');
-  toast(`🤵 ${d.manager} now runs your ${d.name}!`, 'good');
+  toast(tr(`🤵 ${d.manager} now runs your ${nm(d)}!`, `🤵 ఇప్పుడు ${d.manager} మీ ${nm(d)} నడుపుతారు!`), 'good');
   confetti(null, 50);
 }
 function buyUpgrade(id, quiet) {
@@ -441,20 +503,22 @@ function buyUpgrade(id, quiet) {
   S.cash -= u.cost;
   S.upgrades[id] = true;
   S.stats.upgradesBought++;
-  if (!quiet) { sfx('buy'); toast(`${emo(u.icon)} ${u.name} — x${u.mult} profit!`, 'good'); }
+  if (!quiet) { sfx('buy'); toast(`${emo(u.icon)} ${upgName(u)} — x${u.mult} ${tr('profit!', 'లాభం!')}`, 'good'); }
   return true;
 }
 function buyAllUpgrades() {
   let n = 0;
   for (const u of UPGRADES) if (!S.upgrades[u.id] && S.cash >= u.cost) { if (buyUpgrade(u.id, true)) n++; }
-  if (n) { sfx('big'); toast(`⬆️ Bought ${n} upgrade${n > 1 ? 's' : ''}!`, 'good'); confetti(null, 40); } else sfx('err');
+  if (n) { sfx('big'); toast(tr(`⬆️ Bought ${n} upgrade${n > 1 ? 's' : ''}!`, `⬆️ ${n} అప్‌గ్రేడ్‌లు కొన్నారు!`), 'good'); confetti(null, 40); } else sfx('err');
 }
 function buyInvestorUpgrade(id) {
   const u = INVESTOR_UPGRADES.find(x => x.id === id);
   if (!u || S.investorUpgrades[id] || S.investors < u.cost) { sfx('err'); return; }
-  modal(`${ico(u.icon, 'big-ico')}<h3>${u.name}</h3>
-    <p>${u.desc}.<br>This spends <b>${fmtInt(u.cost)}</b> investors, lowering your investor bonus by <b>${fmt(u.cost * investorRate() * 100)}%</b>. Upgrades are permanent.</p>
-    <div class="modal-actions"><button class="btn ghost" data-act="close">Cancel</button><button class="btn purple" data-act="invup-ok" data-id="${id}">Buy it</button></div>`);
+  const [name, desc] = invText(u);
+  modal(`${ico(u.icon, 'big-ico')}<h3>${name}</h3>
+    <p>${desc}.<br>${tr(`This spends <b>${fmtInt(u.cost)}</b> investors, lowering your investor bonus by <b>${fmt(u.cost * investorRate() * 100)}%</b>. Upgrades are permanent.`,
+      `దీనికి <b>${fmtInt(u.cost)}</b> ఇన్వెస్టర్లు ఖర్చవుతారు, మీ బోనస్ <b>${fmt(u.cost * investorRate() * 100)}%</b> తగ్గుతుంది. అప్‌గ్రేడ్ శాశ్వతం.`)}</p>
+    <div class="modal-actions"><button class="btn ghost" data-act="close">${tr('Cancel', 'రద్దు')}</button><button class="btn purple" data-act="invup-ok" data-id="${id}">${tr('Buy it', 'కొనండి')}</button></div>`);
 }
 function confirmInvestorUpgrade(id) {
   const u = INVESTOR_UPGRADES.find(x => x.id === id);
@@ -462,17 +526,20 @@ function confirmInvestorUpgrade(id) {
   S.investors -= u.cost;
   S.investorUpgrades[id] = true;
   sfx('big');
-  toast(`${emo(u.icon)} ${u.name} acquired!`, 'good');
+  toast(`${emo(u.icon)} ${invText(u)[0]} ${tr('acquired!', 'పొందారు!')}`, 'good');
   confetti(null, 80);
 }
 function prestigeAsk() {
   const n = investorsAvailable();
-  if (n < 1) { sfx('err'); toast('Earn more to attract investors.', 'bad'); return; }
-  const newBonus = (S.investors + n) * investorRate() * 100;
-  modal(`${ico('necktie', 'big-ico')}<h3>Sell your ${WORLD.name} empire?</h3>
-    <p>You will gain <b>${fmtInt(n)}</b> investors, bringing your profit bonus to <b>+${fmt(newBonus)}%</b> in every world.</p>
-    <p>Your ${WORLD.name} cash, businesses, managers and cash upgrades reset. Other worlds, investors, gems and awards are kept.</p>
-    <div class="modal-actions"><button class="btn ghost" data-act="close">Not yet</button><button class="btn gold" data-act="prestige-ok">Restart with investors</button></div>`);
+  if (n < 1) { sfx('err'); toast(tr('Earn more to attract investors.', 'ఇన్వెస్టర్లు రావాలంటే ఇంకా సంపాదించండి.'), 'bad'); return; }
+  const newBonus = fmt((S.investors + n) * investorRate() * 100);
+  const w = nm(WORLD);
+  modal(`${ico('necktie', 'big-ico')}<h3>${tr(`Sell your ${w} empire?`, `మీ ${w} సామ్రాజ్యాన్ని అమ్మేయాలా?`)}</h3>
+    <p>${tr(`You will gain <b>${fmtInt(n)}</b> investors, bringing your profit bonus to <b>+${newBonus}%</b> in every world.`,
+      `మీకు <b>${fmtInt(n)}</b> ఇన్వెస్టర్లు వస్తారు, ప్రతి ప్రపంచంలో లాభం బోనస్ <b>+${newBonus}%</b> అవుతుంది.`)}</p>
+    <p>${tr(`Your ${w} cash, businesses, managers and cash upgrades reset. Other worlds, investors, gems and awards are kept.`,
+      `${w} లో క్యాష్, వ్యాపారాలు, మేనేజర్లు, అప్‌గ్రేడ్‌లు రీసెట్ అవుతాయి. ఇతర ప్రపంచాలు, ఇన్వెస్టర్లు, జెమ్స్, అవార్డులు ఉంటాయి.`)}</p>
+    <div class="modal-actions"><button class="btn ghost" data-act="close">${tr('Not yet', 'ఇప్పుడు వద్దు')}</button><button class="btn gold" data-act="prestige-ok">${tr('Restart with investors', 'ఇన్వెస్టర్లతో రీస్టార్ట్')}</button></div>`);
 }
 function prestige() {
   const n = investorsAvailable();
@@ -486,7 +553,7 @@ function prestige() {
   Object.assign(S, newRun(start));
   marketEvent = null;
   sfx('win');
-  toast(`👔 ${fmtInt(n)} investors joined your empire!`, 'good');
+  toast(tr(`👔 ${fmtInt(n)} investors joined your empire!`, `👔 ${fmtInt(n)} ఇన్వెస్టర్లు మీ సామ్రాజ్యంలో చేరారు!`), 'good');
   buildBizCards();
   switchTab('business');
   confetti(null, 200);
@@ -497,7 +564,7 @@ function hype() {
   S.boosts.hype = 120;
   S.boosts.hypeCd = 600;
   sfx('big');
-  toast('📣 Hype campaign launched! x2 profits for 2 minutes.', 'good');
+  toast(tr('📣 Hype campaign launched! x2 profits for 2 minutes.', '📣 హైప్ ప్రచారం మొదలైంది! 2 నిమిషాలు x2 లాభాలు.'), 'good');
   sparkBurst($('hypeBtn'), 16);
 }
 function buyGem(id) {
@@ -506,13 +573,13 @@ function buyGem(id) {
   if (cost == null || S.gems < cost) { sfx('err'); return; }
   S.gems -= cost;
   switch (id) {
-    case 'rush': S.boosts.rush += 900; toast('⚡ Profit Rush! x2 for 15 minutes.', 'gem'); break;
+    case 'rush': S.boosts.rush += 900; toast(tr('⚡ Profit Rush! x2 for 15 minutes.', '⚡ ప్రాఫిట్ రష్! 15 నిమిషాలు x2.'), 'gem'); break;
     case 'warp1': case 'warp24': {
       const amt = bonusCash(id === 'warp1' ? 3600 : 86400);
-      earn(amt); toast(`⏩ Time warped! +${money(amt)}`, 'gem'); coinShower(24); break;
+      earn(amt); toast(tr(`⏩ Time warped! +${money(amt)}`, `⏩ టైమ్ వార్ప్! +${money(amt)}`), 'gem'); coinShower(24); break;
     }
-    case 'golden': S.gemGolden++; toast('👑 Golden Touch! Permanent x2 profits.', 'gem'); confetti(null, 120); break;
-    case 'offline': S.offlineLvl++; toast(`🌙 Offline cap is now ${fmtDur(OFFLINE_CAPS[S.offlineLvl])}.`, 'gem'); break;
+    case 'golden': S.gemGolden++; toast(tr('👑 Golden Touch! Permanent x2 profits.', '👑 గోల్డెన్ టచ్! శాశ్వతంగా x2 లాభాలు.'), 'gem'); confetti(null, 120); break;
+    case 'offline': S.offlineLvl++; toast(tr(`🌙 Offline cap is now ${fmtDur(OFFLINE_CAPS[S.offlineLvl])}.`, `🌙 ఆఫ్‌లైన్ పరిమితి ఇప్పుడు ${fmtDur(OFFLINE_CAPS[S.offlineLvl])}.`), 'gem'); break;
   }
   sfx('big');
 }
@@ -531,16 +598,16 @@ function applyWorld(id) {
   const wi = $('worldIco');
   if (wi) wi.innerHTML = ico(WORLD.icon);
   const wn = $('worldName');
-  if (wn) wn.textContent = WORLD.name;
+  if (wn) wn.textContent = nm(WORLD);
   Stars.setWorld(WORLD.id);
 }
 function unlockWorld(id) {
   const w = worldDef(id);
   if (S.worldsUnlocked[id]) return travelTo(id);
-  if (S.lifetime < w.unlockAt) { sfx('err'); toast(`Earn ${money(w.unlockAt)} lifetime to unlock ${w.name}.`, 'bad'); return; }
+  if (S.lifetime < w.unlockAt) { sfx('err'); toast(tr(`Earn ${money(w.unlockAt)} lifetime to unlock ${w.name}.`, `${w.te} అన్‌లాక్ చేయడానికి మొత్తం ${money(w.unlockAt)} సంపాదించండి.`), 'bad'); return; }
   S.worldsUnlocked[id] = true;
   sfx('win');
-  toast(`🚀 ${w.name} unlocked! Everything there earns x${w.mult}.`, 'good');
+  toast(tr(`🚀 ${w.name} unlocked! Everything there earns x${w.mult}.`, `🚀 ${w.te} అన్‌లాక్! అక్కడ అన్నీ x${w.mult} సంపాదిస్తాయి.`), 'good');
   travelTo(id);
 }
 function travelTo(id) {
@@ -579,12 +646,12 @@ function openBriefcase() {
   S.stats.briefcases++;
   sfx('case');
   const r = Math.random();
-  if (r < 0.12) { S.gems += 3; toast('💼 The briefcase held 💎 3 gems!', 'gem'); }
-  else if (r < 0.45) { S.boosts.golden = 30; toast('💼 Golden Rush! x5 profits for 30 seconds!', 'gem'); }
+  if (r < 0.12) { S.gems += 3; toast(tr('💼 The briefcase held 💎 3 gems!', '💼 బ్రీఫ్‌కేసులో 💎 3 జెమ్స్!'), 'gem'); }
+  else if (r < 0.45) { S.boosts.golden = 30; toast(tr('💼 Golden Rush! x5 profits for 30 seconds!', '💼 గోల్డెన్ రష్! 30 సెకన్లు x5 లాభాలు!'), 'gem'); }
   else {
     const amt = Math.max(50, incomePerSec(false) * 120, S.cash * 0.15);
     earn(amt);
-    toast(`💼 Found ${money(amt)} inside!`, 'gem');
+    toast(tr(`💼 Found ${money(amt)} inside!`, `💼 లోపల ${money(amt)} దొరికింది!`), 'gem');
     coinShower(14);
   }
 }
@@ -592,9 +659,10 @@ function startMarketEvent() {
   const owned = S.biz.map((b, i) => b.owned > 0 ? i : -1).filter(i => i >= 0);
   if (!owned.length) return;
   const i = owned[Math.floor(Math.random() * owned.length)];
+  const d = BUSINESSES[i];
   marketEvent = { biz: i, remaining: 60 };
-  toast(`📈 Market boom! ${emo(BUSINESSES[i].icon)} ${BUSINESSES[i].name} profits x3 for 60s`, 'good');
-  setHeadline(`MARKET BOOM: Demand for ${BUSINESSES[i].name} skyrockets — profits tripled!`);
+  toast(tr(`📈 Market boom! ${emo(d.icon)} ${nm(d)} profits x3 for 60s`, `📈 మార్కెట్ బూమ్! ${emo(d.icon)} ${nm(d)} లాభాలు 60 సెకన్లు x3`), 'good');
+  setHeadline(tr(`MARKET BOOM: Demand for ${d.name} skyrockets — profits tripled!`, `మార్కెట్ బూమ్: ${d.te} కి భారీ డిమాండ్ — లాభాలు మూడింతలు!`));
 }
 
 /* ---------------------------- ACHIEVEMENTS -------------------------- */
@@ -603,7 +671,7 @@ function checkAchievements() {
     if (!S.achievements[a.id] && a.test()) {
       S.achievements[a.id] = Date.now();
       S.gems += a.gems;
-      toast(`🏆 ${a.name} unlocked! +${a.gems} 💎`, 'gem');
+      toast(tr(`🏆 ${a.name()} unlocked! +${a.gems} 💎`, `🏆 ${a.name()} అవార్డు! +${a.gems} 💎`), 'gem');
       sfx('cash');
       if (activeTab === 'awards') renderTab();
     }
@@ -612,13 +680,13 @@ function checkAchievements() {
 
 /* ---------------------------- DAILY REWARD -------------------------- */
 const DAILY_REWARDS = [
-  { icon: 'gem',       label: '5 Gems',            give: () => { S.gems += 5; } },
-  { icon: 'coin',      label: '10 min income',     give: () => earn(bonusCash(600)) },
-  { icon: 'gem',       label: '10 Gems',           give: () => { S.gems += 10; } },
-  { icon: 'bolt',      label: 'Profit Rush 15m',   give: () => { S.boosts.rush += 900; } },
-  { icon: 'gem',       label: '15 Gems',           give: () => { S.gems += 15; } },
-  { icon: 'coin',      label: '1 hour income',     give: () => earn(bonusCash(3600)) },
-  { icon: 'crown',     label: '30 Gems + x5 Rush', give: () => { S.gems += 30; S.boosts.golden += 60; } },
+  { icon: 'gem',   t: ['5 Gems', '5 జెమ్స్'],                        give: () => { S.gems += 5; } },
+  { icon: 'coin',  t: ['10 min income', '10 నిమి ఆదాయం'],           give: () => earn(bonusCash(600)) },
+  { icon: 'gem',   t: ['10 Gems', '10 జెమ్స్'],                      give: () => { S.gems += 10; } },
+  { icon: 'bolt',  t: ['Profit Rush 15m', 'ప్రాఫిట్ రష్ 15ని'],       give: () => { S.boosts.rush += 900; } },
+  { icon: 'gem',   t: ['15 Gems', '15 జెమ్స్'],                      give: () => { S.gems += 15; } },
+  { icon: 'coin',  t: ['1 hour income', '1 గంట ఆదాయం'],             give: () => earn(bonusCash(3600)) },
+  { icon: 'crown', t: ['30 Gems + x5 Rush', '30 జెమ్స్ + x5 రష్'],   give: () => { S.gems += 30; S.boosts.golden += 60; } },
 ];
 function dayKey(offset = 0) {
   const d = new Date();
@@ -633,13 +701,14 @@ function dailyHtml() {
   const boxes = DAILY_REWARDS.map((r, k) => {
     const day = k + 1;
     const cls = (day < today || (!claimable && day === today)) ? 'claimed' : day === today ? 'today' : '';
-    return `<div class="day ${cls}"><small>Day ${day}</small>${ico(r.icon)}<em>${r.label}</em></div>`;
+    return `<div class="day ${cls}"><small>${tr('Day', 'రోజు')} ${day}</small>${ico(r.icon)}<em>${tr(...r.t)}</em></div>`;
   }).join('');
-  return `${ico('gift', 'big-ico')}<h3>Daily Reward</h3>
-    <p>${claimable ? `Day ${today} reward is ready! Come back every day — missing a day restarts from Day 1.`
-      : `Already claimed today. Come back tomorrow for Day ${S.daily.streak % 7 + 1}!`}</p>
+  const next = S.daily.streak % 7 + 1;
+  return `${ico('gift', 'big-ico')}<h3>${tr('Daily Reward', 'డైలీ రివార్డ్')}</h3>
+    <p>${claimable ? tr(`Day ${today} reward is ready! Come back every day — missing a day restarts from Day 1.`, `రోజు ${today} రివార్డ్ రెడీ! ప్రతి రోజు రండి — ఒక రోజు మిస్ అయితే మళ్ళీ రోజు 1 నుంచి.`)
+      : tr(`Already claimed today. Come back tomorrow for Day ${next}!`, `ఈ రోజు తీసుకున్నారు. రేపు రోజు ${next} కోసం రండి!`)}</p>
     <div class="daily-grid">${boxes}</div>
-    <div class="modal-actions">${claimable ? '<button class="btn gold" data-act="daily-claim">Claim!</button>' : '<button class="btn ghost" data-act="close">Close</button>'}</div>`;
+    <div class="modal-actions">${claimable ? `<button class="btn gold" data-act="daily-claim">${tr('Claim!', 'తీసుకోండి!')}</button>` : `<button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button>`}</div>`;
 }
 function claimDaily() {
   if (!canClaimDaily()) return;
@@ -648,7 +717,7 @@ function claimDaily() {
   S.daily = { last: dayKey(), streak: day };
   S.stats.dailyClaims = (S.stats.dailyClaims || 0) + 1;
   sfx('win');
-  toast(`🎁 Day ${day} reward: ${DAILY_REWARDS[day - 1].label}!`, 'gem');
+  toast(tr(`🎁 Day ${day} reward: ${DAILY_REWARDS[day - 1].t[0]}!`, `🎁 రోజు ${day} రివార్డ్: ${DAILY_REWARDS[day - 1].t[1]}!`), 'gem');
   confetti(null, 100);
   save();
 }
@@ -659,8 +728,8 @@ function spinReady() { return Date.now() >= S.spin.freeAt; }
 function spinHtml() {
   const n = SPIN_PRIZES.length, seg = 360 / n;
   const grad = SPIN_PRIZES.map((p, k) => `${p.color} ${k * seg}deg ${(k + 1) * seg}deg`).join(',');
-  const segs = SPIN_PRIZES.map((p, k) => `<div class="seg" style="transform:rotate(${k * seg + seg / 2}deg)"><div class="seg-in">${ico(p.icon)}<small>${p.label}</small></div></div>`).join('');
-  return `<h3>Lucky Spin</h3>
+  const segs = SPIN_PRIZES.map((p, k) => `<div class="seg" style="transform:rotate(${k * seg + seg / 2}deg)"><div class="seg-in">${ico(p.icon)}<small>${tr(...p.t)}</small></div></div>`).join('');
+  return `<h3>${tr('Lucky Spin', 'లక్కీ స్పిన్')}</h3>
     <p class="sub" id="spinInfo">${spinInfoText()}</p>
     <div class="wheel-wrap">
       <div class="wheel-pointer"></div>
@@ -669,18 +738,19 @@ function spinHtml() {
       <div class="wheel-hub">${ico('coin')}</div>
     </div>
     <div class="modal-actions">
-      <button class="btn gold" data-act="spin-go" id="spinFree" ${spinReady() ? '' : 'disabled'}>Free spin</button>
-      <button class="btn blue" data-act="spin-paid" data-gems="${SPIN_GEM_COST}">Spin · 💎${SPIN_GEM_COST}</button>
-      <button class="btn ghost" data-act="close">Close</button>
+      <button class="btn gold" data-act="spin-go" id="spinFree" ${spinReady() ? '' : 'disabled'}>${tr('Free spin', 'ఫ్రీ స్పిన్')}</button>
+      <button class="btn blue" data-act="spin-paid" data-gems="${SPIN_GEM_COST}">${tr('Spin', 'స్పిన్')} · 💎${SPIN_GEM_COST}</button>
+      <button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button>
     </div>`;
 }
 function spinInfoText() {
-  return spinReady() ? 'Your free spin is ready!' : `Next free spin in ${fmtClock((S.spin.freeAt - Date.now()) / 1000)}`;
+  return spinReady() ? tr('Your free spin is ready!', 'మీ ఫ్రీ స్పిన్ రెడీ!')
+    : tr(`Next free spin in ${fmtClock((S.spin.freeAt - Date.now()) / 1000)}`, `తదుపరి ఫ్రీ స్పిన్ ${fmtClock((S.spin.freeAt - Date.now()) / 1000)} లో`);
 }
 function doSpin(paid) {
   if (spinning) return;
   if (!paid && !spinReady()) { sfx('err'); return; }
-  if (paid && S.gems < SPIN_GEM_COST) { sfx('err'); toast('Not enough gems for a spin.', 'bad'); return; }
+  if (paid && S.gems < SPIN_GEM_COST) { sfx('err'); toast(tr('Not enough gems for a spin.', 'స్పిన్‌కు సరిపడా జెమ్స్ లేవు.'), 'bad'); return; }
   if (paid) S.gems -= SPIN_GEM_COST; else S.spin.freeAt = Date.now() + SPIN_COOLDOWN;
   S.stats.spins = (S.stats.spins || 0) + 1;
   spinning = true;
@@ -705,8 +775,7 @@ function doSpin(paid) {
     toast(`🎡 ${msg}`, 'gem');
     confetti($('wheel'), p.big ? 260 : 90);
     if ($('wheel')) {
-      const card = $('modalBody');
-      card.innerHTML = spinHtml();
+      $('modalBody').innerHTML = spinHtml();
       const wl = $('wheel');
       wl.classList.add('won');
       wl.querySelectorAll('.seg')[k].classList.add('hit');
@@ -735,18 +804,18 @@ function missionValue(m) {
 function missionText(m) {
   const w = worldDef(m.world || 'earth');
   const d = w.biz[m.biz] || {};
-  const where = w.id === 'earth' ? '' : ` on ${w.name}`;
+  const where = w.id === 'earth' ? '' : tr(` on ${w.name}`, ` (${w.te})`);
   switch (m.type) {
-    case 'own': return { icon: d.icon, text: `Own ${m.target} ${d.name}${where}` };
-    case 'unlock': return { icon: d.icon, text: `Unlock the ${d.name}${where}` };
-    case 'hire': return { icon: 'manager', text: `Hire ${d.manager} for your ${d.name}` };
-    case 'earn': return { icon: 'coin', text: `Earn ${money(m.target)} cash` };
-    case 'click': return { icon: 'runner', text: `Run businesses by hand ${m.target} times` };
-    case 'case': return { icon: 'briefcase', text: 'Open a golden briefcase' };
-    case 'upgrade': return { icon: 'up', text: `Buy ${m.target} upgrades` };
-    case 'spin': return { icon: 'wheel', text: 'Spin the Lucky Wheel' };
+    case 'own': return { icon: d.icon, text: tr(`Own ${m.target} ${d.name}${where}`, `${m.target} ${d.te} కొనండి${where}`) };
+    case 'unlock': return { icon: d.icon, text: tr(`Unlock the ${d.name}${where}`, `${d.te} అన్‌లాక్ చేయండి${where}`) };
+    case 'hire': return { icon: 'manager', text: tr(`Hire ${d.manager} for your ${d.name}`, `${d.te} కోసం ${d.manager} ని నియమించండి`) };
+    case 'earn': return { icon: 'coin', text: tr(`Earn ${money(m.target)} cash`, `${money(m.target)} క్యాష్ సంపాదించండి`) };
+    case 'click': return { icon: 'runner', text: tr(`Run businesses by hand ${m.target} times`, `వ్యాపారాలను ${m.target} సార్లు చేతితో నడపండి`) };
+    case 'case': return { icon: 'briefcase', text: tr('Open a golden briefcase', 'ఒక బంగారు బ్రీఫ్‌కేస్ తెరవండి') };
+    case 'upgrade': return { icon: 'up', text: tr(`Buy ${m.target} upgrades`, `${m.target} అప్‌గ్రేడ్‌లు కొనండి`) };
+    case 'spin': return { icon: 'wheel', text: tr('Spin the Lucky Wheel', 'లక్కీ వీల్ తిప్పండి') };
   }
-  return { icon: 'clipboard', text: 'Mission' };
+  return { icon: 'clipboard', text: tr('Mission', 'మిషన్') };
 }
 function newMission() {
   const key = m => m.type + (m.world || '') + (m.biz ?? '');
@@ -785,7 +854,7 @@ function claimMission(id) {
   S.stats.missionsDone++;
   replaceMission(k);
   sfx('win');
-  toast(`📋 Mission complete! +${m.gems} 💎 +${money(cash)} cash`, 'gem');
+  toast(tr(`📋 Mission complete! +${m.gems} 💎 +${money(cash)} cash`, `📋 మిషన్ పూర్తి! +${m.gems} 💎 +${money(cash)} క్యాష్`), 'gem');
   confetti(null, 70);
 }
 function skipMission(id) {
@@ -799,12 +868,13 @@ function checkMissions() {
   for (const m of S.missions) {
     if (!m.told && missionValue(m) >= m.target) {
       m.told = true;
-      toast(`📋 Mission done: ${missionText(m).text}. Claim your reward!`, 'good');
+      toast(tr(`📋 Mission done: ${missionText(m).text}. Claim your reward!`, `📋 మిషన్ పూర్తి: ${missionText(m).text}. రివార్డ్ తీసుకోండి!`), 'good');
       sfx('cash');
       if (activeTab === 'missions') renderTab();
     }
   }
 }
+function missionVal(m, v) { return m.type === 'earn' ? `${money(v)} / ${money(m.target)}` : `${fmtInt(v)} / ${fmtInt(m.target)}`; }
 function updateMissionProgress() {
   for (const m of S.missions) {
     const row = document.querySelector(`[data-mrow="${m.id}"]`);
@@ -812,18 +882,13 @@ function updateMissionProgress() {
     const v = Math.min(missionValue(m), m.target);
     if ((v >= m.target) !== (row.dataset.done === '1')) { renderTab(); return; }
     row.querySelector('.mbar div').style.width = (v / m.target * 100) + '%';
-    row.querySelector('.mval').textContent = m.type === 'earn' ? `${money(v)} / ${money(m.target)}` : `${fmtInt(v)} / ${fmtInt(m.target)}`;
+    row.querySelector('.mval').textContent = missionVal(m, v);
   }
 }
 
 /* ---------------------------- LEADERBOARD --------------------------- */
 let lbData = null, lbState = 'idle', lbLastSent = 0, lbLastScore = -1;
-function ensurePlayerId() {
-  if (S.player.id) return;
-  const bytes = new Uint8Array(12);
-  (window.crypto || {}).getRandomValues ? crypto.getRandomValues(bytes) : bytes.forEach((_, i) => { bytes[i] = Math.random() * 256; });
-  S.player.id = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
-}
+function ensurePlayerId() { if (!S.player.id) S.player.id = randomCode(24, '0123456789abcdef'); }
 function cleanName(s) { return String(s || '').replace(/[<>&"'`\\]/g, '').trim().slice(0, 16); }
 async function lbFetch(post) {
   ensurePlayerId();
@@ -845,12 +910,126 @@ async function lbFetch(post) {
 function joinLeaderboard() {
   const input = $('lbName');
   const name = cleanName(input && input.value);
-  if (name.length < 2) { sfx('err'); toast('Please type a name (2–16 letters).', 'bad'); return; }
+  if (name.length < 2) { sfx('err'); toast(tr('Please type a name (2–16 letters).', 'దయచేసి పేరు టైప్ చేయండి (2–16 అక్షరాలు).'), 'bad'); return; }
   S.player.name = name;
   sfx('big');
-  toast(`🏆 Welcome to the leaderboard, ${name}!`, 'good');
+  toast(tr(`🏆 Welcome to the leaderboard, ${name}!`, `🏆 లీడర్‌బోర్డ్‌కు స్వాగతం, ${name}!`), 'good');
   lbFetch(true);
   renderTab();
+}
+
+/* ---------------------------- CLOUD SAVE ---------------------------- */
+const CLOUD_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+let cloudBusy = false, cloudLastAuto = 0;
+function fmtCode(c) { return String(c || '').replace(/[^A-Z0-9]/gi, '').toUpperCase().replace(/(.{4})(?=.)/g, '$1-'); }
+function normCode(c) { return String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+async function cloudSave(manual) {
+  if (cloudBusy) return;
+  if (!S.cloud.code) S.cloud.code = randomCode(12, CLOUD_ALPHA);
+  cloudBusy = true;
+  cloudLastAuto = Date.now();
+  save();
+  try {
+    const res = await fetch(CLOUD_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: S.cloud.code, data: S }), keepalive: !manual });
+    if (!res.ok) throw new Error('status ' + res.status);
+    const out = await res.json();
+    S.cloud.lastSync = out.savedAt || Date.now();
+    save();
+    if (manual) { sfx('big'); toast(tr('☁️ Saved to cloud!', '☁️ క్లౌడ్‌లో సేవ్ అయింది!'), 'good'); }
+  } catch (e) {
+    if (manual) { sfx('err'); toast(tr('Cloud save works on the online game. Check your internet.', 'క్లౌడ్ సేవ్ ఆన్‌లైన్ గేమ్‌లోనే పనిచేస్తుంది. ఇంటర్నెట్ చూడండి.'), 'bad'); }
+  }
+  cloudBusy = false;
+  if (activeTab === 'settings') renderTab();
+}
+function cloudLoadAsk() {
+  modal(`${ico('inbox', 'big-ico')}<h3>${tr('Load from cloud', 'క్లౌడ్ నుంచి లోడ్')}</h3>
+    <p>${tr('Type the cloud code from your other device.', 'మీ మరో డివైస్‌లోని క్లౌడ్ కోడ్ టైప్ చేయండి.')}</p>
+    <input id="cloudCodeIn" class="code-in" maxlength="14" placeholder="XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="characters">
+    <div class="modal-actions"><button class="btn ghost" data-act="close">${tr('Cancel', 'రద్దు')}</button><button class="btn" data-act="cloud-fetch">${tr('Find save', 'సేవ్ వెతకండి')}</button></div>`);
+  setTimeout(() => { const i = $('cloudCodeIn'); if (i) i.focus(); }, 50);
+}
+let cloudPending = null;
+async function cloudFetch() {
+  const code = normCode($('cloudCodeIn') && $('cloudCodeIn').value);
+  if (code.length !== 12) { sfx('err'); toast(tr('A cloud code has 12 letters and numbers.', 'క్లౌడ్ కోడ్‌లో 12 అక్షరాలు/అంకెలు ఉంటాయి.'), 'bad'); return; }
+  try {
+    const res = await fetch(`${CLOUD_URL}?code=${code}`);
+    if (res.status === 404) { sfx('err'); toast(tr('No save found for that code.', 'ఆ కోడ్‌కు సేవ్ దొరకలేదు.'), 'bad'); return; }
+    if (!res.ok) throw new Error('status ' + res.status);
+    const rec = await res.json();
+    cloudPending = { code, data: rec.data };
+    const d = rec.data || {};
+    const when = new Date(rec.savedAt).toLocaleString();
+    modal(`${ico('cloud', 'big-ico')}<h3>${tr('Save found!', 'సేవ్ దొరికింది!')}</h3>
+      <p>${tr('Saved', 'సేవ్ చేసిన సమయం')}: <b>${esc(when)}</b><br>${tr('Lifetime earnings', 'మొత్తం సంపాదన')}: <b>${money(+d.lifetime || 0)}</b><br>${tr('Gems', 'జెమ్స్')}: <b>${fmtInt(+d.gems || 0)}</b></p>
+      <p class="warn">${tr('This replaces the progress on this device.', 'ఇది ఈ డివైస్‌లోని ప్రోగ్రెస్‌ను మార్చేస్తుంది.')}</p>
+      <div class="modal-actions"><button class="btn ghost" data-act="close">${tr('Cancel', 'రద్దు')}</button><button class="btn gold" data-act="cloud-apply">${tr('Load this save', 'ఈ సేవ్ లోడ్ చేయండి')}</button></div>`);
+  } catch (e) {
+    sfx('err');
+    toast(tr('Cloud save works on the online game. Check your internet.', 'క్లౌడ్ సేవ్ ఆన్‌లైన్ గేమ్‌లోనే పనిచేస్తుంది. ఇంటర్నెట్ చూడండి.'), 'bad');
+  }
+}
+function cloudApply() {
+  if (!cloudPending) return;
+  S = mergeState(cloudPending.data);
+  S.cloud.code = cloudPending.code;
+  S.cloud.lastSync = Date.now();
+  S.lastSave = Date.now();
+  cloudPending = null;
+  marketEvent = null;
+  lbData = null;
+  afterStateReplaced();
+  sfx('win');
+  toast(tr('☁️ Progress loaded from the cloud!', '☁️ క్లౌడ్ నుంచి ప్రోగ్రెస్ లోడ్ అయింది!'), 'good');
+  confetti(null, 120);
+}
+function afterStateReplaced() {
+  applyStaticText();
+  applyWorld(S.world);
+  ensureMissions();
+  ensurePlayerId();
+  save();
+  closeModal();
+  buildBizCards();
+  switchTab('business');
+}
+
+/* ---------------------------- SHARE --------------------------------- */
+function shareText() {
+  return tr(`I built a ${money(S.lifetime)} business empire on ${WORLD.name}! 🏙️ Can you beat me? Play Business Empire:`,
+    `నేను ${WORLD.te} పై ${money(S.lifetime)} బిజినెస్ సామ్రాజ్యం కట్టాను! 🏙️ నన్ను దాటగలరా? Business Empire ఆడండి:`);
+}
+async function shareGame() {
+  const url = location.origin + '/';
+  const text = shareText();
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: 'Business Empire', text, url });
+      shareDone();
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+    }
+  }
+  const wa = `https://wa.me/?text=${encodeURIComponent(text + ' ' + url)}`;
+  modal(`${ico('letter', 'big-ico')}<h3>${tr('Share with friends', 'స్నేహితులతో షేర్ చేయండి')}</h3>
+    <p>${esc(text)}<br><b>${esc(url)}</b></p>
+    <div class="modal-actions">
+      <a class="btn" href="${wa}" target="_blank" rel="noopener" data-act="share-done">WhatsApp</a>
+      <button class="btn blue" data-act="share-copy">${tr('Copy link', 'లింక్ కాపీ')}</button>
+      <button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button>
+    </div>`);
+}
+function shareDone() {
+  S.stats.shares = (S.stats.shares || 0) + 1;
+  toast(tr('💌 Thanks for sharing!', '💌 షేర్ చేసినందుకు ధన్యవాదాలు!'), 'good');
+}
+function copyText(text) {
+  const done = () => toast(tr('📋 Copied!', '📋 కాపీ అయింది!'), 'good');
+  if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, done);
+  else done();
 }
 
 /* ---------------------------- FX: STARS, COINS, CONFETTI ------------ */
@@ -1014,14 +1193,14 @@ function buildBizCards() {
   const list = $('bizList');
   list.innerHTML = BUSINESSES.map((d, i) => `
     <div class="biz" data-i="${i}" style="--d:${i * 60}ms">
-      <button class="biz-icon" data-act="run" data-i="${i}" title="Run ${d.name}">
+      <button class="biz-icon" data-act="run" data-i="${i}" title="${esc(nm(d))}">
         <div class="ms"><div class="ms-fill"></div></div>
         <div class="orb-ring"></div>
         <div class="orb">${ico(d.icon, 'biz-img')}</div>
         <span class="lvl">0</span>
       </button>
       <div class="biz-body">
-        <div class="biz-head"><span class="biz-name">${d.name}</span><span class="biz-tag"></span></div>
+        <div class="biz-head"><span class="biz-name">${nm(d)}</span><span class="biz-tag"></span></div>
         <div class="bar" data-act="run" data-i="${i}"><div class="bar-fill"></div><div class="bar-shine"></div><span class="bar-text"></span></div>
         <div class="biz-actions">
           <button class="buy" data-act="buy" data-i="${i}"><span class="buy-n"></span><span class="buy-cost"></span></button>
@@ -1056,7 +1235,7 @@ function updateBizBars() {
 }
 function updateBizText() {
   S.biz.forEach((b, i) => {
-    const c = cards[i], d = BUSINESSES[i];
+    const c = cards[i];
     if (!c) return;
     const locked = b.owned === 0;
     c.el.classList.toggle('locked', locked);
@@ -1065,19 +1244,19 @@ function updateBizText() {
     c.el.classList.toggle('idle', !locked && !b.manager && !b.running);
     c.el.classList.toggle('hot', !!marketEvent && marketEvent.biz === i);
     c.lvl.textContent = fmtInt(b.owned);
-    const nm = nextMilestone(b.owned);
+    const nmx = nextMilestone(b.owned);
     const prevLvl = [...MILESTONES].reverse().find(m => m.lvl <= b.owned);
     const from = prevLvl ? prevLvl.lvl : 0;
-    c.ms.style.width = nm ? ((b.owned - from) / (nm.lvl - from) * 100) + '%' : '100%';
+    c.ms.style.width = nmx ? ((b.owned - from) / (nmx.lvl - from) * 100) + '%' : '100%';
     const n = buyAmount(i), cost = costFor(i, n);
-    c.buyN.textContent = locked ? 'Unlock' : `Buy x${n}`;
+    c.buyN.textContent = locked ? tr('Unlock', 'అన్‌లాక్') : tr(`Buy x${n}`, `కొను x${n}`);
     c.buyCost.textContent = money(cost);
     c.buyBtn.classList.toggle('cant', S.cash < cost);
-    if (locked) { c.tag.textContent = '🔒 Locked'; return; }
+    if (locked) { c.tag.textContent = tr('🔒 Locked', '🔒 లాక్'); return; }
     const ct = cycleTime(i), rev = cycleRevenue(i);
-    c.tag.textContent = nm ? `Next @${nm.lvl}: ${nm.type === 'speed' ? '⚡' : '💰'}x${nm.mult}` : '⭐ Maxed milestones';
-    c.text.textContent = (b.manager && ct < 0.15) ? money(rev / ct) + ' /s' : money(rev);
-    c.timer.textContent = b.manager ? (ct < 0.15 ? '🤖 auto' : fmtClock(ct * (1 - b.progress)))
+    c.tag.textContent = nmx ? `${tr('Next', 'తర్వాత')} @${nmx.lvl}: ${nmx.type === 'speed' ? '⚡' : '💰'}x${nmx.mult}` : tr('⭐ Maxed milestones', '⭐ అన్ని మైల్‌స్టోన్లు పూర్తి');
+    c.text.textContent = (b.manager && ct < 0.15) ? money(rev / ct) + tr(' /s', ' /సె') : money(rev);
+    c.timer.textContent = b.manager ? (ct < 0.15 ? tr('🤖 auto', '🤖 ఆటో') : fmtClock(ct * (1 - b.progress)))
       : b.running ? fmtClock(ct * (1 - b.progress)) : fmtClock(ct);
   });
 }
@@ -1133,56 +1312,67 @@ function renderTab() {
 function header(icon, title, sub) {
   return `<div class="tab-head">${ico(icon, 'head-ico')}<div><h2>${title}</h2><p class="sub">${sub}</p></div></div>`;
 }
+function rowHtml(icon, title, desc, action, cls = '') {
+  return `<div class="row ${cls}"><div class="ico">${ico(icon)}</div><div class="info"><div class="title">${title}</div>${desc ? `<div class="desc">${desc}</div>` : ''}</div>${action}</div>`;
+}
 
 function renderMissions() {
   const rows = S.missions.map(m => {
     const t = missionText(m), v = Math.min(missionValue(m), m.target), done = v >= m.target;
-    const val = m.type === 'earn' ? `${money(v)} / ${money(m.target)}` : `${fmtInt(v)} / ${fmtInt(m.target)}`;
     return `<div class="row mission ${done ? 'ready' : ''}" data-mrow="${m.id}" data-done="${done ? 1 : 0}">
       <div class="ico">${ico(t.icon)}</div>
       <div class="info"><div class="title">${t.text}</div>
         <div class="mbar"><div style="width:${v / m.target * 100}%"></div></div>
-        <div class="desc"><span class="mval">${val}</span> · Reward: 💎${m.gems} + 2 min income</div></div>
-      ${done ? `<button class="btn gold" data-act="mclaim" data-id="${m.id}">Claim</button>`
-        : `<button class="btn ghost" data-act="mskip" data-id="${m.id}" data-gems="2" title="Swap for a new mission">Skip 💎2</button>`}
+        <div class="desc"><span class="mval">${missionVal(m, v)}</span> · ${tr('Reward', 'రివార్డ్')}: 💎${m.gems} + ${tr('2 min income', '2 నిమి ఆదాయం')}</div></div>
+      ${done ? `<button class="btn gold" data-act="mclaim" data-id="${m.id}">${tr('Claim', 'తీసుకోండి')}</button>`
+        : `<button class="btn ghost" data-act="mskip" data-id="${m.id}" data-gems="2">${tr('Skip', 'మార్చు')} 💎2</button>`}
     </div>`;
   }).join('');
-  return header('clipboard', 'Missions', `Finish missions to win gems and cash. Completed so far: <b>${fmtInt(S.stats.missionsDone)}</b>`) +
+  return header('clipboard', tr('Missions', 'మిషన్లు'),
+    tr(`Finish missions to win gems and cash. Completed so far: <b>${fmtInt(S.stats.missionsDone)}</b>`, `మిషన్లు పూర్తి చేసి జెమ్స్, క్యాష్ గెలవండి. ఇప్పటివరకు: <b>${fmtInt(S.stats.missionsDone)}</b>`)) +
     `<div class="list">${rows}</div>`;
 }
 function renderManagers() {
   const rows = BUSINESSES.map((d, i) => {
     const b = S.biz[i];
-    if (b.manager) return `<div class="row done"><div class="ico">${ico(d.icon)}</div><div class="info"><div class="title">${d.manager}</div><div class="desc">Running your ${d.name}</div></div><span class="badge">✔ Hired</span></div>`;
-    const note = b.owned === 0 ? `Unlock ${d.name} first` : `Automatically runs ${d.name} forever — even while you're away`;
-    return `<div class="row"><div class="ico">${ico(d.icon)}</div><div class="info"><div class="title">${d.manager}</div><div class="desc">${note}</div></div>
-      <button class="btn" data-act="hire" data-i="${i}" data-cost="${d.managerCost}" ${b.owned === 0 ? 'disabled' : ''}>Hire ${money(d.managerCost)}</button></div>`;
+    if (b.manager) return rowHtml(d.icon, d.manager, tr(`Running your ${d.name}`, `మీ ${d.te} నడుపుతున్నారు`), `<span class="badge">${tr('✔ Hired', '✔ నియమించారు')}</span>`, 'done');
+    const note = b.owned === 0 ? tr(`Unlock ${d.name} first`, `ముందు ${d.te} అన్‌లాక్ చేయండి`)
+      : tr(`Automatically runs ${d.name} forever — even while you're away`, `${d.te} ని ఎప్పటికీ ఆటోమేటిక్‌గా నడుపుతారు — మీరు లేనప్పుడు కూడా`);
+    return rowHtml(d.icon, d.manager, note,
+      `<button class="btn" data-act="hire" data-i="${i}" data-cost="${d.managerCost}" ${b.owned === 0 ? 'disabled' : ''}>${tr('Hire', 'నియమించు')} ${money(d.managerCost)}</button>`);
   }).join('');
-  return header('manager', `Managers · ${WORLD.name}`, 'Managers run a business automatically and keep earning while you\'re offline.') + `<div class="list">${rows}</div>`;
+  return header('manager', `${tr('Managers', 'మేనేజర్లు')} · ${nm(WORLD)}`,
+    tr('Managers run a business automatically and keep earning while you\'re offline.', 'మేనేజర్లు వ్యాపారాన్ని ఆటోమేటిక్‌గా నడుపుతారు, మీరు ఆఫ్‌లైన్‌లో ఉన్నా సంపాదిస్తారు.')) + `<div class="list">${rows}</div>`;
 }
 function renderUpgrades() {
   const left = UPGRADES.filter(u => !S.upgrades[u.id]);
-  const rows = left.slice(0, 25).map(u => `<div class="row"><div class="ico">${ico(u.icon)}</div><div class="info"><div class="title">${u.name}</div>
-      <div class="desc">${u.target === -1 ? 'All businesses' : BUSINESSES[u.target].name} profit x${u.mult}</div></div>
-      <button class="btn gold" data-act="upgrade" data-id="${u.id}" data-cost="${u.cost}">${money(u.cost)}</button></div>`).join('');
-  return header('up', `Upgrades · ${WORLD.name}`, `Owned ${UPGRADES.length - left.length} / ${UPGRADES.length}. Each upgrade multiplies profits.`) +
-    `<div class="toolbar"><span></span><button class="btn" data-act="upgrade-all">Buy all affordable</button></div>
-    <div class="list">${rows || '<p class="sub">You own every upgrade in this world. Legendary!</p>'}</div>`;
+  const rows = left.slice(0, 25).map(u => rowHtml(u.icon, upgName(u),
+    `${u.target === -1 ? tr('All businesses', 'అన్ని వ్యాపారాలు') : nm(BUSINESSES[u.target])} ${tr('profit', 'లాభం')} x${u.mult}`,
+    `<button class="btn gold" data-act="upgrade" data-id="${u.id}" data-cost="${u.cost}">${money(u.cost)}</button>`)).join('');
+  const owned = UPGRADES.length - left.length;
+  return header('up', `${tr('Upgrades', 'అప్‌గ్రేడ్‌లు')} · ${nm(WORLD)}`,
+    tr(`Owned ${owned} / ${UPGRADES.length}. Each upgrade multiplies profits.`, `${owned} / ${UPGRADES.length} కొన్నారు. ప్రతి అప్‌గ్రేడ్ లాభాన్ని పెంచుతుంది.`)) +
+    `<div class="toolbar"><span></span><button class="btn" data-act="upgrade-all">${tr('Buy all affordable', 'కొనగలిగినవన్నీ కొను')}</button></div>
+    <div class="list">${rows || `<p class="sub">${tr('You own every upgrade in this world. Legendary!', 'ఈ ప్రపంచంలో అన్ని అప్‌గ్రేడ్‌లు మీవే. లెజెండ్!')}</p>`}</div>`;
 }
 function renderInvestors() {
   const avail = investorsAvailable();
   const rate = investorRate();
-  const rows = INVESTOR_UPGRADES.map(u => S.investorUpgrades[u.id]
-    ? `<div class="row done"><div class="ico">${ico(u.icon)}</div><div class="info"><div class="title">${u.name}</div><div class="desc">${u.desc}</div></div><span class="badge">✔ Owned</span></div>`
-    : `<div class="row"><div class="ico">${ico(u.icon)}</div><div class="info"><div class="title">${u.name}</div><div class="desc">${u.desc}</div></div>
-       <button class="btn purple" data-act="invup" data-id="${u.id}" data-inv="${u.cost}">👔 ${fmtInt(u.cost)}</button></div>`).join('');
-  return header('necktie', 'Investors', `Investors join based on your lifetime earnings. Each one boosts ALL profits in every world by +${Math.round(rate * 100)}%.`) +
+  const rows = INVESTOR_UPGRADES.map(u => {
+    const [name, desc] = invText(u);
+    return S.investorUpgrades[u.id]
+      ? rowHtml(u.icon, name, desc, `<span class="badge">${tr('✔ Owned', '✔ ఉంది')}</span>`, 'done')
+      : rowHtml(u.icon, name, desc, `<button class="btn purple" data-act="invup" data-id="${u.id}" data-inv="${u.cost}">👔 ${fmtInt(u.cost)}</button>`);
+  }).join('');
+  const pct = Math.round(rate * 100);
+  return header('necktie', tr('Investors', 'ఇన్వెస్టర్లు'),
+    tr(`Investors join based on your lifetime earnings. Each one boosts ALL profits in every world by +${pct}%.`, `మీ మొత్తం సంపాదన బట్టి ఇన్వెస్టర్లు వస్తారు. ప్రతి ఒక్కరు అన్ని ప్రపంచాల్లో లాభాన్ని +${pct}% పెంచుతారు.`)) +
     `<div class="hero">
-      <div><div class="stat-big">${fmtInt(S.investors)}</div><div class="stat-lbl">Current investors (+${fmt(S.investors * rate * 100)}%)</div></div>
-      <div><div class="stat-big" id="invAvail">${fmtInt(avail)}</div><div class="stat-lbl">Ready to join if you restart ${WORLD.name}</div></div>
-      <button class="btn gold" data-act="prestige" ${avail < 1 ? 'disabled' : ''}>Restart &amp; Claim</button>
+      <div><div class="stat-big">${fmtInt(S.investors)}</div><div class="stat-lbl">${tr('Current investors', 'ప్రస్తుత ఇన్వెస్టర్లు')} (+${fmt(S.investors * rate * 100)}%)</div></div>
+      <div><div class="stat-big" id="invAvail">${fmtInt(avail)}</div><div class="stat-lbl">${tr(`Ready to join if you restart ${WORLD.name}`, `${WORLD.te} రీస్టార్ట్ చేస్తే చేరేవారు`)}</div></div>
+      <button class="btn gold" data-act="prestige" ${avail < 1 ? 'disabled' : ''}>${tr('Restart &amp; Claim', 'రీస్టార్ట్ &amp; పొందండి')}</button>
     </div>
-    <h3 class="sec">Investor Upgrades</h3><p class="sub">Spend investors on powerful permanent upgrades.</p>
+    <h3 class="sec">${tr('Investor Upgrades', 'ఇన్వెస్టర్ అప్‌గ్రేడ్‌లు')}</h3><p class="sub">${tr('Spend investors on powerful permanent upgrades.', 'ఇన్వెస్టర్లను శక్తివంతమైన శాశ్వత అప్‌గ్రేడ్‌లకు ఖర్చు చేయండి.')}</p>
     <div class="list">${rows}</div>`;
 }
 function renderWorlds() {
@@ -1190,104 +1380,136 @@ function renderWorlds() {
     const unlocked = !!S.worldsUnlocked[w.id], here = S.world === w.id;
     const pct = Math.min(100, w.unlockAt ? S.lifetime / w.unlockAt * 100 : 100);
     let action;
-    if (here) action = '<span class="badge">You are here</span>';
-    else if (unlocked) action = `<button class="btn" data-act="travel" data-id="${w.id}">Travel</button>`;
-    else if (S.lifetime >= w.unlockAt) action = `<button class="btn gold" data-act="unlock-world" data-id="${w.id}">Unlock!</button>`;
-    else action = `<div class="world-lock"><div class="mbar"><div style="width:${pct}%"></div></div><small>${money(S.lifetime)} / ${money(w.unlockAt)} lifetime</small></div>`;
+    if (here) action = `<span class="badge">${tr('You are here', 'మీరు ఇక్కడ ఉన్నారు')}</span>`;
+    else if (unlocked) action = `<button class="btn" data-act="travel" data-id="${w.id}">${tr('Travel', 'ప్రయాణం')}</button>`;
+    else if (S.lifetime >= w.unlockAt) action = `<button class="btn gold" data-act="unlock-world" data-id="${w.id}">${tr('Unlock!', 'అన్‌లాక్!')}</button>`;
+    else action = `<div class="world-lock"><div class="mbar"><div style="width:${pct}%"></div></div><small>${money(S.lifetime)} / ${money(w.unlockAt)} ${tr('lifetime', 'మొత్తం')}</small></div>`;
     const preview = w.biz.slice(0, 5).map(b => ico(b.icon)).join('');
     return `<div class="world-card w-${w.id} ${unlocked ? '' : 'locked'} ${here ? 'here' : ''}">
       <div class="planet">${ico(w.icon)}</div>
-      <div class="info"><div class="title">${w.name} <span class="badge">x${w.mult} profits</span></div>
-        <div class="desc">${w.desc}</div><div class="preview">${preview}</div></div>
+      <div class="info"><div class="title">${nm(w)} <span class="badge">x${w.mult} ${tr('profits', 'లాభాలు')}</span></div>
+        <div class="desc">${tr(...w.desc)}</div><div class="preview">${preview}</div></div>
       <div class="world-act">${action}</div></div>`;
   }).join('');
-  return header('earth', 'Worlds', 'Unlock new worlds with lifetime earnings. Each world has its own businesses. Only the world you are in earns money.') +
+  return header('earth', tr('Worlds', 'ప్రపంచాలు'),
+    tr('Unlock new worlds with lifetime earnings. Each world has its own businesses. Only the world you are in earns money.',
+      'మొత్తం సంపాదనతో కొత్త ప్రపంచాలు అన్‌లాక్ చేయండి. ప్రతి ప్రపంచానికి సొంత వ్యాపారాలు. మీరు ఉన్న ప్రపంచం మాత్రమే సంపాదిస్తుంది.')) +
     `<div class="worlds">${cardsHtml}</div>`;
 }
 function renderLeaderboard() {
+  const sub = tr('Compete with players around the world. Your score is your lifetime earnings.', 'ప్రపంచవ్యాప్తంగా ప్లేయర్లతో పోటీ పడండి. మీ స్కోర్ = మీ మొత్తం సంపాదన.');
   if (!S.player.name) {
-    return header('trophy', 'Leaderboard', 'Compete with players around the world. Your score is your lifetime earnings.') +
+    return header('trophy', tr('Leaderboard', 'లీడర్‌బోర్డ్'), sub) +
       `<div class="join-card">${ico('person', 'big-ico')}
-        <h3>Choose your boss name</h3>
-        <input id="lbName" maxlength="16" placeholder="Your name" autocomplete="nickname">
-        <button class="btn gold" data-act="lb-join">Join leaderboard</button>
-        <p class="sub">Only your name, score and current world are shared.</p></div>`;
+        <h3>${tr('Choose your boss name', 'మీ బాస్ పేరు ఎంచుకోండి')}</h3>
+        <input id="lbName" maxlength="16" placeholder="${tr('Your name', 'మీ పేరు')}" autocomplete="nickname">
+        <button class="btn gold" data-act="lb-join">${tr('Join leaderboard', 'లీడర్‌బోర్డ్‌లో చేరండి')}</button>
+        <p class="sub">${tr('Only your name, score and current world are shared.', 'మీ పేరు, స్కోర్, ప్రస్తుత ప్రపంచం మాత్రమే షేర్ అవుతాయి.')}</p></div>`;
   }
   let body;
   if (lbState === 'offline') {
-    body = `<div class="join-card">${ico('earth', 'big-ico')}<h3>Leaderboard is offline</h3>
-      <p class="sub">The leaderboard works on the online version of the game. Check your internet and try again.</p>
-      <button class="btn" data-act="lb-refresh">Try again</button></div>`;
+    body = `<div class="join-card">${ico('earth', 'big-ico')}<h3>${tr('Leaderboard is offline', 'లీడర్‌బోర్డ్ ఆఫ్‌లైన్‌లో ఉంది')}</h3>
+      <p class="sub">${tr('The leaderboard works on the online version of the game. Check your internet and try again.', 'లీడర్‌బోర్డ్ ఆన్‌లైన్ గేమ్‌లోనే పనిచేస్తుంది. ఇంటర్నెట్ చూసి మళ్ళీ ప్రయత్నించండి.')}</p>
+      <button class="btn" data-act="lb-refresh">${tr('Try again', 'మళ్ళీ ప్రయత్నించు')}</button></div>`;
   } else if (!lbData) {
-    body = `<div class="join-card"><div class="loader"></div><p class="sub">Loading players…</p></div>`;
+    body = `<div class="join-card"><div class="loader"></div><p class="sub">${tr('Loading players…', 'ప్లేయర్లు లోడ్ అవుతున్నారు…')}</p></div>`;
   } else {
     const rows = lbData.top.map(p => {
       const medal = p.rank === 1 ? ico('gold') : p.rank === 2 ? ico('silver') : p.rank === 3 ? ico('bronze') : `<b class="rank-n">#${p.rank}</b>`;
       return `<div class="lb-row ${p.me ? 'me' : ''} ${p.rank <= 3 ? 'top' : ''}"><div class="lb-rank">${medal}</div>
-        <div class="lb-name">${esc(p.name)}${p.me ? ' <span class="badge">You</span>' : ''}</div>
+        <div class="lb-name">${esc(p.name)}${p.me ? ` <span class="badge">${tr('You', 'మీరు')}</span>` : ''}</div>
         <div class="lb-world">${ico(worldDef(p.world).icon)}</div><div class="lb-score">${money(p.score)}</div></div>`;
-    }).join('') || '<p class="sub">No players yet. Be the first!</p>';
-    body = `<div class="lb-me">${ico('person')}<div><b>${esc(S.player.name)}</b><br><small>Rank ${lbData.myRank ? '#' + lbData.myRank : '—'} of ${fmtInt(lbData.players)}</small></div>
-      <div class="lb-actions"><button class="btn ghost" data-act="lb-rename">Rename</button><button class="btn" data-act="lb-refresh">Refresh</button></div></div>
+    }).join('') || `<p class="sub">${tr('No players yet. Be the first!', 'ఇంకా ప్లేయర్లు లేరు. మీరే మొదటివారు అవ్వండి!')}</p>`;
+    const rank = lbData.myRank ? '#' + lbData.myRank : '—';
+    body = `<div class="lb-me">${ico('person')}<div><b>${esc(S.player.name)}</b><br><small>${tr(`Rank ${rank} of ${fmtInt(lbData.players)}`, `${fmtInt(lbData.players)} లో ర్యాంక్ ${rank}`)}</small></div>
+      <div class="lb-actions"><button class="btn ghost" data-act="lb-rename">${tr('Rename', 'పేరు మార్చు')}</button><button class="btn" data-act="lb-refresh">${tr('Refresh', 'రిఫ్రెష్')}</button></div></div>
       <div class="lb-list">${rows}</div>`;
   }
-  return header('trophy', 'Leaderboard', 'Top bosses by lifetime earnings. Your score updates every minute.') + body;
+  return header('trophy', tr('Leaderboard', 'లీడర్‌బోర్డ్'), tr('Top bosses by lifetime earnings. Your score updates every minute.', 'మొత్తం సంపాదన బట్టి టాప్ బాస్‌లు. మీ స్కోర్ ప్రతి నిమిషం అప్‌డేట్ అవుతుంది.')) + body;
 }
 function renderShop() {
   const rows = GEM_SHOP.map(g => {
     const c = gemCost(g);
+    const [name, desc] = isTe() ? [g.t[2], g.t[3]] : [g.t[0], g.t[1]];
     let extra = '';
     if (g.id === 'golden') extra = ` <span class="badge">${S.gemGolden}/3</span>`;
-    if (g.id === 'offline') extra = ` <span class="badge">now ${fmtDur(OFFLINE_CAPS[S.offlineLvl])}</span>`;
+    if (g.id === 'offline') extra = ` <span class="badge">${tr('now', 'ఇప్పుడు')} ${fmtDur(OFFLINE_CAPS[S.offlineLvl])}</span>`;
     if (g.id.startsWith('warp')) extra = ` <span class="badge">≈ ${money(bonusCash(g.id === 'warp1' ? 3600 : 86400))}</span>`;
-    return `<div class="row"><div class="ico">${ico(g.icon)}</div><div class="info"><div class="title">${g.name}${extra}</div><div class="desc">${g.desc}</div></div>
-      ${c == null ? '<span class="badge">✔ Maxed</span>' : `<button class="btn blue" data-act="gem" data-id="${g.id}" data-gems="${c}">💎 ${c}</button>`}</div>`;
+    return rowHtml(g.icon, name + extra, desc,
+      c == null ? `<span class="badge">${tr('✔ Maxed', '✔ పూర్తి')}</span>` : `<button class="btn blue" data-act="gem" data-id="${g.id}" data-gems="${c}">💎 ${c}</button>`);
   }).join('');
-  return header('gem', 'Gem Shop', `Earn gems from awards, missions, daily rewards and the Lucky Spin. You have <b>${fmtInt(S.gems)}</b> 💎.`) +
-    `<div class="row spin-row"><div class="ico">${ico('wheel')}</div><div class="info"><div class="title">Lucky Spin</div><div class="desc">Free spin every 4 hours, or spin any time for 💎${SPIN_GEM_COST}.</div></div>
-      <button class="btn gold" data-act="spin">Open wheel</button></div>
-    <div class="list">${rows}</div>`;
+  return header('gem', tr('Gem Shop', 'జెమ్ షాప్'),
+    tr(`Earn gems from awards, missions, daily rewards and the Lucky Spin. You have <b>${fmtInt(S.gems)}</b> 💎.`, `అవార్డులు, మిషన్లు, డైలీ రివార్డులు, లక్కీ స్పిన్ నుంచి జెమ్స్ పొందండి. మీ దగ్గర <b>${fmtInt(S.gems)}</b> 💎 ఉన్నాయి.`)) +
+    rowHtml('wheel', tr('Lucky Spin', 'లక్కీ స్పిన్'), tr(`Free spin every 4 hours, or spin any time for 💎${SPIN_GEM_COST}.`, `ప్రతి 4 గంటలకు ఫ్రీ స్పిన్, లేదా ఎప్పుడైనా 💎${SPIN_GEM_COST} తో.`),
+      `<button class="btn gold" data-act="spin">${tr('Open wheel', 'వీల్ తెరవండి')}</button>`, 'spin-row') +
+    `<div class="list">${rows}</div>`;
 }
 function renderAwards() {
   const got = ACHIEVEMENTS.filter(a => S.achievements[a.id]).length;
   const cells = ACHIEVEMENTS.map(a => `<div class="award ${S.achievements[a.id] ? '' : 'locked'}">${ico(a.icon)}
-    <div><div class="title">${a.name}</div><div class="desc">${a.desc} · 💎${a.gems}</div></div></div>`).join('');
-  return header('medal', 'Awards', `Unlocked ${got} / ${ACHIEVEMENTS.length}. Each award grants gems.`) + `<div class="grid-awards">${cells}</div>`;
+    <div><div class="title">${a.name()}</div><div class="desc">${a.desc()} · 💎${a.gems}</div></div></div>`).join('');
+  return header('medal', tr('Awards', 'అవార్డులు'), tr(`Unlocked ${got} / ${ACHIEVEMENTS.length}. Each award grants gems.`, `${got} / ${ACHIEVEMENTS.length} పొందారు. ప్రతి అవార్డుకు జెమ్స్ వస్తాయి.`)) +
+    `<div class="grid-awards">${cells}</div>`;
 }
 function renderStats() {
   const owned = S.biz.reduce((a, b) => a + b.owned, 0);
   const rows = [
-    ['World', `${WORLD.name} (x${WORLD.mult})`],
-    ['Cash', money(S.cash)],
-    ['Income (managed)', money(incomePerSec()) + ' /s'],
-    ['Total profit multiplier', 'x' + fmt(globalMult())],
-    ['Earned this run', money(S.runEarnings)],
-    ['Best run', money(Math.max(S.stats.bestRun, S.runEarnings))],
-    ['Lifetime earnings', money(S.lifetime)],
-    ['Businesses owned (this world)', fmtInt(owned)],
-    ['Managers hired (this world)', S.biz.filter(b => b.manager).length + ' / ' + BUSINESSES.length],
-    ['Worlds unlocked', Object.keys(S.worldsUnlocked).length + ' / ' + WORLDS.length],
-    ['Upgrades bought (all time)', fmtInt(S.stats.upgradesBought)],
-    ['Restarts', fmtInt(S.stats.prestiges)],
-    ['Lucky spins', fmtInt(S.stats.spins || 0)],
-    ['Golden briefcases opened', fmtInt(S.stats.briefcases)],
-    ['Manual runs', fmtInt(S.stats.clicks)],
-    ['Awards', Object.keys(S.achievements).length + ' / ' + ACHIEVEMENTS.length],
-    ['Play time', fmtDur(S.stats.playTime)],
+    [tr('World', 'ప్రపంచం'), `${nm(WORLD)} (x${WORLD.mult})`],
+    [tr('Cash', 'క్యాష్'), money(S.cash)],
+    [tr('Income (managed)', 'ఆదాయం (మేనేజర్లు)'), money(incomePerSec()) + tr(' /s', ' /సె')],
+    [tr('Total profit multiplier', 'మొత్తం లాభం గుణకం'), 'x' + fmt(globalMult())],
+    [tr('Earned this run', 'ఈ రన్‌లో సంపాదన'), money(S.runEarnings)],
+    [tr('Best run', 'ఉత్తమ రన్'), money(Math.max(S.stats.bestRun, S.runEarnings))],
+    [tr('Lifetime earnings', 'మొత్తం సంపాదన'), money(S.lifetime)],
+    [tr('Businesses owned (this world)', 'వ్యాపారాలు (ఈ ప్రపంచం)'), fmtInt(owned)],
+    [tr('Managers hired (this world)', 'మేనేజర్లు (ఈ ప్రపంచం)'), S.biz.filter(b => b.manager).length + ' / ' + BUSINESSES.length],
+    [tr('Worlds unlocked', 'అన్‌లాక్ అయిన ప్రపంచాలు'), Object.keys(S.worldsUnlocked).length + ' / ' + WORLDS.length],
+    [tr('Upgrades bought (all time)', 'కొన్న అప్‌గ్రేడ్‌లు'), fmtInt(S.stats.upgradesBought)],
+    [tr('Restarts', 'రీస్టార్ట్‌లు'), fmtInt(S.stats.prestiges)],
+    [tr('Lucky spins', 'లక్కీ స్పిన్‌లు'), fmtInt(S.stats.spins || 0)],
+    [tr('Golden briefcases opened', 'తెరిచిన బ్రీఫ్‌కేసులు'), fmtInt(S.stats.briefcases)],
+    [tr('Manual runs', 'చేతితో నడిపినవి'), fmtInt(S.stats.clicks)],
+    [tr('Awards', 'అవార్డులు'), Object.keys(S.achievements).length + ' / ' + ACHIEVEMENTS.length],
+    [tr('Play time', 'ఆడిన సమయం'), fmtDur(S.stats.playTime)],
   ];
-  return header('bars', 'Stats', 'Your empire at a glance.') +
-    `<table class="stats-table">${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>`;
+  return header('bars', tr('Stats', 'గణాంకాలు'), tr('Your empire at a glance.', 'మీ సామ్రాజ్యం ఒక్క చూపులో.')) +
+    `<table class="stats-table">${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>
+    <div class="toolbar share-bar"><span></span><button class="btn gold" data-act="share">${ico('letter')} ${tr('Share my empire', 'నా సామ్రాజ్యం షేర్ చేయి')}</button></div>`;
 }
 function renderSettings() {
-  const row = (icon, title, desc, btn) => `<div class="row setting"><div class="ico">${ico(icon)}</div><div class="info"><div class="title">${title}</div>${desc ? `<div class="desc">${desc}</div>` : ''}</div>${btn}</div>`;
-  return header('gear', 'Settings', `Progress saves automatically in this browser. · Version ${GAME_VERSION}`) +
+  const cloudOn = !!S.cloud.code;
+  const lastSync = S.cloud.lastSync ? new Date(S.cloud.lastSync).toLocaleString() : tr('never', 'ఇంకా లేదు');
+  const cloudBox = cloudOn
+    ? `<div class="cloud-box">
+        <div class="cloud-head">${ico('cloud')}<div><div class="title">${tr('Cloud Save is ON', 'క్లౌడ్ సేవ్ ఆన్‌లో ఉంది')}</div>
+          <div class="desc">${tr('Auto-saves every 2 minutes. Last save', 'ప్రతి 2 నిమిషాలకు ఆటో సేవ్. చివరి సేవ్')}: ${esc(lastSync)}</div></div></div>
+        <div class="code-label">${tr('Your cloud code — keep it secret, use it on your other devices:', 'మీ క్లౌడ్ కోడ్ — ఎవరికీ చెప్పకండి, మీ మరో డివైస్‌లో వాడండి:')}</div>
+        <div class="code-show">${fmtCode(S.cloud.code)}</div>
+        <div class="btn-pair wrap">
+          <button class="btn" data-act="cloud-save">${tr('Save now', 'ఇప్పుడు సేవ్')}</button>
+          <button class="btn ghost" data-act="cloud-copy">${tr('Copy code', 'కోడ్ కాపీ')}</button>
+          <button class="btn blue" data-act="cloud-load">${tr('Load from another device', 'మరో డివైస్ నుంచి లోడ్')}</button>
+        </div></div>`
+    : `<div class="cloud-box">
+        <div class="cloud-head">${ico('cloud')}<div><div class="title">${tr('Cloud Save', 'క్లౌడ్ సేవ్')}</div>
+          <div class="desc">${tr('Save your progress online and continue on any phone or computer.', 'మీ ప్రోగ్రెస్ ఆన్‌లైన్‌లో సేవ్ చేసి, ఏ ఫోన్/కంప్యూటర్‌లోనైనా కొనసాగించండి.')}</div></div></div>
+        <div class="btn-pair wrap">
+          <button class="btn gold" data-act="cloud-save">${tr('Turn on Cloud Save', 'క్లౌడ్ సేవ్ ఆన్ చేయండి')}</button>
+          <button class="btn blue" data-act="cloud-load">${tr('I have a code', 'నా దగ్గర కోడ్ ఉంది')}</button>
+        </div></div>`;
+  return header('gear', tr('Settings', 'సెట్టింగ్‌లు'), `${tr('Progress saves automatically in this browser.', 'ప్రోగ్రెస్ ఈ బ్రౌజర్‌లో ఆటోమేటిక్‌గా సేవ్ అవుతుంది.')} · ${tr('Version', 'వెర్షన్')} ${GAME_VERSION}`) +
     `<div class="list">
-      ${row('phone', 'Install as app', 'Add Business Empire to your phone or PC home screen. Works offline.', '<button class="btn gold" data-act="install">Install</button>')}
-      ${row('speaker', 'Sound effects', '', `<button class="btn ghost" data-act="sound">${S.settings.sound ? 'On' : 'Off'}</button>`)}
-      ${row('numbers', 'Number format', S.settings.notation === 'sci' ? 'Scientific (1.23e15)' : 'Suffixes (1.23 Qa)', '<button class="btn ghost" data-act="notation">Switch</button>')}
-      ${row('disk', 'Save now', '', '<button class="btn ghost" data-act="save">Save</button>')}
-      ${row('refresh', 'Export / Import save', 'Move your progress to another browser.', '<div class="btn-pair"><button class="btn ghost" data-act="export">Export</button><button class="btn ghost" data-act="import">Import</button></div>')}
-      ${row('trash', 'Hard reset', 'Wipes ALL progress including investors, worlds and gems.', '<button class="btn red" data-act="reset">Reset</button>')}
+      ${rowHtml('speech', tr('Language', 'భాష'), tr('Play in English or Telugu.', 'ఇంగ్లీష్ లేదా తెలుగులో ఆడండి.'),
+        `<div class="seg-toggle"><button class="${isTe() ? '' : 'on'}" data-act="lang" data-id="en">English</button><button class="${isTe() ? 'on' : ''}" data-act="lang" data-id="te">తెలుగు</button></div>`, 'setting')}
+      ${cloudBox}
+      ${rowHtml('letter', tr('Share the game', 'గేమ్ షేర్ చేయండి'), tr('Invite friends on WhatsApp and more.', 'WhatsApp లో స్నేహితులను ఆహ్వానించండి.'), `<button class="btn gold" data-act="share">${tr('Share', 'షేర్')}</button>`, 'setting')}
+      ${rowHtml('phone', tr('Install as app', 'యాప్‌గా ఇన్‌స్టాల్'), tr('Add Business Empire to your phone or PC home screen. Works offline.', 'ఫోన్/PC హోమ్ స్క్రీన్‌కు యాడ్ చేయండి. ఆఫ్‌లైన్‌లో కూడా పనిచేస్తుంది.'), `<button class="btn gold" data-act="install">${tr('Install', 'ఇన్‌స్టాల్')}</button>`, 'setting')}
+      ${rowHtml('speaker', tr('Sound effects', 'సౌండ్'), '', `<button class="btn ghost" data-act="sound">${S.settings.sound ? tr('On', 'ఆన్') : tr('Off', 'ఆఫ్')}</button>`, 'setting')}
+      ${rowHtml('numbers', tr('Number format', 'సంఖ్యల రూపం'), S.settings.notation === 'sci' ? tr('Scientific (1.23e15)', 'సైంటిఫిక్ (1.23e15)') : tr('Suffixes (1.23 Qa)', 'సఫిక్స్ (1.23 Qa)'), `<button class="btn ghost" data-act="notation">${tr('Switch', 'మార్చు')}</button>`, 'setting')}
+      ${rowHtml('disk', tr('Save now', 'ఇప్పుడు సేవ్'), '', `<button class="btn ghost" data-act="save">${tr('Save', 'సేవ్')}</button>`, 'setting')}
+      ${rowHtml('refresh', tr('Export / Import save', 'సేవ్ ఎక్స్‌పోర్ట్ / ఇంపోర్ట్'), tr('Move your progress with a long text code.', 'పొడవాటి టెక్స్ట్ కోడ్‌తో ప్రోగ్రెస్ తరలించండి.'),
+        `<div class="btn-pair"><button class="btn ghost" data-act="export">${tr('Export', 'ఎక్స్‌పోర్ట్')}</button><button class="btn ghost" data-act="import">${tr('Import', 'ఇంపోర్ట్')}</button></div>`, 'setting')}
+      ${rowHtml('trash', tr('Hard reset', 'పూర్తి రీసెట్'), tr('Wipes ALL progress including investors, worlds and gems.', 'ఇన్వెస్టర్లు, ప్రపంచాలు, జెమ్స్‌తో సహా అంతా తొలగిస్తుంది.'), `<button class="btn red" data-act="reset">${tr('Reset', 'రీసెట్')}</button>`, 'setting')}
     </div>`;
 }
 
@@ -1313,21 +1535,21 @@ function updateDots() {
 /* ---------------------------- UI: HEADER / BOOSTS ------------------- */
 function updateHeader() {
   $('cash').textContent = money(S.cash);
-  $('ips').textContent = money(incomePerSec()) + ' / sec';
+  $('ips').textContent = money(incomePerSec()) + tr(' / sec', ' / సెకను');
   $('investors').textContent = fmtInt(S.investors);
   $('investorBonus').textContent = '+' + fmt(S.investors * investorRate() * 100) + '%';
   $('gems').textContent = fmtInt(S.gems);
 
   const hb = $('hypeBtn');
   hb.classList.toggle('cooldown', S.boosts.hypeCd > 0);
-  setHTML(hb, ico('megaphone') + (S.boosts.hypeCd > 0 ? ` Hype <small>${fmtClock(S.boosts.hypeCd)}</small>` : ' Hype! <small>x2 · 2m</small>'));
+  setHTML(hb, ico('megaphone') + (S.boosts.hypeCd > 0 ? ` ${tr('Hype', 'హైప్')} <small>${fmtClock(S.boosts.hypeCd)}</small>` : ` ${tr('Hype!', 'హైప్!')} <small>x2 · 2${tr('m', 'ని')}</small>`));
 
   const chips = [];
   if (S.boosts.hype > 0) chips.push(`<span class="chip pink">📣 x2 · ${fmtClock(S.boosts.hype)}</span>`);
   if (S.boosts.rush > 0) chips.push(`<span class="chip blue">⚡ x2 · ${fmtClock(S.boosts.rush)}</span>`);
   if (S.boosts.golden > 0) chips.push(`<span class="chip gold">✨ x5 · ${fmtClock(S.boosts.golden)}</span>`);
   if (marketEvent) chips.push(`<span class="chip hot">📈 ${emo(BUSINESSES[marketEvent.biz].icon)} x3 · ${fmtClock(marketEvent.remaining)}</span>`);
-  chips.push(`<span class="chip total">Total x${fmt(globalMult())}</span>`);
+  chips.push(`<span class="chip total">${tr('Total', 'మొత్తం')} x${fmt(globalMult())}</span>`);
   setHTML($('chips'), chips.join(''));
 
   document.querySelectorAll('#buymode button').forEach(b => b.classList.toggle('active', b.dataset.mode === S.settings.buyMode));
@@ -1350,11 +1572,12 @@ function toast(msg, type = '') {
   setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 300); }, 3200);
 }
 function modal(html) { $('modalBody').innerHTML = html; $('modal').classList.remove('hidden'); }
+// Queued modals are built when shown, so they use the language chosen meanwhile
 const modalQueue = [];
-function queueModal(html) { if ($('modal').classList.contains('hidden')) modal(html); else modalQueue.push(html); }
+function queueModal(fn) { if ($('modal').classList.contains('hidden')) modal(fn()); else modalQueue.push(fn); }
 function closeModal() {
   $('modal').classList.add('hidden');
-  if (modalQueue.length) modal(modalQueue.shift());
+  if (modalQueue.length) modal(modalQueue.shift()());
 }
 let headlineIdx = 0;
 function setHeadline(txt) {
@@ -1363,8 +1586,27 @@ function setHeadline(txt) {
   el.textContent = txt;
 }
 function rotateHeadline() {
-  if (Math.random() < 0.3) setHeadline(`Analysts value your ${WORLD.name} empire's income at ${money(incomePerSec())} per second.`);
-  else setHeadline(HEADLINES[headlineIdx++ % HEADLINES.length]);
+  if (Math.random() < 0.3) setHeadline(tr(`Analysts value your ${WORLD.name} empire's income at ${money(incomePerSec())} per second.`, `మీ ${WORLD.te} సామ్రాజ్య ఆదాయం సెకనుకు ${money(incomePerSec())} అని నిపుణుల అంచనా.`));
+  else setHeadline(tr(...HEADLINES[headlineIdx++ % HEADLINES.length]));
+}
+function welcomeHtml() {
+  return `${ico('city', 'big-ico')}<h3>${tr('Welcome to Business Empire!', 'Business Empire కు స్వాగతం!')}</h3>
+    <div class="seg-toggle big"><button class="${isTe() ? '' : 'on'}" data-act="lang" data-id="en">English</button><button class="${isTe() ? 'on' : ''}" data-act="lang" data-id="te">తెలుగు</button></div>
+    <p>${tr('Tap your <b>Tea Stall</b> to earn cash. Buy more businesses, hire <b>managers</b>, grab <b>upgrades</b>, spin the <b>Lucky Wheel</b>, travel to the <b>Moon and Mars</b>, and climb the <b>leaderboard</b>!',
+      'మీ <b>టీ స్టాల్</b> ట్యాప్ చేసి క్యాష్ సంపాదించండి. ఇంకా వ్యాపారాలు కొనండి, <b>మేనేజర్లను</b> నియమించండి, <b>అప్‌గ్రేడ్‌లు</b> కొనండి, <b>లక్కీ వీల్</b> తిప్పండి, <b>చంద్రుడు, అంగారకుడికి</b> వెళ్ళండి, <b>లీడర్‌బోర్డ్‌లో</b> టాప్‌కి చేరండి!')}</p>
+    <div class="modal-actions"><button class="btn gold" data-act="close">${tr("Let's build!", 'మొదలుపెడదాం!')}</button></div>`;
+}
+function setLang(lang) {
+  S.settings.lang = lang === 'te' ? 'te' : 'en';
+  applyStaticText();
+  applyWorld(S.world);
+  buildBizCards();
+  renderTab();
+  updateHeader();
+  rotateHeadline();
+  // Re-draw the welcome screen if it is the open modal
+  if (!$('modal').classList.contains('hidden') && $('modalBody').querySelector('.seg-toggle.big')) modal(welcomeHtml());
+  save();
 }
 
 /* ---------------------------- INPUT --------------------------------- */
@@ -1399,63 +1641,71 @@ document.addEventListener('click', e => {
     case 'lb-rename': S.player.name = ''; renderTab(); break;
     case 'mclaim': claimMission(id); renderTab(); break;
     case 'mskip': skipMission(id); renderTab(); break;
+    case 'lang': setLang(id); break;
+    case 'share': shareGame(); break;
+    case 'share-done': shareDone(); closeModal(); break;
+    case 'share-copy': copyText(location.origin + '/'); shareDone(); break;
+    case 'cloud-save': cloudSave(true); break;
+    case 'cloud-copy': copyText(fmtCode(S.cloud.code)); break;
+    case 'cloud-load': cloudLoadAsk(); break;
+    case 'cloud-fetch': cloudFetch(); break;
+    case 'cloud-apply': cloudApply(); break;
     case 'install':
       if (installPrompt) {
         installPrompt.prompt();
         installPrompt.userChoice.finally(() => { installPrompt = null; $('installBtn').classList.add('hidden'); });
       } else {
-        modal(`${ico('phone', 'big-ico')}<h3>Install as an app</h3>
-          <p><b>Android (Chrome):</b> tap ⋮ menu → <b>Install app</b> / <b>Add to Home screen</b>.<br>
-          <b>iPhone (Safari):</b> tap Share ⬆️ → <b>Add to Home Screen</b>.<br>
-          <b>PC (Chrome / Edge):</b> click the install icon in the address bar.</p>
-          <div class="modal-actions"><button class="btn gold" data-act="close">Got it</button></div>`);
+        modal(`${ico('phone', 'big-ico')}<h3>${tr('Install as an app', 'యాప్‌గా ఇన్‌స్టాల్ చేయండి')}</h3>
+          <p>${tr('<b>Android (Chrome):</b> tap ⋮ menu → <b>Install app</b> / <b>Add to Home screen</b>.<br><b>iPhone (Safari):</b> tap Share ⬆️ → <b>Add to Home Screen</b>.<br><b>PC (Chrome / Edge):</b> click the install icon in the address bar.',
+            '<b>Android (Chrome):</b> ⋮ మెనూ → <b>Install app</b> / <b>Add to Home screen</b>.<br><b>iPhone (Safari):</b> Share ⬆️ → <b>Add to Home Screen</b>.<br><b>PC (Chrome / Edge):</b> అడ్రస్ బార్‌లో install ఐకాన్ నొక్కండి.')}</p>
+          <div class="modal-actions"><button class="btn gold" data-act="close">${tr('Got it', 'సరే')}</button></div>`);
       }
       break;
     case 'briefcase': openBriefcase(); break;
     case 'close': if (!spinning) closeModal(); break;
     case 'offline-ok': closeModal(); break;
     case 'offline-x2':
-      if (S.gems >= 5 && pendingOffline > 0) { S.gems -= 5; earn(pendingOffline); toast(`🌙 Doubled! +${money(pendingOffline)}`, 'gem'); sfx('big'); coinShower(16); }
+      if (S.gems >= 5 && pendingOffline > 0) { S.gems -= 5; earn(pendingOffline); toast(tr(`🌙 Doubled! +${money(pendingOffline)}`, `🌙 రెట్టింపు! +${money(pendingOffline)}`), 'gem'); sfx('big'); coinShower(16); }
       pendingOffline = 0; closeModal(); break;
     case 'sound': S.settings.sound = !S.settings.sound; renderTab(); break;
     case 'notation': S.settings.notation = S.settings.notation === 'sci' ? 'suffix' : 'sci'; renderTab(); updateBizText(); break;
-    case 'save': save(); toast('💾 Game saved.', 'good'); break;
+    case 'save': save(); toast(tr('💾 Game saved.', '💾 గేమ్ సేవ్ అయింది.'), 'good'); break;
     case 'export': {
       save();
       const code = btoa(unescape(encodeURIComponent(JSON.stringify(S))));
-      modal(`<h3>Export Save</h3><p>Copy this code and keep it safe.</p><textarea readonly id="exportBox">${code}</textarea>
-        <div class="modal-actions"><button class="btn" data-act="copy">Copy</button><button class="btn ghost" data-act="close">Close</button></div>`);
+      modal(`<h3>${tr('Export Save', 'సేవ్ ఎక్స్‌పోర్ట్')}</h3><p>${tr('Copy this code and keep it safe.', 'ఈ కోడ్ కాపీ చేసి జాగ్రత్తగా ఉంచండి.')}</p><textarea readonly id="exportBox">${code}</textarea>
+        <div class="modal-actions"><button class="btn" data-act="copy">${tr('Copy', 'కాపీ')}</button><button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button></div>`);
       break;
     }
-    case 'copy': {
-      const box = $('exportBox'); box.select();
-      (navigator.clipboard ? navigator.clipboard.writeText(box.value) : Promise.reject()).then(
-        () => toast('📋 Copied!', 'good'), () => { document.execCommand && document.execCommand('copy'); toast('📋 Copied!', 'good'); });
-      break;
-    }
+    case 'copy': copyText($('exportBox').value); break;
     case 'import':
-      modal(`<h3>Import Save</h3><p>Paste a save code. This replaces your current progress.</p><textarea id="importBox"></textarea>
-        <div class="modal-actions"><button class="btn ghost" data-act="close">Cancel</button><button class="btn" data-act="import-ok">Import</button></div>`);
+      modal(`<h3>${tr('Import Save', 'సేవ్ ఇంపోర్ట్')}</h3><p>${tr('Paste a save code. This replaces your current progress.', 'సేవ్ కోడ్ పేస్ట్ చేయండి. ఇది ప్రస్తుత ప్రోగ్రెస్‌ను మార్చేస్తుంది.')}</p><textarea id="importBox"></textarea>
+        <div class="modal-actions"><button class="btn ghost" data-act="close">${tr('Cancel', 'రద్దు')}</button><button class="btn" data-act="import-ok">${tr('Import', 'ఇంపోర్ట్')}</button></div>`);
       break;
     case 'import-ok':
       try {
         S = mergeState(JSON.parse(decodeURIComponent(escape(atob($('importBox').value.trim())))));
-        applyWorld(S.world); ensureMissions();
-        save(); closeModal(); buildBizCards(); switchTab('business'); toast('📥 Save imported!', 'good');
-      } catch (err) { toast('That save code is not valid.', 'bad'); }
+        afterStateReplaced();
+        toast(tr('📥 Save imported!', '📥 సేవ్ ఇంపోర్ట్ అయింది!'), 'good');
+      } catch (err) { toast(tr('That save code is not valid.', 'ఆ సేవ్ కోడ్ సరైనది కాదు.'), 'bad'); }
       break;
     case 'reset':
-      modal(`${ico('trash', 'big-ico')}<h3>Erase everything?</h3><p>This permanently deletes all progress, worlds, investors, gems and awards.</p>
-        <div class="modal-actions"><button class="btn ghost" data-act="close">Cancel</button><button class="btn red" data-act="reset-ok">Erase</button></div>`);
+      modal(`${ico('trash', 'big-ico')}<h3>${tr('Erase everything?', 'అంతా తొలగించాలా?')}</h3><p>${tr('This permanently deletes all progress, worlds, investors, gems and awards.', 'ఇది ప్రోగ్రెస్, ప్రపంచాలు, ఇన్వెస్టర్లు, జెమ్స్, అవార్డులు అన్నీ శాశ్వతంగా తొలగిస్తుంది.')}</p>
+        <div class="modal-actions"><button class="btn ghost" data-act="close">${tr('Cancel', 'రద్దు')}</button><button class="btn red" data-act="reset-ok">${tr('Erase', 'తొలగించు')}</button></div>`);
       break;
-    case 'reset-ok':
-      S = defaultState(); applyWorld('earth'); ensureMissions(); marketEvent = null; save(); closeModal(); buildBizCards(); switchTab('business'); toast('Fresh start!', 'good');
+    case 'reset-ok': {
+      const lang = S.settings.lang;
+      S = defaultState(); S.settings.lang = lang; marketEvent = null;
+      afterStateReplaced();
+      toast(tr('Fresh start!', 'కొత్త ప్రారంభం!'), 'good');
       break;
+    }
   }
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !spinning) closeModal();
   if (e.key === 'Enter' && e.target.id === 'lbName') joinLeaderboard();
+  if (e.key === 'Enter' && e.target.id === 'cloudCodeIn') cloudFetch();
 });
 
 /* ---------------------------- GAME LOOP ----------------------------- */
@@ -1519,6 +1769,7 @@ function frame(now) {
     if (activeTab === 'missions') updateMissionProgress();
     const lbWait = lbState === 'offline' ? 300000 : 60000;
     if (S.player.name && Date.now() - lbLastSent > lbWait && S.lifetime > lbLastScore) lbFetch(true);
+    if (S.cloud.code && Date.now() - cloudLastAuto > 120000) cloudSave(false);
   }
   if (newsAcc >= 14) { newsAcc = 0; rotateHeadline(); }
   if (saveAcc >= 10) { saveAcc = 0; save(); }
@@ -1526,6 +1777,14 @@ function frame(now) {
 }
 
 /* ---------------------------- BOOT ---------------------------------- */
+function offlineHtml(away, counted, amt) {
+  const cap = away > counted ? tr(` (capped at ${fmtDur(counted)})`, ` (పరిమితి ${fmtDur(counted)})`) : '';
+  return `${ico('crescent', 'big-ico')}<h3>${tr('Welcome back, boss!', 'మళ్ళీ స్వాగతం, బాస్!')}</h3>
+    <p>${tr(`You were away for <b>${fmtDur(away)}</b>${cap}.<br>Your ${WORLD.name} managers earned`, `మీరు <b>${fmtDur(away)}</b>${cap} దూరంగా ఉన్నారు.<br>మీ ${WORLD.te} మేనేజర్లు సంపాదించింది`)}</p>
+    <div class="stat-big">${money(amt)}</div>
+    <div class="modal-actions"><button class="btn" data-act="offline-ok">${tr('Collect', 'తీసుకోండి')}</button>
+    <button class="btn blue ${S.gems < 5 ? 'cant' : ''}" data-act="offline-x2">${tr('Double it', 'రెట్టింపు')} · 💎5</button></div>`;
+}
 function offlineEarnings() {
   const away = (Date.now() - S.lastSave) / 1000;
   if (away < 30) return;
@@ -1534,11 +1793,7 @@ function offlineEarnings() {
   if (amt <= 0) return;
   earn(amt);
   pendingOffline = amt;
-  modal(`${ico('crescent', 'big-ico')}<h3>Welcome back, boss!</h3>
-    <p>You were away for <b>${fmtDur(away)}</b>${away > counted ? ` (capped at ${fmtDur(counted)})` : ''}.<br>Your ${WORLD.name} managers earned</p>
-    <div class="stat-big">${money(amt)}</div>
-    <div class="modal-actions"><button class="btn" data-act="offline-ok">Collect</button>
-    <button class="btn blue ${S.gems < 5 ? 'cant' : ''}" data-act="offline-x2">Double it · 💎5</button></div>`);
+  modal(offlineHtml(away, counted, amt));
 }
 
 let installPrompt = null;
@@ -1550,7 +1805,7 @@ window.addEventListener('beforeinstallprompt', e => {
 window.addEventListener('appinstalled', () => {
   installPrompt = null;
   $('installBtn').classList.add('hidden');
-  toast('📲 Installed! Open Business Empire from your home screen.', 'good');
+  toast(tr('📲 Installed! Open Business Empire from your home screen.', '📲 ఇన్‌స్టాల్ అయింది! హోమ్ స్క్రీన్ నుంచి తెరవండి.'), 'good');
 });
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('sw.js').catch(() => { /* offline support unavailable */ });
@@ -1558,6 +1813,7 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 
 const hadSave = load();
 hydrateIcons();
+applyStaticText();
 applyWorld(S.world);
 ensureMissions();
 ensurePlayerId();
@@ -1566,10 +1822,12 @@ initTilt();
 updateHeader();
 updateDots();
 if (hadSave) offlineEarnings();
-else modal(`${ico('city', 'big-ico')}<h3>Welcome to Business Empire!</h3>
-  <p>Tap your <b>Tea Stall</b> to earn cash. Buy more businesses, hire <b>managers</b>, grab <b>upgrades</b>, spin the <b>Lucky Wheel</b>, travel to the <b>Moon and Mars</b>, and climb the <b>leaderboard</b>!</p>
-  <div class="modal-actions"><button class="btn gold" data-act="close">Let's build!</button></div>`);
-if (canClaimDaily()) queueModal(dailyHtml());
+else modal(welcomeHtml());
+if (canClaimDaily()) queueModal(dailyHtml);
 window.addEventListener('beforeunload', save);
-document.addEventListener('visibilitychange', () => { if (document.hidden) save(); });
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) return;
+  save();
+  if (S.cloud.code && Date.now() - cloudLastAuto > 15000) cloudSave(false);
+});
 requestAnimationFrame(frame);
