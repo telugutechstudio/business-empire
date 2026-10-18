@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '2.2';
+const GAME_VERSION = '2.3';
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
 let S = null; // game state, initialised below
@@ -53,6 +53,10 @@ const ICONS = {
   elephant: ['Elephant', '🐘'], bow: ['Bow and arrow', '🏹'], mango: ['Mango', '🥭'], lotus: ['Lotus', '🪷'], hibiscus: ['Hibiscus', '🌺'],
   note: ['Musical note', '🎵'], notes: ['Musical notes', '🎶'], hand: ['Backhand index pointing down', '👇', 1], people: ['Busts in silhouette', '👥'],
   calendar: ['Spiral calendar', '🗓️'], grad: ['Graduation cap', '🎓'],
+  swords: ['Crossed swords', '⚔️'], dog: ['Dog face', '🐶'], cat: ['Cat face', '🐱'], rabbit: ['Rabbit face', '🐰'], panda: ['Panda', '🐼'],
+  fox: ['Fox', '🦊'], owl: ['Owl', '🦉'], unicorn: ['Unicorn', '🦄'], dragon: ['Dragon', '🐉'], lion: ['Lion', '🦁'], tiger: ['Tiger face', '🐯'],
+  peacock: ['Peacock', '🦚'], turtle: ['Turtle', '🐢'], heart: ['Red heart', '❤️'], sparkheart: ['Sparkling heart', '💖'], bone: ['Bone', '🦴'],
+  paws: ['Paw prints', '🐾'], bowl: ['Bowl with spoon', '🥣'],
 };
 function iconUrl(key) {
   const d = ICONS[key];
@@ -212,6 +216,7 @@ const ACHIEVEMENTS = (() => {
     () => tr(`Spin the Lucky Wheel ${n} time(s)`, `లక్కీ వీల్‌ను ${n} సార్లు తిప్పండి`), () => (S.stats.spins || 0) >= n));
   add('lb_join', 'trophy', 5, () => tr('On the Board', 'బోర్డు మీద'), () => tr('Join the online leaderboard', 'ఆన్‌లైన్ లీడర్‌బోర్డ్‌లో చేరండి'), () => !!S.player.name);
   add('cloud_on', 'cloud', 5, () => tr('Head in the Clouds', 'క్లౌడ్‌లో సేఫ్'), () => tr('Turn on cloud save', 'క్లౌడ్ సేవ్ ఆన్ చేయండి'), () => !!S.cloud.code);
+  add('chal_win', 'swords', 10, () => tr('Challenge Champion', 'ఛాలెంజ్ ఛాంపియన్'), () => tr('Beat a friend\'s challenge', 'స్నేహితుడి ఛాలెంజ్ గెలవండి'), () => !!(S.challenge && S.challenge.won));
   add('share_1', 'letter', 5, () => tr('Spread the Word', 'అందరికీ చెప్పండి'), () => tr('Share the game with a friend', 'గేమ్‌ను స్నేహితుడితో షేర్ చేయండి'), () => (S.stats.shares || 0) >= 1);
   [10, 25, 50].forEach(n => add(`upg_${n}`, 'up', 5, () => tr(`Upgrader ${n}`, `అప్‌గ్రేడర్ ${n}`),
     () => tr(`Buy ${n} upgrades`, `${n} అప్‌గ్రేడ్‌లు కొనండి`), () => S.stats.upgradesBought >= n));
@@ -266,6 +271,7 @@ function defaultState() {
     cloud: { code: '', lastSync: 0 },
     tutorial: { step: 0, done: false },
     festivals: {},
+    challenge: null,
     stats: { clicks: 0, briefcases: 0, prestiges: 0, upgradesBought: 0, playTime: 0, bestRun: 0, missionsDone: 0, spins: 0, dailyClaims: 0, shares: 0 },
     boosts: { hype: 0, hypeCd: 0, rush: 0, golden: 0 },
     settings: { sound: true, music: true, notation: 'suffix', buyMode: '1', lang: defaultLang() },
@@ -307,6 +313,7 @@ function mergeState(saved) {
   out.player = Object.assign({ id: '', name: '' }, saved.player || {});
   out.cloud = Object.assign({ code: '', lastSync: 0 }, saved.cloud || {});
   out.festivals = saved.festivals || {};
+  out.challenge = saved.challenge && typeof saved.challenge === 'object' ? saved.challenge : null;
   // Players from before the tutorial existed don't need it
   out.tutorial = saved.tutorial ? Object.assign({ step: 0, done: false }, saved.tutorial) : { step: 0, done: (+saved.lifetime || 0) > 5000 };
   out.world = WORLDS.some(w => w.id === saved.world) ? saved.world : 'earth';
@@ -887,6 +894,8 @@ function checkMissions() {
 }
 function missionVal(m, v) { return m.type === 'earn' ? `${money(v)} / ${money(m.target)}` : `${fmtInt(v)} / ${fmtInt(m.target)}`; }
 function updateMissionProgress() {
+  const c = S.challenge, cb = $('chalBar');
+  if (c && cb && !c.won) { cb.style.width = (challengeProgress(c) * 100).toFixed(1) + '%'; $('chalVal').textContent = `${money(S.lifetime)} / ${money(c.score)}`; }
   for (const m of S.missions) {
     const row = document.querySelector(`[data-mrow="${m.id}"]`);
     if (!row) continue;
@@ -1007,13 +1016,83 @@ function afterStateReplaced() {
   switchTab('business');
 }
 
+/* ---------------------------- FRIENDS CHALLENGE --------------------- */
+// A shared link carries the sender's name and score: /?c=<base64url JSON>. The friend wins by earning more.
+const CHALLENGE_GEMS = 20;
+let pendingChallenge = null;
+function b64urlEncode(str) { return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+function b64urlDecode(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return decodeURIComponent(escape(atob(s))); }
+function challengeUrl() {
+  return `${location.origin}/?c=${b64urlEncode(JSON.stringify({ n: S.player.name || '', s: Math.floor(S.lifetime), w: S.world }))}`;
+}
+function readChallengeParam() {
+  const params = new URLSearchParams(location.search);
+  const c = params.get('c');
+  if (!c) return null;
+  history.replaceState(null, '', location.pathname);
+  try {
+    const p = JSON.parse(b64urlDecode(c));
+    const score = Number(p.s);
+    if (!isFinite(score) || score < 0 || score > 1e300) return null;
+    return { name: cleanName(p.n), score: Math.max(1000, Math.floor(score)), world: WORLDS.some(w => w.id === p.w) ? p.w : 'earth' };
+  } catch (e) { return null; }
+}
+function challengerName(c) { return c.name || tr('A friend', 'ఒక స్నేహితుడు'); }
+function challengeInviteHtml() {
+  const c = pendingChallenge;
+  if (!c) return '';
+  const name = esc(challengerName(c));
+  return `${ico('swords', 'big-ico')}<h3>${tr(`${name} challenges you!`, `${name} మీకు ఛాలెంజ్ విసిరారు!`)}</h3>
+    <p>${tr(`Their empire is worth <b>${money(c.score)}</b>. Earn more than that to win <b>💎${CHALLENGE_GEMS}</b>!`,
+      `వారి సామ్రాజ్యం విలువ <b>${money(c.score)}</b>. దానికంటే ఎక్కువ సంపాదించి <b>💎${CHALLENGE_GEMS}</b> గెలవండి!`)}</p>
+    <div class="modal-actions"><button class="btn ghost" data-act="close">${tr('Not now', 'ఇప్పుడు వద్దు')}</button>
+    <button class="btn gold" data-act="chal-accept">${tr('Accept challenge', 'ఛాలెంజ్ స్వీకరించు')}</button></div>`;
+}
+function acceptChallenge() {
+  if (!pendingChallenge) return;
+  S.challenge = Object.assign({}, pendingChallenge, { at: Date.now(), won: false });
+  pendingChallenge = null;
+  sfx('big');
+  toast(tr(`⚔️ Challenge accepted! Beat ${money(S.challenge.score)}.`, `⚔️ ఛాలెంజ్ స్వీకరించారు! ${money(S.challenge.score)} దాటండి.`), 'good');
+  save();
+}
+function challengeProgress(c) { return Math.min(1, Math.log10(S.lifetime + 1) / Math.log10(c.score + 1)); }
+function checkChallenge() {
+  const c = S.challenge;
+  if (!c || c.won || S.lifetime <= c.score) return;
+  c.won = true;
+  S.gems += CHALLENGE_GEMS;
+  sfx('win');
+  confetti(null, 260);
+  const name = esc(challengerName(c));
+  queueModal(() => `${ico('trophy', 'big-ico')}<h3>${tr(`You beat ${name}!`, `మీరు ${name} ని ఓడించారు!`)}</h3>
+    <p>${tr(`Your empire passed <b>${money(c.score)}</b>. +💎${CHALLENGE_GEMS}! Now challenge them back.`, `మీ సామ్రాజ్యం <b>${money(c.score)}</b> దాటింది. +💎${CHALLENGE_GEMS}! ఇప్పుడు మీరు తిరిగి ఛాలెంజ్ చేయండి.`)}</p>
+    <div class="modal-actions"><button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button><button class="btn gold" data-act="share">${tr('Challenge back', 'తిరిగి ఛాలెంజ్')}</button></div>`);
+  if (activeTab === 'missions') renderTab();
+}
+function challengeCardHtml() {
+  const c = S.challenge;
+  if (!c) {
+    return `<div class="chal-card">${ico('swords', 'chal-ico')}<div class="info"><div class="title">${tr('Challenge a friend', 'స్నేహితుడిని ఛాలెంజ్ చేయండి')}</div>
+      <div class="desc">${tr('Send your score. If they beat it, they win gems — then they challenge you back!', 'మీ స్కోర్ పంపండి. వారు దాటితే జెమ్స్ గెలుస్తారు — తర్వాత వారు మిమ్మల్ని ఛాలెంజ్ చేస్తారు!')}</div></div>
+      <button class="btn gold" data-act="share">${tr('Challenge', 'ఛాలెంజ్')}</button></div>`;
+  }
+  const name = esc(challengerName(c));
+  const pct = (challengeProgress(c) * 100).toFixed(1);
+  return `<div class="chal-card ${c.won ? 'won' : ''}">${ico(c.won ? 'trophy' : 'swords', 'chal-ico')}<div class="info">
+      <div class="title">${c.won ? tr(`You beat ${name}!`, `${name} పై గెలిచారు!`) : tr(`Beat ${name}'s empire`, `${name} సామ్రాజ్యాన్ని దాటండి`)}</div>
+      <div class="mbar"><div id="chalBar" style="width:${c.won ? 100 : pct}%"></div></div>
+      <div class="desc"><span id="chalVal">${money(S.lifetime)} / ${money(c.score)}</span> · ${tr('Reward', 'రివార్డ్')}: 💎${CHALLENGE_GEMS}</div></div>
+      <button class="btn ${c.won ? 'gold' : 'ghost'}" data-act="share">${c.won ? tr('Challenge back', 'తిరిగి ఛాలెంజ్') : tr('Invite more', 'ఇంకా పంపండి')}</button></div>`;
+}
+
 /* ---------------------------- SHARE --------------------------------- */
 function shareText() {
-  return tr(`I built a ${money(S.lifetime)} business empire on ${WORLD.name}! 🏙️ Can you beat me? Play Business Empire:`,
-    `నేను ${WORLD.te} పై ${money(S.lifetime)} బిజినెస్ సామ్రాజ్యం కట్టాను! 🏙️ నన్ను దాటగలరా? Business Empire ఆడండి:`);
+  return tr(`⚔️ I challenge you! My business empire is worth ${money(S.lifetime)}. Can you beat me? Play Business Empire:`,
+    `⚔️ నా ఛాలెంజ్! నా బిజినెస్ సామ్రాజ్యం విలువ ${money(S.lifetime)}. నన్ను దాటగలరా? Business Empire ఆడండి:`);
 }
 async function shareGame() {
-  const url = location.origin + '/';
+  const url = challengeUrl();
   const text = shareText();
   if (navigator.share) {
     try {
@@ -1601,7 +1680,7 @@ function renderMissions() {
   }).join('');
   return header('clipboard', tr('Missions', 'మిషన్లు'),
     tr(`Finish missions to win gems and cash. Completed so far: <b>${fmtInt(S.stats.missionsDone)}</b>`, `మిషన్లు పూర్తి చేసి జెమ్స్, క్యాష్ గెలవండి. ఇప్పటివరకు: <b>${fmtInt(S.stats.missionsDone)}</b>`)) +
-    `<div class="list">${rows}</div>`;
+    challengeCardHtml() + `<div class="list">${rows}</div>`;
 }
 function renderManagers() {
   const rows = BUSINESSES.map((d, i) => {
@@ -1925,7 +2004,8 @@ document.addEventListener('click', e => {
     case 'tut-replay': S.tutorial = { step: 0, done: false }; switchTab('business'); toast(tr('📖 Tutorial restarted!', '📖 ట్యుటోరియల్ మళ్ళీ మొదలైంది!'), 'good'); break;
     case 'share': shareGame(); break;
     case 'share-done': shareDone(); closeModal(); break;
-    case 'share-copy': copyText(location.origin + '/'); shareDone(); break;
+    case 'share-copy': copyText(challengeUrl()); shareDone(); break;
+    case 'chal-accept': acceptChallenge(); closeModal(); if (activeTab === 'missions') renderTab(); break;
     case 'cloud-save': cloudSave(true); break;
     case 'cloud-copy': copyText(fmtCode(S.cloud.code)); break;
     case 'cloud-load': cloudLoadAsk(); break;
@@ -2047,6 +2127,7 @@ function frame(now) {
     updateDots();
     checkAchievements();
     checkMissions();
+    checkChallenge();
     if (activeTab === 'stats') renderTab();
     if (activeTab === 'missions') updateMissionProgress();
     const lbWait = lbState === 'offline' ? 300000 : 60000;
@@ -2107,6 +2188,8 @@ if (hadSave) offlineEarnings();
 else modal(welcomeHtml());
 if (canClaimDaily()) queueModal(dailyHtml);
 { const f = activeFestival(); if (f && !S.festivals[f.key]) queueModal(festivalHtml); }
+pendingChallenge = readChallengeParam();
+if (pendingChallenge && !(S.challenge && !S.challenge.won && S.challenge.score === pendingChallenge.score && S.challenge.name === pendingChallenge.name)) queueModal(challengeInviteHtml);
 updateMusicBtn();
 pingPlayers();
 // Browsers only allow sound after the player touches the page

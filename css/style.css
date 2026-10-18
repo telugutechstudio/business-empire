@@ -500,6 +500,19 @@ a.btn { text-decoration: none; display: inline-block; }
 .share-bar .btn .i3d { width: 22px; height: 22px; }
 .hype.share { background: linear-gradient(180deg, #6fe0c0, #1fa58a); box-shadow: 0 4px 0 #0f6b58, 0 8px 16px rgba(31, 165, 138, .3); }
 
+/* Friends challenge */
+.chal-card {
+  display: flex; align-items: center; gap: 14px; margin-bottom: 12px; padding: 14px;
+  background: linear-gradient(135deg, #5a1f3d, #2a1f5c); border: 1px solid #b0457a; border-radius: var(--radius);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, .35); animation: rowIn .35s backwards;
+}
+.chal-card.won { background: linear-gradient(135deg, #5c4a12, #2a1f5c); border-color: var(--gold); }
+.chal-card .info { flex: 1; min-width: 0; }
+.chal-card .title { font-weight: 700; font-size: 17px; }
+.chal-card .desc { color: #e0c8dc; font-size: 13.5px; }
+.chal-ico { width: 56px; height: 56px; animation: wiggle 2.5s ease-in-out infinite; }
+.chal-card .mbar div { background: linear-gradient(90deg, #ff6fa0, var(--gold)); }
+
 /* Music button */
 .music-btn { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(180deg, var(--card2), var(--card)); border: 1px solid var(--border); }
 .music-btn .i3d { width: 26px; height: 26px; animation: float 2.4s ease-in-out infinite; }
