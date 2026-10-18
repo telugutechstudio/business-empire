@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '2.6';
+const GAME_VERSION = '2.7';
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
 let S = null; // game state, initialised below
@@ -293,7 +293,7 @@ function defaultState() {
     tour: { week: '', base: 0, posted: false, pending: '', rewarded: {} },
     stats: { clicks: 0, briefcases: 0, prestiges: 0, upgradesBought: 0, playTime: 0, bestRun: 0, missionsDone: 0, spins: 0, dailyClaims: 0, shares: 0 },
     boosts: { hype: 0, hypeCd: 0, rush: 0, golden: 0 },
-    settings: { sound: true, music: true, notation: 'suffix', buyMode: '1', lang: defaultLang() },
+    settings: { sound: true, music: true, notify: false, notifyAsked: false, notation: 'suffix', buyMode: '1', lang: defaultLang() },
     lastSave: Date.now(),
     created: Date.now(),
   });
@@ -1036,6 +1036,102 @@ function updateTourLive() {
   const m = $('tourMine'); if (m) m.textContent = money(tourScore());
 }
 
+/* ---------------------------- PHONE NOTIFICATIONS ------------------ */
+// Real push reminders: the phone subscribes once, then the game tells the server its timers
+// (free spin, daily reward, pets) and a scheduled function sends at most one reminder at a time.
+const PUSH_URL = '/api/push';
+let pushLastKey = '', pushLastSync = 0;
+function pushSupported() {
+  return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && location.protocol === 'https:';
+}
+function isIOS() { return /iphone|ipad|ipod/i.test(navigator.userAgent); }
+function notifyStatus() {
+  if (!pushSupported()) return 'unsupported';
+  if (Notification.permission === 'denied') return 'blocked';
+  return S.settings.notify && Notification.permission === 'granted' ? 'on' : 'off';
+}
+function pushState() {
+  return { lang: S.settings.lang, tz: -new Date().getTimezoneOffset(), spinAt: S.spin.freeAt, fedAt: S.pets.fedAt,
+    pets: Object.keys(S.pets.owned).length, dailyLast: S.daily.last, tourPlaying: !!S.player.name };
+}
+function b64ToBytes(b64) {
+  const raw = atob((b64 + '='.repeat((4 - b64.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
+  return Uint8Array.from(raw, ch => ch.charCodeAt(0));
+}
+function notifyHelpHtml() {
+  const ios = isIOS();
+  return `${ico('bell', 'big-ico')}<h3>${tr('Notifications', 'నోటిఫికేషన్లు')}</h3>
+    <p>${ios ? tr('On iPhone, first add the game to your Home Screen (Share ⬆️ → Add to Home Screen), open it from there, then turn on notifications.',
+                   'iPhone లో ముందు గేమ్‌ను హోమ్ స్క్రీన్‌కు యాడ్ చేయండి (Share ⬆️ → Add to Home Screen), అక్కడ నుంచి తెరిచి నోటిఫికేషన్లు ఆన్ చేయండి.')
+              : notifyStatus() === 'blocked'
+                ? tr('Notifications are blocked for this site. Allow them in your browser\'s site settings (🔒 next to the address), then try again.',
+                     'ఈ సైట్‌కు నోటిఫికేషన్లు బ్లాక్ అయ్యాయి. బ్రౌజర్ సైట్ సెట్టింగ్స్‌లో (అడ్రస్ పక్కన 🔒) అనుమతించి మళ్ళీ ప్రయత్నించండి.')
+                : tr('This browser can\'t show notifications. Try Chrome on Android or PC.', 'ఈ బ్రౌజర్‌లో నోటిఫికేషన్లు రావు. Android లేదా PC లో Chrome వాడండి.')}</p>
+    <div class="modal-actions"><button class="btn gold" data-act="close">${tr('Got it', 'సరే')}</button></div>`;
+}
+async function enableNotifications() {
+  S.settings.notifyAsked = true;
+  if (!pushSupported() || Notification.permission === 'denied') { modal(notifyHelpHtml()); return; }
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') { toast(tr('Notifications not allowed.', 'నోటిఫికేషన్లకు అనుమతి ఇవ్వలేదు.'), 'bad'); if (activeTab === 'settings') renderTab(); return; }
+  try {
+    ensurePlayerId();
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      const { publicKey } = await (await fetch(PUSH_URL)).json();
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(publicKey) });
+    }
+    const res = await fetch(PUSH_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: S.player.id, sub: sub.toJSON(), state: pushState() }) });
+    if (!res.ok) throw new Error('status ' + res.status);
+    S.settings.notify = true;
+    pushLastKey = JSON.stringify(pushState());
+    sfx('big');
+    toast(tr('🔔 Notifications on! We\'ll remind you about spins, rewards and pets.', '🔔 నోటిఫికేషన్లు ఆన్! స్పిన్, రివార్డ్స్, పెట్స్ గురించి గుర్తు చేస్తాం.'), 'good');
+  } catch (e) {
+    toast(tr('Could not turn on notifications. Check your internet and try again.', 'నోటిఫికేషన్లు ఆన్ కాలేదు. ఇంటర్నెట్ చూసి మళ్ళీ ప్రయత్నించండి.'), 'bad');
+  }
+  save();
+  if (activeTab === 'settings') renderTab();
+}
+async function disableNotifications() {
+  S.settings.notify = false;
+  save();
+  if (activeTab === 'settings') renderTab();
+  toast(tr('🔕 Notifications off.', '🔕 నోటిఫికేషన్లు ఆఫ్.'), 'good');
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) await sub.unsubscribe();
+    await fetch(PUSH_URL, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: S.player.id }) });
+  } catch (e) { /* already off on the server */ }
+}
+// Tell the server about changed timers (at most every 30 seconds)
+function pushSync(force) {
+  if (notifyStatus() !== 'on') return;
+  const st = pushState(), key = JSON.stringify(st);
+  if (!force && (key === pushLastKey || Date.now() - pushLastSync < 30000)) return;
+  pushLastKey = key; pushLastSync = Date.now();
+  navigator.serviceWorker.ready.then(reg => reg.pushManager.getSubscription()).then(sub => {
+    if (!sub) return;
+    return fetch(PUSH_URL, { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: S.player.id, sub: sub.toJSON(), state: st }) });
+  }).catch(() => { /* try again later */ });
+}
+function notifyAskHtml() {
+  return `${ico('bell', 'big-ico')}<h3>${tr('Get reminders?', 'రిమైండర్లు కావాలా?')}</h3>
+    <p>${tr('We can tell you when your free spin and daily reward are ready, and when your pets are hungry. Never at night.',
+      'ఫ్రీ స్పిన్, డైలీ రివార్డ్ రెడీ అయినప్పుడు, పెట్స్‌కు ఆకలి వేసినప్పుడు మీకు చెప్తాం. రాత్రి పూట ఎప్పుడూ రాదు.')}</p>
+    <div class="modal-actions"><button class="btn ghost" data-act="notify-later">${tr('Not now', 'ఇప్పుడు వద్దు')}</button>
+    <button class="btn gold" data-act="notify-on">${tr('Yes, remind me', 'అవును, గుర్తు చేయండి')}</button></div>`;
+}
+function maybeAskNotify() {
+  if (S.settings.notifyAsked || !pushSupported() || Notification.permission !== 'default' || !S.tutorial.done) return;
+  S.settings.notifyAsked = true;
+  queueModal(notifyAskHtml);
+}
+
 /* ---------------------------- CLOUD SAVE ---------------------------- */
 const CLOUD_ALPHA = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 let cloudBusy = false, cloudLastAuto = 0;
@@ -1581,6 +1677,7 @@ function placeHand(target) {
 }
 function endTutorial() {
   S.tutorial.done = true;
+  maybeAskNotify();
   updateTutorial();
   $('tutHand').classList.add('hidden');
   save();
@@ -2058,6 +2155,17 @@ function renderStats() {
     `<table class="stats-table">${rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join('')}</table>
     <div class="toolbar share-bar"><span></span><button class="btn gold" data-act="share">${ico('letter')} ${tr('Share my empire', 'నా సామ్రాజ్యం షేర్ చేయి')}</button></div>`;
 }
+function notifyRowHtml() {
+  const st = notifyStatus();
+  const desc = { on: tr('On — reminders for spins, rewards, pets and the tournament.', 'ఆన్ — స్పిన్, రివార్డ్స్, పెట్స్, టోర్నమెంట్ రిమైండర్లు.'),
+    off: tr('Get a phone reminder when your free spin or daily reward is ready.', 'ఫ్రీ స్పిన్ లేదా డైలీ రివార్డ్ రెడీ అయినప్పుడు ఫోన్‌కు రిమైండర్.'),
+    blocked: tr('Blocked in browser settings.', 'బ్రౌజర్ సెట్టింగ్స్‌లో బ్లాక్ అయింది.'),
+    unsupported: isIOS() ? tr('On iPhone, install the game to the Home Screen first.', 'iPhone లో ముందు గేమ్‌ను హోమ్ స్క్రీన్‌కు ఇన్‌స్టాల్ చేయండి.') : tr('Not available in this browser.', 'ఈ బ్రౌజర్‌లో అందుబాటులో లేదు.') }[st];
+  const btn = st === 'on' ? `<button class="btn ghost" data-act="notify-off">${tr('On', 'ఆన్')}</button>`
+    : st === 'off' ? `<button class="btn gold" data-act="notify-on">${tr('Turn on', 'ఆన్ చేయి')}</button>`
+    : `<button class="btn ghost" data-act="notify-help">${tr('How?', 'ఎలా?')}</button>`;
+  return rowHtml('bell', tr('Notifications', 'నోటిఫికేషన్లు'), desc, btn, 'setting');
+}
 function renderSettings() {
   const cloudOn = !!S.cloud.code;
   const lastSync = S.cloud.lastSync ? new Date(S.cloud.lastSync).toLocaleString() : tr('never', 'ఇంకా లేదు');
@@ -2083,6 +2191,7 @@ function renderSettings() {
     `<div class="list">
       ${rowHtml('speech', tr('Language', 'భాష'), tr('Play in English or Telugu.', 'ఇంగ్లీష్ లేదా తెలుగులో ఆడండి.'),
         `<div class="seg-toggle"><button class="${isTe() ? '' : 'on'}" data-act="lang" data-id="en">English</button><button class="${isTe() ? 'on' : ''}" data-act="lang" data-id="te">తెలుగు</button></div>`, 'setting')}
+      ${notifyRowHtml()}
       ${rowHtml('notes', tr('Music', 'మ్యూజిక్'), tr('A different tune on every world.', 'ప్రతి ప్రపంచానికి వేరే పాట.'), `<button class="btn ghost" data-act="music">${S.settings.music ? tr('On', 'ఆన్') : tr('Off', 'ఆఫ్')}</button>`, 'setting')}
       ${rowHtml('grad', tr('Tutorial', 'ట్యుటోరియల్'), tr('Show the step-by-step guide again.', 'స్టెప్-బై-స్టెప్ గైడ్ మళ్ళీ చూపించు.'), `<button class="btn ghost" data-act="tut-replay">${tr('Replay', 'మళ్ళీ చూడు')}</button>`, 'setting')}
       ${cloudBox}
@@ -2232,6 +2341,10 @@ document.addEventListener('click', e => {
     case 'mskip': skipMission(id); renderTab(); break;
     case 'lang': setLang(id); break;
     case 'music': toggleMusic(); break;
+    case 'notify-on': closeModal(); enableNotifications(); break;
+    case 'notify-off': disableNotifications(); break;
+    case 'notify-help': modal(notifyHelpHtml()); break;
+    case 'notify-later': closeModal(); save(); break;
     case 'pet-buy': buyPet(id); renderTab(); break;
     case 'pet-lvl': levelPet(id); renderTab(); break;
     case 'pet-feed': feedPets(); renderTab(); break;
@@ -2375,6 +2488,7 @@ function frame(now) {
     const lbWait = lbState === 'offline' ? 300000 : 60000;
     if (S.player.name && Date.now() - lbLastSent > lbWait && S.lifetime > lbLastScore) lbFetch(true);
     if (S.cloud.code && Date.now() - cloudLastAuto > 120000) cloudSave(false);
+    pushSync(false);
   }
   if (newsAcc >= 14) { newsAcc = 0; rotateHeadline(); }
   if (saveAcc >= 10) { saveAcc = 0; save(); }
@@ -2432,6 +2546,7 @@ if (canClaimDaily()) queueModal(dailyHtml);
 { const f = activeFestival(); if (f && !S.festivals[f.key]) queueModal(festivalHtml); }
 checkTourWeek();
 if (S.tour.pending) claimTourReward();
+if (hadSave && S.lifetime > 1e4) maybeAskNotify();
 pendingChallenge = readChallengeParam();
 if (pendingChallenge && !(S.challenge && !S.challenge.won && S.challenge.score === pendingChallenge.score && S.challenge.name === pendingChallenge.name)) queueModal(challengeInviteHtml);
 updateMusicBtn();
@@ -2443,6 +2558,7 @@ document.addEventListener('visibilitychange', () => {
   if (!document.hidden) { Music.start(); return; }
   Music.stop();
   save();
+  pushSync(true);
   if (S.cloud.code && Date.now() - cloudLastAuto > 15000) cloudSave(false);
 });
 requestAnimationFrame(frame);
