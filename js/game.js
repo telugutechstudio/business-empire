@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '2.8';
+const GAME_VERSION = '2.9';
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
 let S = null; // game state, initialised below
@@ -63,6 +63,7 @@ const ICONS = {
   dizzy: ['Dizzy', '💫'], alienm: ['Alien monster', '👾'], crystal: ['Crystal ball', '🔮'], atom: ['Atom symbol', '⚛️'], magnet: ['Magnet', '🧲'],
   starplain: ['Star', '⭐'], hole: ['Hole', '🕳️'], dna: ['Dna', '🧬'], wand: ['Magic wand', '🪄'], shooting: ['Shooting star', '🌠'],
   sunface: ['Sun with face', '🌞'], nightstars: ['Night with stars', '🌃'],
+  ticket: ['Ticket', '🎫'], chartdown: ['Chart decreasing', '📉'], tv: ['Television', '📺'], shield: ['Shield', '🛡️'], page: ['Page with curl', '📃'],
 };
 function iconUrl(key) { return ICONS[key] ? `icons/3d/${key}.webp` : ''; }
 function emo(key) { return (ICONS[key] || [])[1] || '❔'; }
@@ -229,6 +230,8 @@ const ACHIEVEMENTS = (() => {
   add('pet_max', 'dragon', 15, () => tr('Best Friends', 'బెస్ట్ ఫ్రెండ్స్'), () => tr('Get a pet to level 10', 'ఒక పెట్‌ను లెవెల్ 10 చేయండి'), () => Object.values(S.pets.owned).some(l => l >= 10));
   add('tour_top3', 'medal', 15, () => tr('Podium Finish', 'పోడియం'), () => tr('Finish top 3 in a weekly tournament', 'వారపు టోర్నమెంట్‌లో టాప్ 3'), () => (S.stats.tourTop3 || 0) >= 1);
   add('tour_win', 'trophy', 30, () => tr('Tournament Champion', 'టోర్నమెంట్ ఛాంపియన్'), () => tr('Win a weekly tournament', 'వారపు టోర్నమెంట్ గెలవండి'), () => (S.stats.tourWins || 0) >= 1);
+  add('trade_1', 'chart', 3, () => tr('First Trade', 'మొదటి ట్రేడ్'), () => tr('Buy shares on the stock market', 'స్టాక్ మార్కెట్‌లో షేర్లు కొనండి'), () => (S.stats.trades || 0) >= 1);
+  add('trade_win', 'chart', 10, () => tr('Market Wizard', 'మార్కెట్ మాంత్రికుడు'), () => tr('Sell shares for a 25% profit', '25% లాభానికి షేర్లు అమ్మండి'), () => (S.stats.bestTrade || 0) >= 0.25);
   add('chal_win', 'swords', 10, () => tr('Challenge Champion', 'ఛాలెంజ్ ఛాంపియన్'), () => tr('Beat a friend\'s challenge', 'స్నేహితుడి ఛాలెంజ్ గెలవండి'), () => !!(S.challenge && S.challenge.won));
   add('share_1', 'letter', 5, () => tr('Spread the Word', 'అందరికీ చెప్పండి'), () => tr('Share the game with a friend', 'గేమ్‌ను స్నేహితుడితో షేర్ చేయండి'), () => (S.stats.shares || 0) >= 1);
   [10, 25, 50].forEach(n => add(`upg_${n}`, 'up', 5, () => tr(`Upgrader ${n}`, `అప్‌గ్రేడర్ ${n}`),
@@ -288,6 +291,7 @@ function defaultState() {
     challenge: null,
     pets: { owned: {}, fedAt: 0 },
     tour: { week: '', base: 0, posted: false, pending: '', rewarded: {} },
+    stocks: {},
     stats: { clicks: 0, briefcases: 0, prestiges: 0, upgradesBought: 0, playTime: 0, bestRun: 0, missionsDone: 0, spins: 0, dailyClaims: 0, shares: 0 },
     boosts: { hype: 0, hypeCd: 0, rush: 0, golden: 0 },
     settings: { sound: true, music: true, lowfx: !!(navigator.connection && navigator.connection.saveData), notify: false, notifyAsked: false, notation: 'suffix', buyMode: '1', lang: defaultLang() },
@@ -330,6 +334,7 @@ function mergeState(saved) {
   out.cloud = Object.assign({ code: '', lastSync: 0 }, saved.cloud || {});
   out.festivals = saved.festivals || {};
   out.tour = Object.assign({ week: '', base: 0, posted: false, pending: '', rewarded: {} }, saved.tour || {});
+  out.stocks = saved.stocks && typeof saved.stocks === 'object' ? saved.stocks : {};
   out.pets = Object.assign({ owned: {}, fedAt: 0 }, saved.pets || {});
   out.challenge = saved.challenge && typeof saved.challenge === 'object' ? saved.challenge : null;
   // Players from before the tutorial existed don't need it
@@ -587,6 +592,7 @@ function prestige() {
   let start = 0;
   for (const u of INVESTOR_UPGRADES) if (u.type === 'start' && S.investorUpgrades[u.id]) start += u.value;
   Object.assign(S, newRun(start));
+  S.stocks[S.world] = {};
   marketEvent = null;
   sfx('win');
   toast(tr(`👔 ${fmtInt(n)} investors joined your empire!`, `👔 ${fmtInt(n)} ఇన్వెస్టర్లు మీ సామ్రాజ్యంలో చేరారు!`), 'good');
@@ -1511,6 +1517,106 @@ function festivalFloaters(dt) {
   setTimeout(() => el.remove(), 15000);
 }
 
+/* ---------------------------- STOCK MARKET -------------------------- */
+// Every player sees the same prices: a slow wave, a faster wave and smooth noise, all worked out
+// from the clock (one step per minute), so no server is needed. Shares are kept per world.
+const STOCKS = [
+  { id: 'chai',   icon: 'tea',    name: ['Chai Corp', 'చాయ్ కార్ప్'],          amp: 0.18, p1: 540,  p2: 47,  noise: 0.05, ph: 0.3 },
+  { id: 'rocket', icon: 'space',  name: ['Rocket Motors', 'రాకెట్ మోటార్స్'], amp: 0.26, p1: 900,  p2: 71,  noise: 0.08, ph: 1.7 },
+  { id: 'moonm',  icon: 'moon',   name: ['Moon Mining', 'మూన్ మైనింగ్'],      amp: 0.28, p1: 1440, p2: 59,  noise: 0.07, ph: 2.9 },
+  { id: 'robo',   icon: 'robot',  name: ['Robo Tech', 'రోబో టెక్'],           amp: 0.28, p1: 660,  p2: 37,  noise: 0.10, ph: 4.1 },
+  { id: 'film',   icon: 'studio', name: ['Film Fun', 'ఫిల్మ్ ఫన్'],            amp: 0.22, p1: 1200, p2: 83,  noise: 0.06, ph: 5.2 },
+  { id: 'gemb',   icon: 'gem',    name: ['Gem Bank', 'జెమ్ బ్యాంక్'],         amp: 0.12, p1: 2880, p2: 113, noise: 0.03, ph: 0.9 },
+];
+const STOCK_FEE = 0.01;
+let stockShownMinute = -1;
+function nowMinute() { return Math.floor(Date.now() / 60000); }
+function hash01(a, b) {
+  let h = Math.imul(a, 374761393) + Math.imul(b, 668265263) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+}
+function stockPrice(k, minute = nowMinute()) {
+  const s = STOCKS[k], TAU = Math.PI * 2;
+  const x = minute / 30, i = Math.floor(x), f = x - i, sm = (1 - Math.cos(f * Math.PI)) / 2;
+  const n = hash01(k + 1, i) * (1 - sm) + hash01(k + 1, i + 1) * sm;
+  const v = 1 + s.amp * Math.sin(TAU * minute / s.p1 + s.ph) + s.amp * 0.2 * Math.sin(TAU * minute / s.p2 + s.ph * 2) + s.noise * (n * 2 - 1);
+  return Math.max(0.2, v) * 100;
+}
+function portfolio() { return S.stocks[S.world] || (S.stocks[S.world] = {}); }
+function buyStock(k, frac) {
+  const s = STOCKS[k];
+  if (!s) return;
+  const spend = S.cash * Math.min(1, Math.max(0, frac));
+  if (spend < 10) { sfx('err'); toast(tr('Not enough cash to buy shares.', 'షేర్లు కొనడానికి క్యాష్ సరిపోదు.'), 'bad'); return; }
+  const pos = portfolio()[s.id] || { units: 0, cost: 0 };
+  pos.units += spend * (1 - STOCK_FEE) / stockPrice(k);
+  pos.cost += spend;
+  portfolio()[s.id] = pos;
+  S.cash -= spend;
+  S.stats.trades = (S.stats.trades || 0) + 1;
+  sfx('buy');
+  toast(tr(`📈 Bought ${s.name[0]} shares for ${money(spend)}`, `📈 ${money(spend)} తో ${s.name[1]} షేర్లు కొన్నారు`), 'good');
+}
+function stockValue(k) {
+  const pos = portfolio()[STOCKS[k].id];
+  return pos ? pos.units * stockPrice(k) * (1 - STOCK_FEE) : 0;
+}
+function sellStock(k) {
+  const s = STOCKS[k], pos = s && portfolio()[s.id];
+  if (!pos || pos.units <= 0) { sfx('err'); return; }
+  const value = stockValue(k), gain = value - pos.cost;
+  delete portfolio()[s.id];
+  S.cash += value;
+  // Only the profit counts as new earnings
+  if (gain > 0) { S.runEarnings += gain; S.lifetime += gain; }
+  S.stats.bestTrade = Math.max(S.stats.bestTrade || 0, gain / pos.cost);
+  if (gain >= 0) { sfx('win'); coinShower(10); } else sfx('click');
+  const pct = (gain / pos.cost * 100).toFixed(1);
+  toast(gain >= 0 ? tr(`💰 Sold ${s.name[0]}: +${money(gain)} (+${pct}%)`, `💰 ${s.name[1]} అమ్మారు: +${money(gain)} (+${pct}%)`)
+    : tr(`📉 Sold ${s.name[0]}: ${money(gain)} (${pct}%)`, `📉 ${s.name[1]} అమ్మారు: ${money(gain)} (${pct}%)`), gain >= 0 ? 'good' : 'bad');
+}
+function sparkline(k) {
+  const now = nowMinute(), W = 120, H = 36;
+  const pts = Array.from({ length: 60 }, (_, j) => stockPrice(k, now - 59 + j));
+  const min = Math.min(...pts), max = Math.max(...pts), up = pts[59] >= pts[0];
+  const d = pts.map((p, j) => `${(j / 59 * W).toFixed(1)},${(H - 2 - (p - min) / (max - min || 1) * (H - 4)).toFixed(1)}`).join(' ');
+  const color = up ? '#2fd27a' : '#ff5c6c';
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+    <polyline points="0,${H} ${d} ${W},${H}" fill="${color}" opacity=".15"/><polyline points="${d}" fill="none" stroke="${color}" stroke-width="2"/></svg>`;
+}
+function renderStocks() {
+  stockShownMinute = nowMinute();
+  let total = 0, cost = 0;
+  const rows = STOCKS.map((s, k) => {
+    const price = stockPrice(k), hourAgo = stockPrice(k, nowMinute() - 60);
+    const ch = (price / hourAgo - 1) * 100, pos = portfolio()[s.id];
+    let holding = '';
+    if (pos) {
+      const v = stockValue(k), g = (v / pos.cost - 1) * 100;
+      total += v; cost += pos.cost;
+      holding = `<div class="stock-hold ${g >= 0 ? 'up' : 'down'}">${tr('You own', 'మీ షేర్లు')}: <b>${money(v)}</b> (${g >= 0 ? '+' : ''}${g.toFixed(1)}%)</div>`;
+    }
+    return `<div class="stock-row">
+      <div class="ico">${ico(s.icon)}</div>
+      <div class="stock-info"><div class="title">${tr(...s.name)}</div>
+        <div class="stock-price">${price.toFixed(2)} <span class="${ch >= 0 ? 'up' : 'down'}">${ch >= 0 ? '▲' : '▼'} ${Math.abs(ch).toFixed(1)}%</span></div>${holding}</div>
+      ${sparkline(k)}
+      <div class="stock-btns">
+        <button class="btn" data-act="stock-buy" data-k="${k}" data-f="0.1">${tr('Buy', 'కొను')} 10%</button>
+        <button class="btn" data-act="stock-buy" data-k="${k}" data-f="0.5">50%</button>
+        ${pos ? `<button class="btn gold" data-act="stock-sell" data-k="${k}">${tr('Sell', 'అమ్ము')}</button>` : ''}
+      </div></div>`;
+  }).join('');
+  const g = cost ? (total / cost - 1) * 100 : 0;
+  return header('chart', tr('Stock Market', 'స్టాక్ మార్కెట్'),
+    tr('Prices change every minute and are the same for every player. Buy low, sell high! (1% fee)', 'ధరలు ప్రతి నిమిషం మారుతాయి, అందరికీ ఒకటే. తక్కువకు కొని ఎక్కువకు అమ్మండి! (1% ఫీజు)')) +
+    `<div class="stock-summary"><div><div class="stat-big">${money(total)}</div><div class="stat-lbl">${tr('Your shares', 'మీ షేర్ల విలువ')} · ${nm(WORLD)}</div></div>
+      <div><div class="stat-big ${g >= 0 ? 'up' : 'down'}">${g >= 0 ? '+' : ''}${g.toFixed(1)}%</div><div class="stat-lbl">${tr('Profit', 'లాభం')}</div></div>
+      <div><div class="stat-big">${money(S.cash)}</div><div class="stat-lbl">${tr('Cash', 'క్యాష్')}</div></div></div>
+    <div class="list">${rows}</div>`;
+}
+
 /* ---------------------------- PETS ---------------------------------- */
 // Pets give lasting bonuses. Feed them at least once a day, or a hungry pet only gives half its bonus.
 const PETS = [
@@ -1969,7 +2075,7 @@ function switchTab(tab) {
 }
 function renderTab() {
   const fn = { missions: renderMissions, managers: renderManagers, upgrades: renderUpgrades, investors: renderInvestors,
-    worlds: renderWorlds, pets: renderPets, leaderboard: renderLeaderboard, shop: renderShop, awards: renderAwards, stats: renderStats, settings: renderSettings }[activeTab];
+    worlds: renderWorlds, pets: renderPets, stocks: renderStocks, leaderboard: renderLeaderboard, shop: renderShop, awards: renderAwards, stats: renderStats, settings: renderSettings }[activeTab];
   if (fn) $('tab-' + activeTab).innerHTML = fn();
   refreshAffordability();
 }
@@ -2347,6 +2453,8 @@ document.addEventListener('click', e => {
     case 'notify-off': disableNotifications(); break;
     case 'notify-help': modal(notifyHelpHtml()); break;
     case 'notify-later': closeModal(); save(); break;
+    case 'stock-buy': buyStock(+el.dataset.k, +el.dataset.f); renderTab(); break;
+    case 'stock-sell': sellStock(+el.dataset.k); renderTab(); break;
     case 'pet-buy': buyPet(id); renderTab(); break;
     case 'pet-lvl': levelPet(id); renderTab(); break;
     case 'pet-feed': feedPets(); renderTab(); break;
@@ -2486,6 +2594,7 @@ function frame(now) {
     checkChallenge();
     if (activeTab === 'stats') renderTab();
     if (activeTab === 'pets') updatePetTimer();
+    if (activeTab === 'stocks' && Math.floor(Date.now() / 60000) !== stockShownMinute) renderTab();
     if (activeTab === 'missions') updateMissionProgress();
     checkTourWeek();
     if (activeTab === 'leaderboard') updateTourLive();

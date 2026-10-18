@@ -501,6 +501,32 @@ a.btn { text-decoration: none; display: inline-block; }
 .share-bar .btn .i3d { width: 22px; height: 22px; }
 .hype.share { background: linear-gradient(180deg, #6fe0c0, #1fa58a); box-shadow: 0 4px 0 #0f6b58, 0 8px 16px rgba(31, 165, 138, .3); }
 
+/* Stock market */
+.stock-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 14px; margin-bottom: 12px; border-radius: var(--radius);
+  background: linear-gradient(135deg, #12402c, #1b2f5c); border: 1px solid #2f9a68; }
+.stock-summary .stat-big { font-size: 22px; }
+.stat-big.up, .stock-price .up, .stock-hold.up { color: var(--green); }
+.stat-big.down, .stock-price .down, .stock-hold.down { color: var(--red); }
+.stock-row { display: grid; grid-template-columns: 54px 1fr 130px auto; gap: 12px; align-items: center; padding: 10px 14px;
+  background: linear-gradient(160deg, rgba(38, 46, 85, .95), rgba(28, 34, 64, .95)); border: 1px solid var(--border); border-radius: var(--radius); }
+.stock-row .ico { width: 54px; height: 54px; display: grid; place-items: center; background: radial-gradient(circle at 35% 30%, #3d4785, #151a38); border-radius: 14px; }
+.stock-row .ico .i3d { width: 40px; height: 40px; }
+.stock-row .title { font-weight: 600; }
+.stock-price { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 17px; }
+.stock-price span { font-size: 13px; margin-left: 6px; }
+.stock-hold { font-size: 12.5px; }
+.spark { width: 130px; height: 40px; }
+.stock-btns { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.stock-btns .btn { padding: 7px 10px; font-size: 13px; }
+@media (max-width: 760px) {
+  .stock-row { grid-template-columns: 46px 1fr 90px; padding: 10px; }
+  .stock-row .ico { width: 46px; height: 46px; }
+  .spark { width: 90px; }
+  .stock-btns { grid-column: 1 / -1; justify-content: stretch; }
+  .stock-btns .btn { flex: 1; }
+  .stock-summary .stat-big { font-size: 17px; }
+}
+
 /* Weekly tournament */
 .lb-tabs { display: flex; width: 100%; margin-bottom: 12px; }
 .lb-tabs button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
