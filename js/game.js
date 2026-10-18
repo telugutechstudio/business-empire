@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '2.9';
+const GAME_VERSION = '3.0';
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
 let S = null; // game state, initialised below
@@ -230,6 +230,8 @@ const ACHIEVEMENTS = (() => {
   add('pet_max', 'dragon', 15, () => tr('Best Friends', 'బెస్ట్ ఫ్రెండ్స్'), () => tr('Get a pet to level 10', 'ఒక పెట్‌ను లెవెల్ 10 చేయండి'), () => Object.values(S.pets.owned).some(l => l >= 10));
   add('tour_top3', 'medal', 15, () => tr('Podium Finish', 'పోడియం'), () => tr('Finish top 3 in a weekly tournament', 'వారపు టోర్నమెంట్‌లో టాప్ 3'), () => (S.stats.tourTop3 || 0) >= 1);
   add('tour_win', 'trophy', 30, () => tr('Tournament Champion', 'టోర్నమెంట్ ఛాంపియన్'), () => tr('Win a weekly tournament', 'వారపు టోర్నమెంట్ గెలవండి'), () => (S.stats.tourWins || 0) >= 1);
+  [[1, 'Scratcher', 'స్క్రాచర్'], [25, 'Scratch Master', 'స్క్రాచ్ మాస్టర్']].forEach(([n, en, te]) => add(`scratch_${n}`, 'ticket', n === 25 ? 15 : 3,
+    () => tr(en, te), () => tr(`Scratch ${n} card(s)`, `${n} కార్డు(లు) స్క్రాచ్ చేయండి`), () => (S.stats.scratches || 0) >= n));
   add('trade_1', 'chart', 3, () => tr('First Trade', 'మొదటి ట్రేడ్'), () => tr('Buy shares on the stock market', 'స్టాక్ మార్కెట్‌లో షేర్లు కొనండి'), () => (S.stats.trades || 0) >= 1);
   add('trade_win', 'chart', 10, () => tr('Market Wizard', 'మార్కెట్ మాంత్రికుడు'), () => tr('Sell shares for a 25% profit', '25% లాభానికి షేర్లు అమ్మండి'), () => (S.stats.bestTrade || 0) >= 0.25);
   add('chal_win', 'swords', 10, () => tr('Challenge Champion', 'ఛాలెంజ్ ఛాంపియన్'), () => tr('Beat a friend\'s challenge', 'స్నేహితుడి ఛాలెంజ్ గెలవండి'), () => !!(S.challenge && S.challenge.won));
@@ -292,6 +294,7 @@ function defaultState() {
     pets: { owned: {}, fedAt: 0 },
     tour: { week: '', base: 0, posted: false, pending: '', rewarded: {} },
     stocks: {},
+    scratch: { day: '', card: null },
     stats: { clicks: 0, briefcases: 0, prestiges: 0, upgradesBought: 0, playTime: 0, bestRun: 0, missionsDone: 0, spins: 0, dailyClaims: 0, shares: 0 },
     boosts: { hype: 0, hypeCd: 0, rush: 0, golden: 0 },
     settings: { sound: true, music: true, lowfx: !!(navigator.connection && navigator.connection.saveData), notify: false, notifyAsked: false, notation: 'suffix', buyMode: '1', lang: defaultLang() },
@@ -334,6 +337,7 @@ function mergeState(saved) {
   out.cloud = Object.assign({ code: '', lastSync: 0 }, saved.cloud || {});
   out.festivals = saved.festivals || {};
   out.tour = Object.assign({ week: '', base: 0, posted: false, pending: '', rewarded: {} }, saved.tour || {});
+  out.scratch = Object.assign({ day: '', card: null }, saved.scratch || {});
   out.stocks = saved.stocks && typeof saved.stocks === 'object' ? saved.stocks : {};
   out.pets = Object.assign({ owned: {}, fedAt: 0 }, saved.pets || {});
   out.challenge = saved.challenge && typeof saved.challenge === 'object' ? saved.challenge : null;
@@ -1517,6 +1521,115 @@ function festivalFloaters(dt) {
   setTimeout(() => el.remove(), 15000);
 }
 
+/* ---------------------------- SCRATCH CARD ------------------------- */
+// One free card a day (more for gems). The prize is picked when the card is made and saved,
+// so closing the card or reloading never changes it. Three matching symbols show the prize.
+const SCRATCH_GEMS = 3;
+const SCRATCH_PRIZES = [
+  { icon: 'coin',      t: ['10 min income', '10 నిమి ఆదాయం'], w: 30, give: () => cashPrize(600) },
+  { icon: 'gem',       t: ['5 Gems', '5 జెమ్స్'],              w: 25, give: () => { S.gems += 5; return tr('+5 gems', '+5 జెమ్స్'); } },
+  { icon: 'bolt',      t: ['x2 for 10m', '10 నిమి x2'],         w: 18, give: () => { S.boosts.rush += 600; return tr('x2 profits for 10 minutes', '10 నిమిషాలు x2 లాభాలు'); } },
+  { icon: 'hourglass', t: ['1 hour income', '1 గంట ఆదాయం'],   w: 12, give: () => cashPrize(3600) },
+  { icon: 'sparkles',  t: ['x5 for 30s', '30 సె x5'],           w: 10, give: () => { S.boosts.golden += 30; return tr('x5 profits for 30 seconds', '30 సెకన్లు x5 లాభాలు'); } },
+  { icon: 'crown',     t: ['15 Gems', '15 జెమ్స్'],             w: 5,  big: true, give: () => { S.gems += 15; return tr('JACKPOT! +15 gems', 'జాక్‌పాట్! +15 జెమ్స్'); } },
+];
+function scratchFreeReady() { return S.scratch.day !== dayKey(); }
+function newScratchCard(paid) {
+  const total = SCRATCH_PRIZES.reduce((a, p) => a + p.w, 0);
+  let roll = Math.random() * total, k = 0;
+  while (roll >= SCRATCH_PRIZES[k].w) { roll -= SCRATCH_PRIZES[k].w; k++; }
+  // 3 winning symbols + 3 different other symbols, shuffled
+  const others = SCRATCH_PRIZES.map((p, j) => j).filter(j => j !== k).sort(() => Math.random() - 0.5).slice(0, 3);
+  const cells = [k, k, k, ...others].sort(() => Math.random() - 0.5);
+  return { prize: k, cells, paid, done: false };
+}
+function openScratch() {
+  if (!S.scratch.card && scratchFreeReady()) { S.scratch.day = dayKey(); S.scratch.card = newScratchCard(false); save(); }
+  modal(scratchHtml());
+  if (S.scratch.card && !S.scratch.card.done) setTimeout(initScratchCanvas, 30);
+}
+function buyScratch() {
+  if (S.scratch.card && !S.scratch.card.done) return;
+  if (S.gems < SCRATCH_GEMS) { sfx('err'); toast(tr('Not enough gems.', 'జెమ్స్ సరిపోవు.'), 'bad'); return; }
+  S.gems -= SCRATCH_GEMS;
+  S.scratch.card = newScratchCard(true);
+  save();
+  modal(scratchHtml());
+  setTimeout(initScratchCanvas, 30);
+}
+function scratchHtml() {
+  const c = S.scratch.card;
+  const sub = tr('Scratch the silver area. Match 3 symbols to win!', 'వెండి భాగాన్ని గీకండి. 3 ఒకేలా ఉంటే గెలుపు!');
+  if (!c) {
+    return `${ico('ticket', 'big-ico')}<h3>${tr('Scratch Card', 'స్క్రాచ్ కార్డ్')}</h3>
+      <p>${tr('Your free card for today is used. A new free card comes tomorrow!', 'ఈ రోజు ఫ్రీ కార్డ్ అయిపోయింది. రేపు కొత్త ఫ్రీ కార్డ్ వస్తుంది!')}</p>
+      <div class="modal-actions"><button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button>
+      <button class="btn blue" data-act="scratch-buy" data-gems="${SCRATCH_GEMS}">${tr('New card', 'కొత్త కార్డ్')} · 💎${SCRATCH_GEMS}</button></div>`;
+  }
+  const cells = c.cells.map(j => `<div class="sc-cell ${c.done && j === c.prize ? 'win' : ''}">${ico(SCRATCH_PRIZES[j].icon)}<small>${tr(...SCRATCH_PRIZES[j].t)}</small></div>`).join('');
+  const actions = c.done
+    ? `<button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button>
+       <button class="btn blue" data-act="scratch-buy" data-gems="${SCRATCH_GEMS}">${tr('New card', 'కొత్త కార్డ్')} · 💎${SCRATCH_GEMS}</button>`
+    : `<button class="btn ghost" data-act="scratch-reveal">${tr('Reveal all', 'అన్నీ చూపించు')}</button>`;
+  return `<h3>${tr('Scratch Card', 'స్క్రాచ్ కార్డ్')}</h3><p class="sub">${c.done ? tr(`You won: <b>${SCRATCH_PRIZES[c.prize].t[0]}</b>!`, `మీరు గెలిచింది: <b>${SCRATCH_PRIZES[c.prize].t[1]}</b>!`) : sub}</p>
+    <div class="scratch-card ${c.done ? 'done' : ''}"><div class="sc-grid">${cells}</div>${c.done ? '' : '<canvas id="scratchCv"></canvas>'}</div>
+    <div class="modal-actions">${actions}</div>`;
+}
+function initScratchCanvas() {
+  const cv = $('scratchCv');
+  if (!cv) return;
+  const r = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = r.width * dpr; cv.height = r.height * dpr;
+  const ctx = cv.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, cv.width, cv.height);
+  g.addColorStop(0, '#c9ced8'); g.addColorStop(0.5, '#eef1f6'); g.addColorStop(1, '#aab0bd');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = 'rgba(90, 96, 112, .45)';
+  ctx.font = `700 ${16 * dpr}px Fredoka, sans-serif`;
+  ctx.textAlign = 'center';
+  for (let y = 30 * dpr; y < cv.height; y += 46 * dpr) {
+    for (let x = 50 * dpr; x < cv.width; x += 110 * dpr) ctx.fillText(tr('SCRATCH', 'గీకండి'), x + (y / dpr % 92 ? 55 * dpr : 0), y);
+  }
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = 46 * dpr;
+  let down = false, lastPt = null, moves = 0;
+  const pt = e => { const b = cv.getBoundingClientRect(); return [(e.clientX - b.left) * dpr, (e.clientY - b.top) * dpr]; };
+  const scrape = p => {
+    ctx.beginPath();
+    if (lastPt) ctx.moveTo(...lastPt); else ctx.moveTo(p[0] - 0.1, p[1]);
+    ctx.lineTo(...p); ctx.stroke();
+    lastPt = p;
+    if (++moves % 6 === 0) { sfx('tick'); if (clearedShare(ctx, cv) > 0.5) revealScratch(); }
+  };
+  cv.addEventListener('pointerdown', e => { down = true; lastPt = null; cv.setPointerCapture(e.pointerId); scrape(pt(e)); });
+  cv.addEventListener('pointermove', e => { if (down) scrape(pt(e)); });
+  const up = () => { down = false; lastPt = null; };
+  cv.addEventListener('pointerup', up);
+  cv.addEventListener('pointercancel', up);
+}
+function clearedShare(ctx, cv) {
+  const data = ctx.getImageData(0, 0, cv.width, cv.height).data;
+  let clear = 0, n = 0;
+  for (let i = 3; i < data.length; i += 4 * 16) { n++; if (data[i] < 32) clear++; }
+  return clear / n;
+}
+function revealScratch() {
+  const c = S.scratch.card;
+  if (!c || c.done) return;
+  c.done = true;
+  const p = SCRATCH_PRIZES[c.prize];
+  const msg = p.give();
+  S.stats.scratches = (S.stats.scratches || 0) + 1;
+  save();
+  sfx(p.big ? 'win' : 'big');
+  toast(`🎫 ${msg}`, 'gem');
+  modal(scratchHtml());
+  confetti(document.querySelector('.scratch-card'), p.big ? 220 : 90);
+  // The finished card stays visible until closed; the next open starts a new one
+  S.scratch.card = null;
+  save();
+}
+
 /* ---------------------------- STOCK MARKET -------------------------- */
 // Every player sees the same prices: a slow wave, a faster wave and smooth noise, all worked out
 // from the clock (one step per minute), so no server is needed. Shares are kept per world.
@@ -2330,6 +2443,7 @@ function updateDots() {
   $('dot-worlds').classList.toggle('on', WORLDS.some(w => !S.worldsUnlocked[w.id] && S.lifetime >= w.unlockAt));
   $('dot-daily').classList.toggle('on', canClaimDaily());
   $('dot-spin').classList.toggle('on', spinReady());
+  $('dot-scratch').classList.toggle('on', scratchFreeReady());
   const hasPets = Object.keys(S.pets.owned).length > 0;
   $('dot-pets').classList.toggle('on', hasPets ? (petsHungry() && petFeedReady()) : PETS.some(p => p.cost.cash ? S.cash >= p.cost.cash : false));
 }
@@ -2453,6 +2567,9 @@ document.addEventListener('click', e => {
     case 'notify-off': disableNotifications(); break;
     case 'notify-help': modal(notifyHelpHtml()); break;
     case 'notify-later': closeModal(); save(); break;
+    case 'scratch': openScratch(); break;
+    case 'scratch-buy': buyScratch(); break;
+    case 'scratch-reveal': revealScratch(); break;
     case 'stock-buy': buyStock(+el.dataset.k, +el.dataset.f); renderTab(); break;
     case 'stock-sell': sellStock(+el.dataset.k); renderTab(); break;
     case 'pet-buy': buyPet(id); renderTab(); break;
