@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '4.4';
+const GAME_VERSION = '4.5';
 const BIZ_OFF = true; // businesses, managers, upgrades, investors, stocks and worlds are switched off
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
@@ -1380,6 +1380,12 @@ function copyText(text) {
 const Music = (() => {
   const _ = null;
   const SONGS = {
+    spin: { bpm: 124, wave: 'square', echo: 0.2, clap: true,
+      chords: [[60, 64, 67], [55, 59, 62], [57, 60, 64], [53, 57, 60]],
+      lead: [72, _, 72, 74, 76, _, 74, 72, 71, _, 71, 72, 74, _, 79, _, 76, _, 76, 77, 79, _, 77, 76, 74, _, 72, _, 74, _, _, _] },
+    build: { bpm: 96, wave: 'triangle', echo: 0.3,
+      chords: [[60, 64, 67], [61, 65, 68], [60, 64, 67], [55, 59, 62]],
+      lead: [72, _, 73, _, 76, _, 77, _, 79, _, _, 80, 79, _, 77, _, 76, _, 77, _, 76, _, 73, _, 72, _, _, _, 71, _, 72, _] },
     earth: { bpm: 108, wave: 'triangle', echo: 0.18,
       chords: [[60, 64, 67], [57, 60, 64], [53, 57, 60], [55, 59, 62]],
       lead: [72, _, 76, _, 79, _, 76, 74, 72, _, 69, _, 72, _, 76, _, 77, _, 76, _, 74, _, 72, _, 74, _, 71, _, 67, _, _, _] },
@@ -1442,6 +1448,12 @@ const Music = (() => {
     s.connect(f).connect(g).connect(master);
     s.start(t); s.stop(t + 0.06);
   }
+  function clap(t) {
+    const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = noise; f.type = 'bandpass'; f.frequency.value = 1600;
+    g.gain.setValueAtTime(0.12, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+    s.connect(f).connect(g).connect(master); s.start(t); s.stop(t + 0.13);
+  }
   function playStep(t) {
     const eighth = 60 / song.bpm / 2;
     const bar = Math.floor(step / 8) % 4, pos = step % 8;
@@ -1451,7 +1463,7 @@ const Music = (() => {
     tone(t, chord[pos % 3] + 12, eighth * 0.9, song.wave, 0.025, false);                  // arpeggio
     const ln = song.lead[step % 32];
     if (ln) tone(t, ln, eighth * 1.8, song.wave, 0.07, true);                              // melody
-    if (song !== SONGS.moon) { if (pos === 0 || pos === 4) kick(t); if (pos % 2 === 1) hat(t, 0.05); }
+    if (song !== SONGS.moon) { if (pos === 0 || pos === 4) kick(t); if (pos % 2 === 1) hat(t, 0.05); if (song.clap && (pos === 2 || pos === 6)) clap(t); }
     else if (pos === 0) hat(t, 0.03);
   }
   function schedule() {
@@ -2704,7 +2716,8 @@ function mountBuildView() {
   const w = host.clientWidth || 600, h = Math.round(Math.min(620, Math.max(380, Math.min(w * 0.8, innerHeight - 230))));
   B3.renderer.setSize(w, h); B3.camera.aspect = w / h; B3.camera.updateProjectionMatrix();
   const view = S.build.view != null && S.build.view < S.build.done ? S.build.view : null;
-  if (view != null) b3Show(view, 5); else if (allBuilt()) b3Show(LANDMARKS.length - 1, 5); else b3Show(S.build.done, S.build.stage);
+  if (lmCelebrate >= 0) b3Show(lmCelebrate, 5);
+  else if (view != null) b3Show(view, 5); else if (allBuilt()) b3Show(LANDMARKS.length - 1, 5); else b3Show(S.build.done, S.build.stage);
   if (!B3.raf) { B3.lastT = performance.now(); B3.raf = requestAnimationFrame(b3Loop); }
 }
 function b3Loop(now) {
@@ -2713,7 +2726,10 @@ function b3Loop(now) {
   if (now - B3.lastT < (fxOff() ? 64 : 31)) return;
   const dt = Math.min(0.1, (now - B3.lastT) / 1000); B3.lastT = now;
   if (!B3.drag) B3.yaw += dt * 0.12;
-  const cam = B3.camera; const d = 15.5 * Math.min(1.6, Math.max(1, 1.7 / cam.aspect)); // pull back on narrow screens
+  const zk = B3.zoomFrom ? Math.min(1, (now - B3.zoomFrom) / 1400) : 1;
+  if (zk >= 1) B3.zoomFrom = 0;
+  const cam = B3.camera; const d = 15.5 * Math.min(1.6, Math.max(1, 1.7 / cam.aspect)) * (1 + 1.4 * Math.pow(1 - zk, 3));
+  if (zk < 1) B3.yaw += dt * 1.2 * (1 - zk); // pull back on narrow screens
   cam.position.set(Math.sin(B3.yaw) * d, 8.5, Math.cos(B3.yaw) * d); cam.lookAt(0, 1.8, 0);
   for (let k = B3.anims.length - 1; k >= 0; k--) {
     const a = B3.anims[k]; a.t += dt / 0.9;
@@ -2728,13 +2744,15 @@ function b3Loop(now) {
 }
 // ---- Build tab ----
 // ---- Build tab: the 3D island fills the screen; map and parts open from buttons on top of it ----
+let lmCelebrate = -1;
 function renderBuild() {
-  const B = S.build, viewing = B.view != null && B.view < B.done;
-  const shownIdx = viewing ? B.view : allBuilt() ? LANDMARKS.length - 1 : B.done;
-  const L = LANDMARKS[shownIdx], st = viewing || allBuilt() ? 5 : B.stage;
+  const B = S.build, viewing = lmCelebrate < 0 && B.view != null && B.view < B.done;
+  const shownIdx = lmCelebrate >= 0 ? lmCelebrate : viewing ? B.view : allBuilt() ? LANDMARKS.length - 1 : B.done;
+  const L = LANDMARKS[shownIdx], st = lmCelebrate >= 0 || viewing || allBuilt() ? 5 : B.stage;
   const dots = L.parts.map((p, k) => `<span class="${k < st ? 'on' : k === st ? 'next' : ''}"></span>`).join('');
   let bottom;
-  if (viewing) bottom = `<button class="btn gold bv-main" data-act="build-view" data-id="-1">${tr('Back to building', 'కట్టడానికి తిరిగి')}</button>`;
+  if (lmCelebrate >= 0) bottom = `<button class="btn gold bv-main" data-act="lm-next">${tr('Next landmark ➜', 'తర్వాతి కట్టడం ➜')}</button>`;
+  else if (viewing) bottom = `<button class="btn gold bv-main" data-act="build-view" data-id="-1">${tr('Back to building', 'కట్టడానికి తిరిగి')}</button>`;
   else if (allBuilt()) bottom = `<div class="bv-note">${tr('Every landmark is built! More cities soon.', 'అన్ని కట్టడాలూ పూర్తి! మరిన్ని నగరాలు త్వరలో.')}</div>`;
   else {
     const cost = stageCost(B.done, B.stage), ok = S.cash >= cost;
@@ -2785,20 +2803,24 @@ function buildPart() {
   B.stage++; B.view = null;
   const cash = bonusCash(300 * (B.done + 1)); earn(cash); S.slot.energy += 5; giveAlbumPack('basic', 1, true); addLeague(30);
   sfx('buy');
-  toast(tr(`🏗️ ${L.parts[part][0]} built! +${money(cash)} cash, +5 ⚡, +1 📦`, `🏗️ ${L.parts[part][1]} పూర్తి! +${money(cash)} క్యాష్, +5 ⚡, +1 📦`), 'good');
+  toast(tr(`🏗️ ${L.parts[part][0]} built! +${money(cash)} coins, +5 ⚡, +1 📦`, `🏗️ ${L.parts[part][1]} పూర్తి! +${money(cash)} కాయిన్లు, +5 ⚡, +1 📦`), 'good');
   let finished = false;
   if (B.stage >= 5) {
     finished = true;
     const gems = 20 * (B.done + 1);
-    B.done++; B.stage = 0; S.gems += gems; S.slot.energy += 25; giveAlbumPack('gold', 1, true);
-    B.view = B.done - 1; // keep the finished landmark on screen to enjoy it
+    const bonus = bonusCash(3600 * (B.done + 1));
+    B.done++; B.stage = 0; B.view = null; S.gems += gems; S.slot.energy += 25; earn(bonus); giveAlbumPack('gold', 1, true);
+    lmCelebrate = B.done - 1; // show the finished landmark until the player moves on
     setTimeout(() => {
-      sfx('win'); confetti($('buildView'), 220);
-      modal(`${ico(L.icon, 'big-ico')}<h3>${tr(`${L.name[0]} is complete!`, `${L.name[1]} పూర్తయింది!`)}</h3>
-        <p>${tr(`+${gems} 💎 · +25 ⚡ · <b>+${LANDMARK_BONUS * 100}% profits forever</b>`, `+${gems} 💎 · +25 ⚡ · <b>శాశ్వతంగా +${LANDMARK_BONUS * 100}% లాభాలు</b>`)}</p>
-        ${allBuilt() ? '' : `<p class="sub">${tr(`Next: ${LANDMARKS[B.done].name[0]}`, `తర్వాత: ${LANDMARKS[B.done].name[1]}`)}</p>`}
-        <div class="modal-actions"><button class="btn gold" data-act="close">${tr('Hooray!', 'హుర్రే!')}</button></div>`);
-    }, 900);
+      SlotFX.jackpot(); confetti($('buildView'), 240);
+      const next = LANDMARKS[B.done];
+      const tile = (icon, big, small, k) => `<div class="lm-tile" style="animation-delay:${0.25 + k * 0.15}s">${ico(icon)}<b>${big}</b><small>${small}</small></div>`;
+      modal(`<div class="lm-done"><div class="lm-rays"></div>${ico(L.icon, 'big-ico')}</div>
+        <h3>${tr(`${L.name[0]} is complete!`, `${L.name[1]} పూర్తయింది!`)}</h3>
+        <div class="lm-tiles">${tile('coin', fmtInt(bonus), tr('coins', 'కాయిన్లు'), 0)}${tile('gem', gems, tr('gems', 'జెమ్స్'), 1)}${tile('bolt', 25, tr('energy', 'ఎనర్జీ'), 2)}${tile('pack', 1, tr('gold pack', 'గోల్డ్ ప్యాక్'), 3)}${tile('chart', '+' + LANDMARK_BONUS * 100 + '%', tr('all prizes', 'అన్ని బహుమతులు'), 4)}</div>
+        ${next ? `<p class="sub">${tr(`Next up: <b>${next.name[0]}</b>, ${next.city[0]}`, `తర్వాత: <b>${next.name[1]}</b>, ${next.city[1]}`)}</p>` : `<p class="sub">${tr('You built every landmark!', 'అన్ని కట్టడాలూ కట్టేశారు!')}</p>`}
+        <div class="modal-actions"><button class="btn gold lm-next" data-act="lm-next">${next ? tr('Collect & next landmark ➜', 'తీసుకుని తర్వాతి కట్టడం ➜') : tr('Collect', 'తీసుకో')}</button></div>`);
+    }, 1100);
   }
   save();
   const keep = B3.T;
@@ -3206,6 +3228,7 @@ const Stars = (() => {
     moon: ['#ffffff', '#d7dcef', '#a9b3d6'],
     mars: ['#ffe2c7', '#ffb08a', '#ff8a5c'],
     galaxy: ['#f0e0ff', '#9fd0ff', '#ff9ef0'],
+    party: ['#ffe066', '#ff8ad8', '#7ae8ff'],
   };
   let stars = [], colors = THEMES.earth, w = 0, h = 0, dpr = 1, warpUntil = 0, px = 0, py = 0, shoot = null;
   function resize() {
@@ -3229,6 +3252,7 @@ const Stars = (() => {
       ctx.globalAlpha = alpha;
       ctx.fillStyle = colors[s.c];
       if (warp > 0) { ctx.fillRect(x, y - warp * 40 * s.z * dpr, 1.6 * dpr * s.z, warp * 40 * s.z * dpr + 2); }
+      else if (colors === THEMES.party && s.c === 1 && s.z > 0.6) { ctx.globalAlpha = alpha * 0.25; ctx.beginPath(); ctx.arc(x, y, (4 + s.z * 9) * dpr, 0, 6.283); ctx.fill(); }
       else { ctx.beginPath(); ctx.arc(x, y, (0.5 + s.z * 1.3) * dpr, 0, 6.283); ctx.fill(); }
     }
     if (!shoot && Math.random() < dt * 0.08) shoot = { x: rand(0, w), y: rand(0, h * 0.5), vx: rand(-900, -500) * dpr, vy: rand(250, 450) * dpr, life: 0.9 };
@@ -3468,6 +3492,7 @@ function switchTab(tab) {
   document.querySelectorAll('.tab').forEach(s => s.classList.toggle('active', s.id === 'tab-' + tab));
   $('main').scrollTop = 0;
   if (tab === 'slots') raidSync(false);
+  if (BIZ_OFF) Music.setWorld(tab === 'build' ? 'build' : 'spin');
   if (tab === 'leaderboard') { lbFetch(!!S.player.name && S.lifetime > lbLastScore); tourFetch(!!S.player.name && tourScore() > tourLastScore); }
   renderTab();
 }
@@ -3760,8 +3785,10 @@ function updateDots() {
 }
 
 /* ---------------------------- UI: HEADER / BOOSTS ------------------- */
+let cashShown = null;
 function updateHeader() {
-  $('cash').textContent = money(S.cash);
+  if (cashShown == null || Math.abs(S.cash - cashShown) < 1 || !BIZ_OFF) cashShown = S.cash; else cashShown += (S.cash - cashShown) * 0.25;
+  $('cash').textContent = money(Math.round(cashShown));
   if (BIZ_OFF) { slotRegen(); $('ips').textContent = `⚡ ${S.slot.energy} / ${slotMax()}` + (S.slot.energy < slotMax() ? ` · +1 ${fmtClock(slotNextIn())}` : ''); }
   else $('ips').textContent = money(incomePerSec()) + tr(' / sec', ' / సెకను');
   $('investors').textContent = fmtInt(S.investors);
@@ -3899,6 +3926,12 @@ document.addEventListener('click', e => {
     case 'star-trade': tradeStars(); break;
     case 'cal-claim': claimCalendar(); break;
     case 'build-part': buildPart(); break;
+    case 'lm-next': {
+      const from = el.getBoundingClientRect().width ? el : $('buildView');
+      flyTo('coins', from, 'coin', 10); flyTo('gems', from, 'gem', 5, 120); flyTo('pack', from, 'pack', 2, 240);
+      lmCelebrate = -1; closeModal(); SlotFX.whoosh();
+      B3.zoomFrom = performance.now(); renderTab(); break;
+    }
     case 'build-map': openBuildMap(); break;
     case 'build-parts': openBuildParts(); break;
     case 'build-view': S.build.view = +id >= 0 ? +id : null; closeModal(); renderTab(); break;
@@ -4121,6 +4154,7 @@ ensureMissions();
 ensurePlayerId();
 if (!BIZ_OFF) { buildBizCards(); initTilt(); }
 document.body.classList.toggle('biz-off', BIZ_OFF);
+if (BIZ_OFF) { Music.setWorld('spin'); Stars.setWorld('party'); }
 if (BIZ_OFF) switchTab('slots');
 updateHeader();
 updateDots();
