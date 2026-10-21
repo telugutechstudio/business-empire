@@ -1349,3 +1349,17 @@ body.biz-off .cash-wrap { flex: 0 1 auto; width: auto; max-width: 340px; min-wid
 .pet-card.active { border-color: var(--gold) !important; box-shadow: 0 0 18px rgba(255, 210, 90, .5); }
 .pet-card .pet-on { background: #2fb35a; color: #fff; }
 @media (max-width: 760px) { .sg-pet { padding: 3px 8px 3px 4px; } .sg-pet .i3d { width: 26px; height: 26px; } .sg-pet b { font-size: 11px; } }
+
+/* ---------- Weekly theme banner ---------- */
+.theme-banner { display: flex; align-items: center; gap: 8px; width: 100%; margin: 0 0 8px; padding: 5px 12px; border-radius: 14px; border: 2px solid #ffd25a; color: #fff; font: inherit; cursor: pointer; text-align: left;
+  background: linear-gradient(90deg, #d8341e, #ff7a3d 50%, #d8341e); background-size: 200% 100%; animation: themeShine 6s linear infinite; box-shadow: 0 3px 0 #7a1a08; }
+.theme-banner .i3d { width: 28px; height: 28px; flex: none; }
+.theme-banner b { font-size: 14px; color: #ffe066; white-space: nowrap; }
+.theme-banner span { flex: 1; font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.theme-banner small { font-size: 11px; opacity: .85; white-space: nowrap; }
+@keyframes themeShine { to { background-position: -200% 0; } }
+.col-buff { margin: 8px 0 2px; padding: 6px 10px; border-radius: 10px; background: rgba(255, 210, 90, .18); border: 1px solid rgba(255, 210, 90, .5); font-size: 13px; }
+@media (max-width: 760px) { .theme-banner { margin-bottom: 6px; padding: 4px 8px; } .theme-banner .i3d { width: 22px; height: 22px; } .theme-banner b { font-size: 12px; } .theme-banner span { font-size: 11px; } }
+.marquee[data-act] { cursor: pointer; }
+.marquee span { white-space: nowrap; }
+@media (max-height: 720px) { .theme-banner { display: none; } }

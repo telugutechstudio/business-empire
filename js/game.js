@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '5.0';
+const GAME_VERSION = '5.1';
 const BIZ_OFF = true; // businesses, managers, upgrades, investors, stocks and worlds are switched off
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
@@ -1760,8 +1760,8 @@ function piggyCap() { return Math.round(40000 * cityScale() / 100) * 100; }
 function availBets() { return SLOT_BETS.filter(b => b === 1 || S.slot.energy >= b * BET_NEED); }
 function clampBet() { const a = availBets(); if (!a.includes(S.slot.bet)) S.slot.bet = a.filter(b => b <= S.slot.bet).pop() || 1; }
 const PRIZE = { coin3: 8000, cherry3: 4000, bag3: 6000, coin2: 1000, cherry2: 600, bag2: 800, other2: 250, none: 150 };
-function prizeUnit() { return cityScale() * spinMult(); }
-function prizeOf(k, bet = 1) { return Math.round(PRIZE[k] * bet * prizeUnit() * (k.endsWith('3') ? 1 + petPower('jackpot') : 1) / 10) * 10; }
+function prizeUnit() { return cityScale() * spinMult() * (1 + themeBuff('profit')); }
+function prizeOf(k, bet = 1) { return Math.round(PRIZE[k] * bet * prizeUnit() * (k.endsWith('3') ? 1 + petPower('jackpot') + themeBuff('jackpot') : 1) / 10) * 10; }
 const SLOT_SYMS = [
   { k: 'coin', w: 30 }, { k: 'cherry', w: 22 }, { k: 'moneybag', w: 16 }, { k: 'bolt', w: 12 }, { k: 'pig', w: 8 }, { k: 'gem', w: 6 }, { k: 'swords', w: 14 }, { k: 'hammer', w: 9 }, { k: 'shield', w: 9 },
 ];
@@ -1774,7 +1774,7 @@ function slotRegen() {
   const every = slotRegenMs(), n = Math.floor((now - sl.at) / every);
   if (n > 0) { sl.energy = Math.min(slotMax(), sl.energy + n); sl.at = sl.energy >= slotMax() ? now : sl.at + n * every; }
 }
-function slotRegenMs() { return SLOT_REGEN / (1 + petPower('regen')); }
+function slotRegenMs() { return SLOT_REGEN / (1 + petPower('regen') + themeBuff('regen')); }
 function slotNextIn() { return S.slot.energy >= slotMax() ? 0 : Math.max(0, (S.slot.at + slotRegenMs() - Date.now()) / 1000); }
 function slotPick() {
   const total = SLOT_SYMS.reduce((t, x) => t + x.w, 0);
@@ -1907,7 +1907,7 @@ function bossCardHtml() {
 function slotBattle(line, bet) {
   const n = line.filter(k => k === 'swords').length;
   if (!n) return '';
-  const b = S.slot.boss, dmg = Math.round((n === 3 ? 100 : 10 * n) * bet * (1 + petPower('boss')));
+  const b = S.slot.boss, dmg = Math.round((n === 3 ? 100 : 10 * n) * bet * (1 + petPower('boss') + themeBuff('boss')));
   if (petPower('boss')) setTimeout(() => petPop(`+${Math.round(petPower('boss') * 100)}% ⚔️`), 200);
   b.hp -= dmg;
   const foe = $('bossCard') ? $('bossFoe') : $('dmgLayer');
@@ -1930,16 +1930,28 @@ function slotBattle(line, bet) {
   }
   return msg;
 }
-// ---- Weekly collection: every spin collects the week's item; milestones pay out ----
+// ---- Weekly theme: each week has its own theme with a special boost, and every spin collects
+// the week's item toward milestone prizes ----
 const COL_ITEMS = [
-  { icon: 'mango', name: ['Mango harvest', 'మామిడి పంట'] },
-  { icon: 'lotus', name: ['Lotus pond', 'కమలాల కొలను'] },
-  { icon: 'kite', name: ['Kite festival', 'గాలిపటాల పండుగ'] },
-  { icon: 'diya', name: ['Festival of lights', 'దీపాల పండుగ'] },
+  { icon: 'mosque', name: ['Taj Week', 'తాజ్ వారం'], buff: 'jackpot', amt: 0.5, desc: ['Three-of-a-kind coins +50%', 'మూడు ఒకేలా వస్తే +50% కాయిన్లు'] },
+  { icon: 'hammer', name: ['Raid Week', 'దాడుల వారం'], buff: 'raid', amt: 1, desc: ['Raids pay double', 'దాడులకు రెట్టింపు కాయిన్లు'] },
+  { icon: 'construction', name: ['Builder Week', 'నిర్మాణ వారం'], buff: 'build', amt: 0.2, desc: ['Every building tile costs 20% less', 'ప్రతి టైల్ 20% తక్కువ ధర'] },
+  { icon: 'swords', name: ['Boss Week', 'బాస్ వారం'], buff: 'boss', amt: 1, desc: ['Double damage to the boss', 'బాస్‌కి రెట్టింపు దెబ్బ'] },
+  { icon: 'kite', name: ['Kite Festival', 'గాలిపటాల పండుగ'], buff: 'profit', amt: 0.25, desc: ['All spin coins +25%', 'అన్ని స్పిన్ కాయిన్లు +25%'] },
+  { icon: 'album', name: ['Sticker Week', 'స్టిక్కర్ వారం'], buff: 'sticker', amt: 1, desc: ['One extra sticker in every pack', 'ప్రతి ప్యాక్‌లో ఒక స్టిక్కర్ ఎక్కువ'] },
+  { icon: 'bolt', name: ['Energy Week', 'ఎనర్జీ వారం'], buff: 'regen', amt: 1, desc: ['Energy refills twice as fast', 'ఎనర్జీ రెండింతలు వేగంగా నిండుతుంది'] },
+  { icon: 'diya', name: ['Festival of Lights', 'దీపాల పండుగ'], buff: 'gems', amt: 1, desc: ['Gem prizes are doubled', 'జెమ్ బహుమతులు రెట్టింపు'] },
 ];
+// The boost this week gives to one kind of thing (0 when the week has another theme)
+function themeBuff(kind) { const it = colWeek(); return it.buff === kind ? it.amt : 0; }
+function themeBannerHtml() {
+  const it = colWeek();
+  return `<button class="theme-banner" data-act="sg-open" data-id="event" id="themeBanner">${ico(it.icon)}<b>${tr(...it.name)}</b><span>${tr(...it.desc)}</span><small>${fmtDur(tourEndsIn())}</small></button>`;
+}
 const COL_STEPS = [
   { at: 100, energy: 10 }, { at: 300, coins: 8000 }, { at: 600, gems: 5 }, { at: 1000, energy: 15 }, { at: 1500, coins: 40000, gems: 10 },
 ];
+function colCoins(st) { return Math.round(st.coins * cityScale() / 100) * 100; }
 function colWeek() {
   const C = S.slot.col, wk = tourWeekKey();
   if (C.week !== wk) { C.week = wk; C.n = 0; C.got = 0; C.item = (Math.floor(tourWeekStart() / (7 * 86400000)) % COL_ITEMS.length + COL_ITEMS.length) % COL_ITEMS.length; }
@@ -1949,9 +1961,11 @@ function colCardHtml() {
   const C = S.slot.col, it = colWeek(), max = COL_STEPS[COL_STEPS.length - 1].at;
   const marks = COL_STEPS.map((st, k) => `<i class="${k < C.got ? 'got' : ''}" style="left:${st.at / max * 100}%" title="${st.at}"></i>`).join('');
   const next = COL_STEPS[C.got];
-  const prize = next ? [next.coins ? `${ico('coin')} ${fmtInt(next.coins)}` : '', next.gems ? `💎 ${next.gems}` : '', next.energy ? `⚡ ${next.energy}` : ''].filter(Boolean).join(' · ') : tr('All prizes won! New event next week.', 'అన్ని బహుమతులూ గెలిచారు! వచ్చే వారం కొత్త ఈవెంట్.');
+  const prize = next ? [next.coins ? `${ico('coin')} ${fmtInt(colCoins(next))}` : '', next.gems ? `💎 ${next.gems}` : '', next.energy ? `⚡ ${next.energy}` : ''].filter(Boolean).join(' · ') : tr('All prizes won! New event next week.', 'అన్ని బహుమతులూ గెలిచారు! వచ్చే వారం కొత్త ఈవెంట్.');
   return `<div class="col-card" id="colCard">
     <div class="col-head">${ico(it.icon)}<b>${tr(...it.name)}</b><small>${tr('ends in', 'ముగింపు')} ${fmtDur(tourEndsIn())}</small></div>
+    <div class="col-buff">✨ ${tr('This week', 'ఈ వారం')}: <b>${tr(...it.desc)}</b></div>
+    <p class="sub">${tr(`Every spin collects ${emo(it.icon)}. Bigger bets and jackpots collect more.`, `ప్రతి స్పిన్‌కి ${emo(it.icon)} వస్తుంది. పెద్ద బెట్, జాక్‌పాట్‌కి ఇంకా ఎక్కువ.`)}</p>
     <div class="col-bar"><div style="width:${Math.min(100, C.n / max * 100)}%"></div>${marks}<b>${fmtInt(Math.min(C.n, max))} / ${fmtInt(next ? next.at : max)}</b></div>
     <div class="col-next">${next ? tr('Next prize', 'తర్వాతి బహుమతి') + ': ' : ''}${prize}</div>
   </div>`;
@@ -1962,12 +1976,12 @@ function slotCollect(line, bet, p) {
   C.n += bet * (1 + Math.floor(Math.random() * 3)) + (p.big ? 10 * bet : 0);
   while (C.got < COL_STEPS.length && C.n >= COL_STEPS[C.got].at) {
     const st = COL_STEPS[C.got]; C.got++;
-    if (st.coins) earn(st.coins);
+    if (st.coins) earn(colCoins(st));
     if (st.gems) S.gems += st.gems;
     if (st.energy) S.slot.energy += st.energy;
     if (C.got === 3) giveAlbumPack('basic', 1, true);
     if (C.got === COL_STEPS.length) giveAlbumPack('gold', 1, true);
-    const what = [st.coins ? `+${fmtInt(st.coins)} ${tr('coins', 'కాయిన్లు')}` : '', st.gems ? `+${st.gems} 💎` : '', st.energy ? `+${st.energy} ⚡` : ''].filter(Boolean).join(', ');
+    const what = [st.coins ? `+${fmtInt(colCoins(st))} ${tr('coins', 'కాయిన్లు')}` : '', st.gems ? `+${st.gems} 💎` : '', st.energy ? `+${st.energy} ⚡` : ''].filter(Boolean).join(', ');
     setTimeout(() => { toast(`${emo(it.icon)} ${tr(`${it.name[0]} prize: ${what}`, `${it.name[1]} బహుమతి: ${what}`)}`, 'good'); confetti($('colCard'), 80); }, 400);
   }
 }
@@ -2065,7 +2079,7 @@ async function raidGo(i) {
     html = `${ico('shield', 'big-ico')}<h3>${tr('Blocked!', 'ఆపేశారు!')}</h3><p>${tr(`${esc(t.name)} had a shield. You still get ${fmtInt(coins)} coins for trying.`, `${esc(t.name)} దగ్గర షీల్డ్ ఉంది. ప్రయత్నానికి ${fmtInt(coins)} కాయిన్లు.`)}</p>`;
     sfx('err');
   } else {
-    res.amt = Math.round(Math.min(res.amt, 9000 * cityScale()) * (1 + petPower('raid'))); // capped, then the pet's share on top
+    res.amt = Math.round(Math.min(res.amt, 9000 * cityScale()) * (1 + petPower('raid') + themeBuff('raid'))); // capped, then the pet's and the week's share on top
     earn(res.amt);
     raidLog(tr(`🔨 You raided ${t.name}: +${fmtInt(res.amt)} coins`, `🔨 ${t.name} మీద దాడి: +${fmtInt(res.amt)} కాయిన్లు`));
     html = `${ico('moneybag', 'big-ico')}<h3>${tr('Great raid!', 'భలే దాడి!')}</h3><div class="stat-big">+${fmtInt(res.amt)} ${ico('coin')}</div>`;
@@ -2316,13 +2330,14 @@ function renderSlots() {
       ${petBadgeHtml()}
       <button class="sg-vip" data-act="sg-open" data-id="vip">${ico('crown')}<b>${tr(...vipTier().name)}</b></button>
     </div>
+    ${themeBannerHtml()}
     <div class="sg-stage"><div id="dmgLayer"></div>
       <div class="sg-rail" id="railLeft">${R.left}</div>
       <div class="sg-center">
         <div class="slot-machine pro">
-          <div class="marquee"><div class="bulbs"></div><span>${tr('MEGA SPIN', 'మెగా స్పిన్')}</span></div>
+          <div class="marquee" data-act="sg-open" data-id="event"><div class="bulbs"></div><span>${emo(colWeek().icon)} ${tr(...colWeek().name).toUpperCase()}</span></div>
           <div class="reels-frame"><div class="reels">${last.map((k, i) => reelHtml(k, i)).join('')}<div class="payline"></div><div class="reel-glass"></div></div></div>
-          <div class="slot-result" id="slotResult">${tr('Good luck, boss!', 'ఆల్ ది బెస్ట్, బాస్!')}</div>
+          <div class="slot-result" id="slotResult">✨ ${tr(...colWeek().desc)}</div>
         </div>
         <div class="sg-controls">
           <button class="bet-pill" data-act="slot-bet" id="slotBetBtn">${betBtnHtml()}</button>
@@ -2533,7 +2548,7 @@ function slotFinish(line, bet) {
   let coinWin = 0;
   if (p.coins) { earn(p.coins); coinWin += p.coins; }
   if (p.cash) { earn(p.cash); coinWin += p.cash; }
-  if (p.gems) { S.gems += p.gems; parts.push(`+${p.gems} 💎`); }
+  if (p.gems) { p.gems = Math.round(p.gems * (1 + themeBuff('gems'))); S.gems += p.gems; parts.push(`+${p.gems} 💎`); }
   if (p.energy) { sl.energy += p.energy; parts.push(`+${p.energy} ⚡`); }
   if (p.piggy) { const v = sl.piggy; earn(v); coinWin += v; sl.piggy = 0; parts.push(tr('🐷 Piggy bank!', '🐷 పిగ్గీ బ్యాంక్!')); }
   const swords = line.filter(k => k === 'swords').length, lvlBefore = sl.boss.lvl;
@@ -2835,7 +2850,7 @@ function hashKind([q, r], ci) { const h = Math.abs((q * 73856093) ^ (r * 1934966
 // Prices and prizes both scale by 1.8× per city
 function cityScale(ci = S.city ? S.city.i : 0) { return Math.pow(1.8, Math.min(ci, CITIES.length - 1)); }
 function spinMult() { return landmarkBonus() * albumBonus() * petBonus('profit'); }
-function taskCost(ci, t) { return Math.round(3000 * Math.pow(1.8, ci + t.i / cityPlan(ci).tasks.length) / 100) * 100; }
+function taskCost(ci, t) { return Math.round(3000 * Math.pow(1.8, ci + t.i / cityPlan(ci).tasks.length) * (1 - themeBuff('build')) / 100) * 100; }
 function taskReward(ci, t) { return t.gift ? { coins: Math.round(taskCost(ci, t) * 0.6 / 100) * 100, energy: 3 } : null; }
 function taskName(ci, t) {
   if (t.type === 'part') { const L = LANDMARKS[CITIES[ci].lms[t.li]]; return `${tr(...L.name)}: ${tr(...lmParts(L)[t.k])}`; }
@@ -3675,6 +3690,7 @@ function openPack(kind) {
   const P = PACKS[kind], got = [];
   for (let i = 0; i < P.n; i++) got.push(drawSticker(kind === 'gold' && i === P.n - 1 ? 4 : 1));
   if (Math.random() < petPower('sticker')) got.push(drawSticker(2)); // the unicorn slips in a bonus sticker
+  if (themeBuff('sticker')) got.push(drawSticker());
   const cards = got.map((s, i) => {
     const isNew = !A.have[s.id];
     A.have[s.id] = (A.have[s.id] || 0) + 1;
