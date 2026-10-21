@@ -1177,3 +1177,7 @@ body.biz-off .ips { color: #7dff9a; }
   .bet-pill { min-width: 70px; padding: 6px 10px; }
   .bet-pill b { font-size: 20px; }
 }
+
+/* Rewards flying into their counters */
+.reward-fly { position: fixed; left: 0; top: 0; width: 38px; height: 38px; margin: -19px 0 0 -19px; pointer-events: none; z-index: 70; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .45)); }
+.rail-btn.bump, .sg-energy.bump, .pill.gem.bump, .tab-btn.bump { animation: bump .25s ease-out; }

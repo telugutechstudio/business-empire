@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '4.2';
+const GAME_VERSION = '4.3';
 const BIZ_OFF = true; // businesses, managers, upgrades, investors, stocks and worlds are switched off
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
@@ -739,6 +739,7 @@ function startMarketEvent() {
 
 /* ---------------------------- ACHIEVEMENTS -------------------------- */
 function checkAchievements() {
+  if (BIZ_OFF) return; // the old awards were about businesses
   for (const a of ACHIEVEMENTS) {
     if (!S.achievements[a.id] && a.test()) {
       S.achievements[a.id] = Date.now();
@@ -885,7 +886,7 @@ function missionText(m) {
     case 'own': return { icon: d.icon, text: tr(`Own ${m.target} ${d.name}${where}`, `${m.target} ${d.te} కొనండి${where}`) };
     case 'unlock': return { icon: d.icon, text: tr(`Unlock the ${d.name}${where}`, `${d.te} అన్‌లాక్ చేయండి${where}`) };
     case 'hire': return { icon: 'manager', text: tr(`Hire ${d.manager} for your ${d.name}`, `${d.te} కోసం ${d.manager} ని నియమించండి`) };
-    case 'earn': return { icon: 'coin', text: tr(`Earn ${money(m.target)} cash`, `${money(m.target)} క్యాష్ సంపాదించండి`) };
+    case 'earn': return { icon: 'coin', text: BIZ_OFF ? tr(`Win ${money(m.target)} coins`, `${money(m.target)} కాయిన్లు గెలవండి`) : tr(`Earn ${money(m.target)} cash`, `${money(m.target)} క్యాష్ సంపాదించండి`) };
     case 'click': return { icon: 'runner', text: tr(`Run businesses by hand ${m.target} times`, `వ్యాపారాలను ${m.target} సార్లు చేతితో నడపండి`) };
     case 'case': return { icon: 'briefcase', text: tr('Open a golden briefcase', 'ఒక బంగారు బ్రీఫ్‌కేస్ తెరవండి') };
     case 'upgrade': return { icon: 'up', text: tr(`Buy ${m.target} upgrades`, `${m.target} అప్‌గ్రేడ్‌లు కొనండి`) };
@@ -2225,6 +2226,14 @@ const SlotFX = (() => {
     hit() { noise(0, 0.18, 0.18, 300, 120, 'lowpass'); note(90, 0, 0.2, 'sine', 0.12, 50); },
     clang() { note(1200, 0, 0.4, 'square', 0.04, 900); note(1800, 0, 0.3, 'sine', 0.03); },
     whoosh() { noise(0, 0.5, 0.1, 300, 4000); },
+    land(kind, k = 0) {
+      if (kind === 'coin') note(1700 + (k % 6) * 140, 0, 0.09, 'sine', 0.05, 2600);
+      else if (kind === 'gem') { note(1568, 0, 0.18, 'triangle', 0.06); note(2093, 0.07, 0.25, 'triangle', 0.05); }
+      else if (kind === 'zap') note(400, 0, 0.18, 'square', 0.04, 1600);
+      else if (kind === 'hit') { noise(0, 0.12, 0.14, 400, 120, 'lowpass'); note(110, 0, 0.15, 'sine', 0.1, 60); }
+      else if (kind === 'clang') { note(1200, 0, 0.35, 'square', 0.035, 900); note(1800, 0, 0.25, 'sine', 0.03); }
+      else note(880, 0, 0.1, 'triangle', 0.05, 1320);
+    },
   };
 })();
 
@@ -2237,9 +2246,9 @@ function railsHtml() {
   const b = S.slot.boss, max = bossMaxHp(b.lvl), C = S.slot.col, it = colWeek(), colMax = COL_STEPS[COL_STEPS.length - 1].at;
   const left = [
     railBtn('boss', bossOf(b.lvl).icon, tr('Boss', 'బాస్'), `${Math.round(Math.max(0, b.hp) / max * 100)}%`, false, 'railBoss'),
-    railBtn('event', it.icon, tr('Event', 'ఈవెంట్'), `${Math.min(100, Math.round(C.n / colMax * 100))}%`),
-    railBtn('village', 'shield', tr('Village', 'ఊరు'), `${S.raid.shields}/${SHIELD_MAX}`, S.raid.tokens > 0 || helpLeft()),
-    railBtn('piggy', 'pig', tr('Piggy', 'పిగ్గీ'), `${Math.round(S.slot.piggy / PIGGY_CAP * 100)}%`, S.slot.piggy >= PIGGY_CAP),
+    railBtn('event', it.icon, tr('Event', 'ఈవెంట్'), `${Math.min(100, Math.round(C.n / colMax * 100))}%`, false, 'railEvent'),
+    railBtn('village', 'shield', tr('Village', 'ఊరు'), `${S.raid.shields}/${SHIELD_MAX}`, S.raid.tokens > 0 || helpLeft(), 'railVillage'),
+    railBtn('piggy', 'pig', tr('Piggy', 'పిగ్గీ'), `${Math.round(S.slot.piggy / PIGGY_CAP * 100)}%`, S.slot.piggy >= PIGGY_CAP, 'railPiggy'),
   ].join('');
   const right = [
     railBtn('gift', 'gift', tr('Gift', 'గిఫ్ట్'), giftReady() ? tr('Free!', 'ఫ్రీ!') : fmtClock(giftIn()).replace(/^00:/, ''), giftReady()),
@@ -2376,6 +2385,59 @@ function slotSpin() {
   });
   setTimeout(() => slotFinish(line, bet), longest * 1000 + 120);
 }
+// ---- Rewards fly from the reels into where they belong, with a sound when they land ----
+const FLY_TARGETS = {
+  coins: () => $('cash'), gems: () => document.querySelector('.pill.gem'), energy: () => document.querySelector('.sg-energy'),
+  boss: () => $('railBoss'), event: () => $('railEvent'), village: () => $('railVillage'), piggy: () => $('railPiggy'),
+  pack: () => document.querySelector('.tab-btn[data-tab="album"]'),
+};
+const LAND_SOUND = { coins: 'coin', gems: 'gem', energy: 'zap', boss: 'hit', event: 'pop', village: 'clang', piggy: 'coin', pack: 'pop' };
+let flying = 0;
+function visibleEl(el) { if (!el) return null; const r = el.getBoundingClientRect(); return r.width && r.height ? el : null; }
+function flyTo(kind, fromEl, iconKey, n = 4, delay = 0) {
+  const target = visibleEl(FLY_TARGETS[kind] && FLY_TARGETS[kind]());
+  if (!target || !fromEl) return;
+  if (fxOff()) { restartAnim(target, 'bump'); SlotFX.land(LAND_SOUND[kind]); return; }
+  const from = centerOf(fromEl), to = centerOf(target);
+  for (let k = 0; k < n && flying < 40; k++) {
+    flying++;
+    const c = document.createElement('img');
+    c.className = 'reward-fly'; c.src = iconUrl(iconKey); c.alt = '';
+    c.onerror = () => { c.remove(); };
+    document.body.appendChild(c);
+    const sx = from.x + rand(-26, 26), sy = from.y + rand(-18, 18);
+    const mx = (sx + to.x) / 2 + rand(-90, 90), my = Math.min(sy, to.y) - rand(50, 140);
+    const anim = c.animate([
+      { transform: `translate(${sx}px,${sy}px) scale(.3)`, opacity: 0 },
+      { transform: `translate(${sx}px,${sy - 34}px) scale(1.15)`, opacity: 1, offset: 0.18 },
+      { transform: `translate(${mx}px,${my}px) scale(1)`, opacity: 1, offset: 0.6 },
+      { transform: `translate(${to.x}px,${to.y}px) scale(.45)`, opacity: 0.9 },
+    ], { duration: 820 + k * 85, delay: delay + k * 40, easing: 'cubic-bezier(.45,0,.55,1)', fill: 'backwards' });
+    anim.onfinish = () => {
+      c.remove(); flying--;
+      const t = visibleEl(FLY_TARGETS[kind]());
+      if (t) restartAnim(t, 'bump');
+      if (k === 0 || k === n - 1 || kind === 'coins') SlotFX.land(LAND_SOUND[kind], k);
+    };
+  }
+}
+// Center symbol of a reel, used as the starting point of a flight
+function reelCenter(i) { const r = $('reel' + i); return r ? r.querySelector('.strip .sym:nth-last-child(2)') || r : null; }
+function flySpinRewards(line, p, extras) {
+  const res = $('slotResult');
+  const winReel = line.findIndex((k, i) => line.indexOf(k) !== i || line.lastIndexOf(k) !== i);
+  const src = winReel >= 0 ? reelCenter(winReel) : res;
+  if (extras.coins) flyTo('coins', src || res, 'coin', Math.min(12, 3 + Math.floor(Math.log10(extras.coins + 1) * 1.5)));
+  if (p.gems) flyTo('gems', src || res, 'gem', Math.min(8, p.gems + 2), 150);
+  if (p.energy) flyTo('energy', src || res, 'bolt', Math.min(8, 2 + p.energy), 150);
+  line.forEach((k, i) => {
+    if (k === 'swords') flyTo('boss', reelCenter(i), 'swords', 2, 80 * i);
+    if (k === 'shield' && line.every(x => x === 'shield')) flyTo('village', reelCenter(i), 'shield', 1, 120 * i);
+  });
+  flyTo('event', reelCenter(1), colWeek().icon, 2, 250);
+  flyTo('piggy', reelCenter(2), 'coin', 1, 350);
+  if (extras.pack) flyTo('pack', res, 'pack', 2, 500);
+}
 // Count a number up on screen with soft ticks
 function rollUp(el, to, html) {
   const t0 = performance.now(), dur = Math.min(1200, 400 + Math.log10(to + 1) * 150);
@@ -2403,7 +2465,7 @@ function slotFinish(line, bet) {
   if (p.gems) { S.gems += p.gems; parts.push(`+${p.gems} 💎`); }
   if (p.energy) { sl.energy += p.energy; parts.push(`+${p.energy} ⚡`); }
   if (p.piggy) { const v = sl.piggy; earn(v); coinWin += v; sl.piggy = 0; parts.push(tr('🐷 Piggy bank!', '🐷 పిగ్గీ బ్యాంక్!')); }
-  const swords = line.filter(k => k === 'swords').length;
+  const swords = line.filter(k => k === 'swords').length, lvlBefore = sl.boss.lvl;
   const hit = slotBattle(line, bet);
   if (hit) { parts.push(hit); SlotFX.hit(); }
   slotCollect(line, bet, p);
@@ -2419,13 +2481,14 @@ function slotFinish(line, bet) {
     if (coinWin) rollUp(res, coinWin, v => `+${fmtInt(v)} ${ico('coin')}${extra}`);
     else res.innerHTML = parts.join('  ·  ') || tr('So close!', 'కొద్దిలో పోయింది!');
     if (p.big) {
-      machine.classList.add('jack'); confetti(res, 160); flyCoins(res, 10); SlotFX.jackpot();
+      machine.classList.add('jack'); confetti(res, 160); SlotFX.jackpot();
       showBigWin(`${tr('JACKPOT!', 'జాక్‌పాట్!')}<small>${coinWin ? `+${fmtInt(coinWin)} ${ico('coin')}` : parts.join(' · ')}</small>`, true);
     } else if (!p.small || swords) {
-      machine.classList.add('won'); flyCoins(res, 3);
+      machine.classList.add('won');
       if (coinWin >= 8000 * bet) { SlotFX.big(); showBigWin(`${tr('BIG WIN!', 'బిగ్ విన్!')}<small>+${fmtInt(coinWin)} ${ico('coin')}</small>`); } else SlotFX.small();
     }
   }
+  flySpinRewards(line, p, { coins: coinWin, pack: sl.boss.lvl !== lvlBefore });
   if (sl.boss.lvl && $('bossCard')) updateBossHp();
   slotBusy = false;
   updateSlotLive(); updateHeader(); save();
