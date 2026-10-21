@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '3.4';
+const GAME_VERSION = '3.5';
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
 let S = null; // game state, initialised below
@@ -295,7 +295,7 @@ function defaultState() {
     tour: { week: '', base: 0, posted: false, pending: '', rewarded: {} },
     stocks: {},
     scratch: { day: '', card: null },
-    slot: { energy: 30, at: 0, bet: 1, coins: 0, piggy: 0 },
+    slot: { energy: 30, at: 0, bet: 1, coins: 0, piggy: 0, gift: { at: 0, chest: 0 }, cal: { last: '', streak: 0 } },
     build: { done: 0, stage: 0, view: null },
     stats: { clicks: 0, briefcases: 0, prestiges: 0, upgradesBought: 0, playTime: 0, bestRun: 0, missionsDone: 0, spins: 0, dailyClaims: 0, shares: 0 },
     boosts: { hype: 0, hypeCd: 0, rush: 0, golden: 0 },
@@ -342,6 +342,8 @@ function mergeState(saved) {
   out.scratch = Object.assign({ day: '', card: null }, saved.scratch || {});
   out.build = Object.assign({ done: 0, stage: 0, view: null }, saved.build || {});
   out.slot = Object.assign({ energy: 30, at: 0, bet: 1, coins: 0, piggy: 0 }, saved.slot || {});
+  out.slot.gift = Object.assign({ at: 0, chest: 0 }, out.slot.gift || {});
+  out.slot.cal = Object.assign({ last: '', streak: 0 }, out.slot.cal || {});
   out.stocks = saved.stocks && typeof saved.stocks === 'object' ? saved.stocks : {};
   out.pets = Object.assign({ owned: {}, fedAt: 0 }, saved.pets || {});
   out.challenge = saved.challenge && typeof saved.challenge === 'object' ? saved.challenge : null;
@@ -1770,6 +1772,7 @@ function renderSlots() {
         <button class="btn ghost auto-btn ${slotAuto ? 'on' : ''}" data-act="slot-auto" id="slotAutoBtn">${tr('AUTO', 'ఆటో')}</button>
       </div>
     </div>
+    <div class="gift-row">${giftCardHtml()}${calCardHtml()}</div>
     <div class="piggy-card">
       <div class="piggy-ico">${ico('pig')}</div>
       <div class="info"><div class="title">${tr('Piggy bank', 'పిగ్గీ బ్యాంక్')} · <span id="piggyVal">${fmtInt(sl.piggy)}</span> ${tr('coins', 'కాయిన్లు')}</div>
@@ -1779,6 +1782,60 @@ function renderSlots() {
     </div>
     <details class="pt-wrap"><summary>${ico('trophy')} ${tr('Prizes', 'బహుమతులు')}</summary>${slotPaytableHtml()}</details>`;
 }
+// ---- Free gift (energy every 20 minutes, 7 gifts fill a treasure chest) and the 7-day spin calendar ----
+const GIFT_EVERY = 20 * 60 * 1000, GIFT_ENERGY = 5, CHEST_SIZE = 7;
+const CAL_ENERGY = [10, 15, 20, 25, 30, 40, 60], CAL_GEMS_DAY7 = 15;
+function giftReady() { return Date.now() >= S.slot.gift.at; }
+function giftIn() { return Math.max(0, (S.slot.gift.at - Date.now()) / 1000); }
+function calReady() { return S.slot.cal.last !== dayKey(); }
+function calDay() { return S.slot.cal.last === dayKey(-1) ? S.slot.cal.streak % 7 + 1 : 1; } // day you'd claim next (1–7)
+function giftCardHtml() {
+  const g = S.slot.gift, ready = giftReady();
+  const segs = Array.from({ length: CHEST_SIZE }, (_, k) => `<span class="${k < g.chest ? 'on' : ''}"></span>`).join('');
+  return `<div class="gift-card ${ready ? 'ready' : ''}" id="giftCard">
+    <div class="gc-head">${ico('gift')}<b>${tr('Free gift', 'ఫ్రీ గిఫ్ట్')}</b></div>
+    <div class="gc-chest"><div class="gc-segs">${segs}</div>${ico('briefcase')}</div>
+    <button class="btn ${ready ? 'gold' : 'ghost'} gc-btn" data-act="gift-claim" id="giftBtn" ${ready ? '' : 'disabled'}>${ready ? `${tr('Claim', 'తీసుకో')} +${GIFT_ENERGY} ⚡` : fmtClock(giftIn())}</button>
+  </div>`;
+}
+function calCardHtml() {
+  const ready = calReady(), next = calDay(), done = ready ? next - 1 : S.slot.cal.streak % 7 || 7;
+  const cells = CAL_ENERGY.map((e, k) => {
+    const d = k + 1, cls = d <= done ? 'got' : ready && d === next ? 'today' : '';
+    return `<div class="cal-cell ${cls}"><small>${tr('Day', 'రోజు')} ${d}</small><b>${e}⚡</b>${d === 7 ? `<em>+${CAL_GEMS_DAY7}💎</em>` : ''}${d <= done ? '<i>✓</i>' : ''}</div>`;
+  }).join('');
+  return `<div class="cal-card" id="calCard">
+    <div class="gc-head">${ico('calendar')}<b>${tr('Spin calendar', 'స్పిన్ క్యాలెండర్')}</b><small>${tr('Come back every day for more energy', 'రోజూ వస్తే ఇంకా ఎక్కువ ఎనర్జీ')}</small></div>
+    <div class="cal-row">${cells}</div>
+    ${ready ? `<button class="btn gold" data-act="cal-claim">${tr(`Claim day ${next}`, `రోజు ${next} తీసుకో`)}: +${CAL_ENERGY[next - 1]} ⚡</button>` : `<p class="sub">${tr('Claimed today. See you tomorrow!', 'ఈ రోజు తీసుకున్నారు. రేపు కలుద్దాం!')}</p>`}
+  </div>`;
+}
+function claimGift() {
+  if (!giftReady()) return;
+  const g = S.slot.gift;
+  g.at = Date.now() + GIFT_EVERY;
+  S.slot.energy += GIFT_ENERGY; g.chest++;
+  let msg = tr(`🎁 +${GIFT_ENERGY} energy!`, `🎁 +${GIFT_ENERGY} ఎనర్జీ!`);
+  if (g.chest >= CHEST_SIZE) {
+    g.chest = 0;
+    const coins = 50000, gems = 10;
+    S.slot.coins += coins; S.gems += gems; S.slot.energy += 20;
+    msg = tr(`🧰 Treasure chest! +${fmtInt(coins)} coins, +${gems} 💎, +20 ⚡`, `🧰 నిధి పెట్టె! +${fmtInt(coins)} కాయిన్లు, +${gems} 💎, +20 ⚡`);
+    confetti($('giftCard'), 120); sfx('win');
+  } else sfx('cash');
+  toast(msg, 'good');
+  save(); renderTab();
+}
+function claimCalendar() {
+  if (!calReady()) return;
+  const C = S.slot.cal, d = calDay(), e = CAL_ENERGY[d - 1];
+  C.streak = d === 1 ? 1 : C.streak + 1; C.last = dayKey();
+  S.slot.energy += e;
+  let msg = tr(`🗓️ Day ${d}: +${e} energy!`, `🗓️ రోజు ${d}: +${e} ఎనర్జీ!`);
+  if (d === 7) { S.gems += CAL_GEMS_DAY7; msg += ` +${CAL_GEMS_DAY7} 💎`; confetti($('calCard'), 140); }
+  sfx('win'); toast(msg, 'good');
+  save(); renderTab();
+}
 function updateSlotLive() {
   if (activeTab !== 'slots' || !$('slotEnergy')) return;
   slotRegen();
@@ -1787,6 +1844,8 @@ function updateSlotLive() {
   $('slotTimer').textContent = S.slot.energy >= SLOT_MAX ? tr('Full', 'నిండింది') : `+1 ${tr('in', 'లో')} ${fmtClock(slotNextIn())}`;
   $('piggyVal').textContent = fmtInt(S.slot.piggy);
   $('piggyBar').style.width = Math.min(100, S.slot.piggy / PIGGY_CAP * 100) + '%';
+  const gb = $('giftBtn');
+  if (gb) { if (giftReady() === gb.disabled) $('giftCard').outerHTML = giftCardHtml(); else if (!giftReady()) gb.textContent = fmtClock(giftIn()); }
 }
 function slotSetBet() {
   if (slotBusy) return;
@@ -2925,7 +2984,7 @@ function updateDots() {
   $('dot-daily').classList.toggle('on', canClaimDaily());
   $('dot-spin').classList.toggle('on', spinReady());
   $('dot-scratch').classList.toggle('on', scratchFreeReady());
-  slotRegen(); $('dot-slots').classList.toggle('on', S.slot.energy >= SLOT_MAX);
+  slotRegen(); $('dot-slots').classList.toggle('on', S.slot.energy >= SLOT_MAX || giftReady() || calReady());
   $('dot-build').classList.toggle('on', !allBuilt() && S.slot.coins >= stageCost(S.build.done, S.build.stage));
   const hasPets = Object.keys(S.pets.owned).length > 0;
   $('dot-pets').classList.toggle('on', hasPets ? (petsHungry() && petFeedReady()) : PETS.some(p => p.cost.cash ? S.cash >= p.cost.cash : false));
@@ -3055,6 +3114,8 @@ document.addEventListener('click', e => {
     case 'slot-bet': slotSetBet(); break;
     case 'slot-auto': slotAuto = !slotAuto; el.classList.toggle('on', slotAuto); if (slotAuto && !slotBusy) slotSpin(); break;
     case 'piggy-break': breakPiggy(); break;
+    case 'gift-claim': claimGift(); break;
+    case 'cal-claim': claimCalendar(); break;
     case 'build-part': buildPart(); break;
     case 'build-view': S.build.view = +id >= 0 ? +id : null; renderTab(); break;
     case 'ad': watchAd(); break;

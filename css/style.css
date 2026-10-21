@@ -858,3 +858,27 @@ body.lowfx .loader, body.lowfx .bar.fast .bar-fill, body.lowfx .tut-hand { anima
 .map-stop.now { border-color: var(--gold); box-shadow: 0 0 14px rgba(255, 200, 61, .35); }
 .map-stop.built { border-color: #2fb35a; }
 .map-stop.locked { opacity: .5; }
+
+/* ---------- Free gift + spin calendar ---------- */
+.gift-row { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; margin-top: 16px; }
+.gift-card, .cal-card { padding: 12px 14px; border-radius: 18px; background: linear-gradient(180deg, #4a2f8a, #2c1f5a); border: 2px solid #8a6ad8; box-shadow: 0 6px 0 #1a1238; }
+.gift-card.ready { border-color: var(--gold); box-shadow: 0 6px 0 #1a1238, 0 0 18px rgba(255, 200, 61, .45); }
+.gc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.gc-head .i3d { width: 30px; height: 30px; }
+.gc-head b { color: var(--gold); font-size: 16px; }
+.gc-head small { color: #cfc4f0; width: 100%; font-size: 12px; }
+.gc-chest { display: flex; align-items: center; gap: 8px; margin: 10px 0; }
+.gc-chest .i3d { width: 36px; height: 36px; }
+.gc-segs { flex: 1; display: flex; gap: 3px; padding: 4px; border-radius: 10px; background: rgba(0, 0, 0, .35); }
+.gc-segs span { flex: 1; height: 12px; border-radius: 4px; background: #3a2c6a; }
+.gc-segs span.on { background: linear-gradient(180deg, #8af0a8, #2fb35a); }
+.gc-btn { width: 100%; }
+.cal-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin: 10px 0; }
+.cal-cell { position: relative; display: flex; flex-direction: column; align-items: center; padding: 6px 2px; border-radius: 10px; background: rgba(0, 0, 0, .3); border: 1px solid rgba(255, 255, 255, .12); font-size: 12px; }
+.cal-cell b { font-size: 14px; color: #7dff9a; }
+.cal-cell em { font-style: normal; font-size: 11px; color: #9fd8ff; }
+.cal-cell small { color: #cfc4f0; }
+.cal-cell.got { opacity: .55; }
+.cal-cell.got i { position: absolute; top: 2px; right: 4px; font-style: normal; color: #7dff9a; font-weight: 700; }
+.cal-cell.today { border-color: var(--gold); background: rgba(255, 200, 61, .2); box-shadow: 0 0 10px rgba(255, 200, 61, .4); }
+@media (max-width: 640px) { .gift-row { grid-template-columns: 1fr; } .cal-row { gap: 4px; } .cal-cell { font-size: 11px; } }
