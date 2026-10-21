@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '5.5';
+const GAME_VERSION = '5.6';
 const BIZ_OFF = true; // businesses, managers, upgrades, investors, stocks and worlds are switched off
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
@@ -3692,10 +3692,49 @@ function stateInfo(id) {
   const row = (icon, label, val) => `<div class="st-row">${ico(icon)}<div><small>${label}</small><b>${tr(...val)}</b></div></div>`;
   SlotFX.press();
   modal(`<div class="st-head"><div class="stamp ${on ? 'on' : ''}">${on ? '✓' : '?'}<small>${on ? tr('STAMPED', 'స్టాంప్') : tr('NOT YET', 'ఇంకా లేదు')}</small></div><div><h3>${tr(...st.name)}</h3>
-      <small>${cities.length ? tr(`In the game: ${cities.map(c => c.name[0]).join(', ')}`, `గేమ్‌లో: ${cities.map(c => c.name[1]).join(', ')}`) : tr('Coming to the game later', 'త్వరలో గేమ్‌లోకి')}</small></div></div>
+      <small>${cities.length ? tr(`In the game: ${cities.map(c => c.name[0]).join(', ')}`, `గేమ్‌లో: ${cities.map(c => c.name[1]).join(', ')}`) : tr('Coming to the game later', 'త్వరలో గేమ్‌లోకి')}</small>${speakBtn('state', id)}</div></div>
     <div class="st-rows">${row('city', tr('Capital', 'రాజధాని'), st.capital)}${row('speech', tr('Language', 'భాష'), st.lang)}${row('curry', tr('Famous food', 'ప్రసిద్ధ వంటకం'), st.food)}${row('party', tr('Dance / festival', 'నృత్యం / పండుగ'), st.dance)}</div>
     <div class="modal-actions"><button class="btn gold" data-act="states">${tr('All states', 'అన్ని రాష్ట్రాలు')}</button><button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button></div>`);
 }
+// ---- Read facts aloud with the device's own voice (Telugu when the device has one, else English) ----
+let speakingBtn = null, teVoiceWarned = false;
+function pickVoice(lang) {
+  const vs = (window.speechSynthesis && speechSynthesis.getVoices()) || [], l = lang.toLowerCase();
+  return vs.find(v => v.lang.replace('_', '-').toLowerCase() === l) || vs.find(v => v.lang.toLowerCase().startsWith(l.slice(0, 2))) || null;
+}
+function speakText(kind, id) {
+  const t = { lm: () => { const L = LANDMARKS[id]; return L && [`${L.name[0]}. ${L.fact[0]}`, `${L.name[1]}. ${L.fact[1]}`]; },
+    city: () => { const C = CITIES[+id]; return C && [`${C.name[0]}. ${C.fact[0]}`, `${C.name[1]}. ${C.fact[1]}`]; },
+    state: () => { const st = STATES.find(x => x.id === id); return st && [
+      `${st.name[0]}. Capital: ${st.capital[0]}. Language: ${st.lang[0]}. Famous food: ${st.food[0]}. ${st.dance[0]}.`,
+      `${st.name[1]}. రాజధాని: ${st.capital[1]}. భాష: ${st.lang[1]}. ప్రసిద్ధ వంటకం: ${st.food[1]}. ${st.dance[1]}.`]; } }[kind];
+  return t ? t() : null;
+}
+function stopSpeaking() {
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  if (speakingBtn) speakingBtn.classList.remove('speaking');
+  speakingBtn = null;
+}
+function speakFact(el, kind, id) {
+  if (!('speechSynthesis' in window)) { toast(tr('This device cannot read aloud.', 'ఈ పరికరం చదివి వినిపించలేదు.'), 'bad'); return; }
+  const wasMe = speakingBtn === el;
+  stopSpeaking();
+  if (wasMe) return; // second tap stops
+  const text = speakText(kind, id);
+  if (!text) return;
+  let lang = isTe() ? 'te-IN' : 'en-IN', voice = pickVoice(lang), say = isTe() ? text[1] : text[0];
+  if (isTe() && !voice) {
+    lang = 'en-IN'; voice = pickVoice(lang); say = text[0];
+    if (!teVoiceWarned) { teVoiceWarned = true; toast('🔊 ఈ పరికరంలో తెలుగు గొంతు లేదు, ఇంగ్లీష్‌లో చదువుతున్నాం.', 'info'); }
+  }
+  const u = new SpeechSynthesisUtterance(say);
+  u.lang = voice ? voice.lang : lang; u.rate = 0.95;
+  try { if (voice) u.voice = voice; } catch (e) { /* keep the language only */ }
+  u.onend = u.onerror = () => { if (speakingBtn === el) stopSpeaking(); };
+  speakingBtn = el; el.classList.add('speaking');
+  speechSynthesis.speak(u);
+}
+function speakBtn(kind, id) { return `<button class="speak-btn" data-act="speak" data-kind="${kind}" data-id="${id}" title="${esc(tr('Listen', 'వినండి'))}">${ico('speaker')}<span>${tr('Listen', 'వినండి')}</span></button>`; }
 function openBuildMap() {
   const pts = CITIES.map(C => mapXY(...C.ll));
   const pins = CITIES.map((C, ci) => {
@@ -3739,7 +3778,7 @@ function openBuildParts() {
 }
 const lmYear = L => Array.isArray(L.y) ? tr(...L.y) : L.y;
 function lmCity(id) { return CITIES.find(C => C.lms.includes(id)); }
-function factHtml(L) { return `<div class="fact-card"><b>${ico('book')} ${tr('Did you know?', 'మీకు తెలుసా?')}</b><p>${tr(...L.fact)}</p><small>${tr('Built', 'నిర్మాణం')}: ${lmYear(L)} · ${tr(...lmCity(L.id).name)}</small></div>`; }
+function factHtml(L) { return `<div class="fact-card"><b>${ico('book')} ${tr('Did you know?', 'మీకు తెలుసా?')}${speakBtn('lm', L.id)}</b><p>${tr(...L.fact)}</p><small>${tr('Built', 'నిర్మాణం')}: ${lmYear(L)} · ${tr(...lmCity(L.id).name)}</small></div>`; }
 // Three answers in a fixed shuffled order; the right one is quiz[1][0]
 function quizHtml(id) {
   const L = LANDMARKS[id], [q, opts] = L.quiz, done = S.city.quiz[id];
@@ -3776,7 +3815,7 @@ function cityIntro(ci) {
   if (!C) return;
   modal(`<div class="lm-done"><div class="lm-rays"></div>${ico('worldmap', 'big-ico')}</div>
     <h3>${tr(`Welcome to ${C.name[0]}!`, `${C.name[1]} కి స్వాగతం!`)}</h3>
-    <p class="sub city-fact">${tr(...C.fact)}</p>
+    <p class="sub city-fact">${tr(...C.fact)}</p>${speakBtn('city', ci)}
     <div class="intro-lms">${C.lms.map(id => `<button class="intro-lm" data-act="lm-info" data-id="${id}">${ico(LANDMARKS[id].icon)}<span>${tr(...LANDMARKS[id].name)}</span></button>`).join('')}</div>
     <p class="sub">${tr('Tap the glowing + tiles to build. Tap a place above to learn about it.', 'మెరిసే + టైల్స్ నొక్కి కట్టండి. పైన ఒక ప్రదేశాన్ని నొక్కి దాని గురించి తెలుసుకోండి.')}</p>
     <div class="modal-actions"><button class="btn gold" data-act="close">${tr('Let’s build!', 'కడదాం!')}</button></div>`);
@@ -5066,11 +5105,11 @@ function toast(msg, type = '') {
   while (box.children.length > 4) box.firstChild.remove();
   setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 300); }, 3200);
 }
-function modal(html) { $('modalBody').innerHTML = html; $('modal').classList.remove('hidden'); }
+function modal(html) { stopSpeaking(); $('modalBody').innerHTML = html; $('modal').classList.remove('hidden'); }
 // Queued modals are built when shown, so they use the language chosen meanwhile
 const modalQueue = [];
 function queueModal(fn) { if ($('modal').classList.contains('hidden')) modal(fn()); else modalQueue.push(fn); }
-function closeModal() {
+function closeModal() { stopSpeaking();
   $('modal').classList.add('hidden');
   if (modalQueue.length) modal(modalQueue.shift()());
 }
@@ -5192,6 +5231,7 @@ document.addEventListener('click', e => {
     }
     case 'build-map': openBuildMap(); break;
     case 'states': openStates(); break;
+    case 'speak': speakFact(el, el.dataset.kind, id); break;
     case 'state-info': stateInfo(id); break;
     case 'build-parts': openBuildParts(); break;
     case 'lm-info': lmInfo(id); break;

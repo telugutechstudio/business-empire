@@ -1413,3 +1413,11 @@ body.biz-off .cash-wrap { flex: 0 1 auto; width: auto; max-width: 340px; min-wid
 .stamp-new { display: flex; align-items: center; gap: 10px; margin: 8px auto; padding: 6px 12px; border-radius: 14px; border: 0; background: #fff3d0; color: #3a2600; font: inherit; cursor: pointer; }
 .stamp-new .stamp { width: 40px; height: 40px; font-size: 18px; }
 @media (max-width: 520px) { .st-rows { grid-template-columns: 1fr; } }
+
+/* ---------- Listen button ---------- */
+.speak-btn { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; padding: 3px 10px 3px 6px; border-radius: 999px; border: 0; background: #6a3ad8; color: #fff; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; vertical-align: middle; }
+.speak-btn .i3d { width: 20px !important; height: 20px !important; }
+.speak-btn.speaking { background: #e04a3a; animation: spinIdle 1s ease-in-out infinite; }
+.fact-card b .speak-btn { margin-left: auto; } .st-head .speak-btn { margin: 6px 0 0; }
+.city-fact + .speak-btn { margin: -4px auto 6px; display: flex; width: max-content; }
+.st-head .speak-btn { display: flex; width: max-content; }
