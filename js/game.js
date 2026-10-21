@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '3.7';
+const GAME_VERSION = '3.8';
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
 let S = null; // game state, initialised below
@@ -298,6 +298,7 @@ function defaultState() {
     slot: { energy: 30, at: 0, bet: 1, coins: 0, piggy: 0, gift: { at: 0, chest: 0 }, cal: { last: '', streak: 0 }, boss: { lvl: 1, hp: 300 }, col: { week: '', n: 0, got: 0, item: 0 } },
     build: { done: 0, stage: 0, view: null },
     album: { have: {}, packs: { basic: 2, gold: 0 }, stars: 0, sets: {} },
+    raid: { shields: 1, tokens: 0, helpDay: '', log: [], online: false },
     stats: { clicks: 0, briefcases: 0, prestiges: 0, upgradesBought: 0, playTime: 0, bestRun: 0, missionsDone: 0, spins: 0, dailyClaims: 0, shares: 0 },
     boosts: { hype: 0, hypeCd: 0, rush: 0, golden: 0 },
     settings: { sound: true, music: true, lowfx: !!(navigator.connection && navigator.connection.saveData), notify: false, notifyAsked: false, notation: 'suffix', buyMode: '1', lang: defaultLang() },
@@ -341,6 +342,7 @@ function mergeState(saved) {
   out.festivals = saved.festivals || {};
   out.tour = Object.assign({ week: '', base: 0, posted: false, pending: '', rewarded: {} }, saved.tour || {});
   out.scratch = Object.assign({ day: '', card: null }, saved.scratch || {});
+  out.raid = Object.assign({ shields: 1, tokens: 0, helpDay: '', log: [], online: false }, saved.raid || {});
   out.album = Object.assign({ have: {}, stars: 0, sets: {} }, saved.album || {});
   out.album.packs = Object.assign({ basic: saved.album ? 0 : 2, gold: 0 }, out.album.packs || {});
   out.build = Object.assign({ done: 0, stage: 0, view: null }, saved.build || {});
@@ -1702,7 +1704,7 @@ function revealScratch() {
 // Energy refills over time; each spin costs energy times the bet and pays coins, cash, gems or energy.
 const SLOT_MAX = 50, SLOT_REGEN = 6 * 60 * 1000, SLOT_BETS = [1, 2, 3, 5, 10], PIGGY_GEMS = 10, PIGGY_CAP = 250000;
 const SLOT_SYMS = [
-  { k: 'coin', w: 30 }, { k: 'cherry', w: 22 }, { k: 'moneybag', w: 16 }, { k: 'bolt', w: 12 }, { k: 'pig', w: 8 }, { k: 'gem', w: 6 }, { k: 'swords', w: 14 },
+  { k: 'coin', w: 30 }, { k: 'cherry', w: 22 }, { k: 'moneybag', w: 16 }, { k: 'bolt', w: 12 }, { k: 'pig', w: 8 }, { k: 'gem', w: 6 }, { k: 'swords', w: 14 }, { k: 'hammer', w: 9 }, { k: 'shield', w: 9 },
 ];
 const SLOT_CELL = 88; // px height of one symbol on a reel
 let slotBusy = false, slotAuto = false;
@@ -1739,6 +1741,7 @@ function slotPrize(line, bet) {
     if (top === 'bolt') p.energy = bet;
     if (top === 'pig' || top === 'gem') p.coins = 1000 * bet;
     if (top === 'swords') p.small = false;
+    if (top === 'hammer' || top === 'shield') p.coins = 1000 * bet;
   } else p.coins = 500 * bet; // a little something every spin
   return p;
 }
@@ -1750,6 +1753,8 @@ function slotPaytableHtml() {
     ['bolt', tr('+10 energy', '+10 ఎనర్జీ'), tr('energy back', 'ఎనర్జీ తిరిగి')],
     ['pig', tr('Piggy bank opens free!', 'పిగ్గీ బ్యాంక్ ఫ్రీగా తెరుచుకుంటుంది!'), tr('1,000 coins', '1,000 కాయిన్లు')],
     ['gem', tr('3 gems', '3 జెమ్స్'), tr('1,000 coins', '1,000 కాయిన్లు')],
+    ['hammer', tr('Raid another village!', 'ఇంకో ఊరిపై దాడి!'), tr('1,000 coins', '1,000 కాయిన్లు')],
+    ['shield', tr('+1 shield (max 3)', '+1 షీల్డ్ (3 వరకు)'), tr('1,000 coins', '1,000 కాయిన్లు')],
     ['swords', tr('Critical hit: 100 × bet damage', 'క్రిటికల్ హిట్: 100 × బెట్ దెబ్బ'), tr('Each ⚔️ hits the boss for 10 × bet', 'ప్రతి ⚔️ బాస్‌కి 10 × బెట్ దెబ్బ')],
   ];
   return `<div class="paytable"><div class="pt-head"><span>${tr('Symbol', 'గుర్తు')}</span><span>×3</span><span>×2</span></div>` +
@@ -1781,6 +1786,7 @@ function renderSlots() {
         <button class="btn ghost auto-btn ${slotAuto ? 'on' : ''}" data-act="slot-auto" id="slotAutoBtn">${tr('AUTO', 'ఆటో')}</button>
       </div>
     </div>
+    ${raidCardHtml()}
     <div class="gift-row">${giftCardHtml()}${calCardHtml()}</div>
     <div class="piggy-card">
       <div class="piggy-ico">${ico('pig')}</div>
@@ -1944,6 +1950,140 @@ function updateBossHp() {
   el.firstElementChild.style.width = Math.max(0, b.hp) / max * 100 + '%';
   el.querySelector('b').textContent = `${fmtInt(Math.max(0, b.hp))} / ${fmtInt(max)}`;
 }
+// ---- Raids, shields and helping other villages ----
+// Three 🔨 give a raid: pick another player's village and take some coins (a 🛡️ blocks it). Three 🛡️ add a shield.
+// Real players come from /api/raid; when it can't be reached, friendly bot villages stand in so it always works.
+const RAID_URL = '/api/raid', SHIELD_MAX = 3, HELP_REWARD = 10000;
+const BOT_NAMES = ['Raju', 'Sita', 'Venkat', 'Lakshmi', 'Ravi', 'Padma', 'Kiran', 'Anil', 'Swathi', 'Mahesh', 'Bhanu', 'Geetha'];
+let raidLastSync = 0, raidTargets = null;
+function raidName() { ensurePlayerId(); return S.player.name || `Boss ${S.player.id.slice(0, 4).toUpperCase()}`; }
+async function raidPost(body) {
+  ensurePlayerId();
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 6000);
+  try {
+    const r = await fetch(RAID_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: S.player.id, ...body }), signal: ctl.signal });
+    const data = await r.json();
+    if (!r.ok) throw Object.assign(new Error(data.error || 'server error'), { status: r.status });
+    return data;
+  } finally { clearTimeout(t); }
+}
+function raidLog(text) { S.raid.log = [{ text, ts: Date.now() }, ...S.raid.log].slice(0, 6); }
+async function raidSync(force) {
+  if (!force && Date.now() - raidLastSync < 120000) return;
+  raidLastSync = Date.now();
+  try {
+    const { inbox } = await raidPost({ action: 'sync', name: raidName(), coins: Math.floor(S.slot.coins), shields: S.raid.shields, lm: S.build.done });
+    S.raid.online = true;
+    const news = [];
+    for (const m of inbox || []) {
+      if (m.type === 'raid') { S.slot.coins = Math.max(0, S.slot.coins - m.amt); raidLog(tr(`🔨 ${m.from} raided you: -${fmtInt(m.amt)} coins`, `🔨 ${m.from} దాడి చేశారు: -${fmtInt(m.amt)} కాయిన్లు`)); news.push('raid'); }
+      if (m.type === 'blocked') { S.raid.shields = Math.max(0, S.raid.shields - 1); raidLog(tr(`🛡️ Your shield stopped ${m.from}`, `🛡️ మీ షీల్డ్ ${m.from} ని ఆపింది`)); news.push('blocked'); }
+      if (m.type === 'help') { S.slot.energy += m.energy || 5; raidLog(tr(`🤝 ${m.from} helped you: +${m.energy || 5} ⚡`, `🤝 ${m.from} సాయం చేశారు: +${m.energy || 5} ⚡`)); news.push('help'); }
+    }
+    if (news.length) { toast(S.raid.log[0].text, news.includes('raid') ? 'bad' : 'good'); save(); if (activeTab === 'slots') renderTab(); }
+  } catch (e) { S.raid.online = false; }
+}
+function botTargets() {
+  const names = BOT_NAMES.slice().sort(() => Math.random() - 0.5).slice(0, 4);
+  return names.map((n, k) => ({ id: 'bot-' + k, bot: true, name: tr(`${n}'s village`, `${n} గారి ఊరు`), lm: Math.max(0, S.build.done + Math.floor(rand(-1, 2))),
+    coins: Math.floor(Math.max(20000, S.slot.coins * rand(0.4, 1.6)) + 20000 * S.build.done), shield: Math.random() < 0.25 }));
+}
+async function loadTargets() {
+  raidTargets = null;
+  try {
+    await raidSync(true);
+    const { targets } = await raidPost({ action: 'targets' });
+    raidTargets = targets && targets.length >= 2 ? targets : [...(targets || []), ...botTargets()].slice(0, 4);
+  } catch (e) { raidTargets = botTargets(); }
+  return raidTargets;
+}
+function targetCardsHtml(mode) {
+  if (!raidTargets) return `<div class="loader"></div>`;
+  return `<div class="raid-targets">${raidTargets.map((t, i) => `<div class="raid-target">
+    ${ico(t.bot ? 'hut' : 'person', 'rt-ico')}<b>${esc(t.name)}</b>
+    <small>${ico('construction')} ${t.lm} · ${ico('coin')} ${fmtInt(t.coins)}</small>
+    ${t.shield ? `<span class="rt-shield">${ico('shield')}</span>` : ''}
+    <button class="btn ${mode === 'raid' ? 'red' : 'green'}" data-act="${mode === 'raid' ? 'raid-go' : 'help-go'}" data-id="${i}">${mode === 'raid' ? `${ico('hammer')} ${tr('Raid', 'దాడి')}` : `🤝 ${tr('Help', 'సాయం')}`}</button></div>`).join('')}</div>`;
+}
+async function openRaid() {
+  if (S.raid.tokens <= 0) return;
+  const head = `${ico('hammer', 'big-ico')}<h3>${tr('Raid a village!', 'ఒక ఊరి మీద దాడి!')}</h3><p class="sub">${tr('Pick a village. A 🛡️ shield will block you.', 'ఒక ఊరిని ఎంచుకోండి. 🛡️ షీల్డ్ ఉంటే ఆపుతుంది.')}</p>`;
+  modal(head + targetCardsHtml('raid'));
+  await loadTargets();
+  if (!$('modal').classList.contains('hidden')) modal(head + targetCardsHtml('raid'));
+}
+async function raidGo(i) {
+  const t = raidTargets && raidTargets[i];
+  if (!t || S.raid.tokens <= 0) return;
+  S.raid.tokens--;
+  modal(`<div class="raid-anim">${ico('hammer', 'big-ico swing')}</div><p>${tr('Raiding', 'దాడి చేస్తున్నారు')} ${esc(t.name)}…</p>`);
+  sfx('big');
+  let res;
+  if (t.bot) res = t.shield ? { blocked: true } : { amt: Math.max(2000, Math.floor(t.coins * 0.15)) };
+  else {
+    try { res = await raidPost({ action: 'raid', target: t.id }); }
+    catch (e) { S.raid.tokens++; modal(`<p>${tr('Could not reach that village. Try again.', 'ఆ ఊరిని చేరలేకపోయాం. మళ్ళీ ప్రయత్నించండి.')}</p><div class="modal-actions"><button class="btn" data-act="close">OK</button></div>`); return; }
+  }
+  await new Promise(r => setTimeout(r, 900));
+  S.stats.raids = (S.stats.raids || 0) + 1;
+  let html;
+  if (res.blocked) {
+    const coins = 3000 * (1 + S.build.done); S.slot.coins += coins;
+    raidLog(tr(`🛡️ ${t.name} blocked your raid (+${fmtInt(coins)} for trying)`, `🛡️ ${t.name} మీ దాడిని ఆపారు (ప్రయత్నానికి +${fmtInt(coins)})`));
+    html = `${ico('shield', 'big-ico')}<h3>${tr('Blocked!', 'ఆపేశారు!')}</h3><p>${tr(`${esc(t.name)} had a shield. You still get ${fmtInt(coins)} coins for trying.`, `${esc(t.name)} దగ్గర షీల్డ్ ఉంది. ప్రయత్నానికి ${fmtInt(coins)} కాయిన్లు.`)}</p>`;
+    sfx('err');
+  } else {
+    S.slot.coins += res.amt;
+    raidLog(tr(`🔨 You raided ${t.name}: +${fmtInt(res.amt)} coins`, `🔨 ${t.name} మీద దాడి: +${fmtInt(res.amt)} కాయిన్లు`));
+    html = `${ico('moneybag', 'big-ico')}<h3>${tr('Great raid!', 'భలే దాడి!')}</h3><div class="stat-big">+${fmtInt(res.amt)} ${ico('coin')}</div>`;
+    sfx('win');
+  }
+  save();
+  modal(html + `<div class="modal-actions">${S.raid.tokens > 0 ? `<button class="btn red" data-act="raid-open">${tr('Raid again', 'మళ్ళీ దాడి')} (${S.raid.tokens})</button>` : ''}<button class="btn gold" data-act="close">${tr('Nice!', 'సూపర్!')}</button></div>`);
+  if (!res.blocked) confetti($('modalBody'), 120);
+  if (activeTab === 'slots') renderTab();
+}
+function helpLeft() { return S.raid.helpDay !== dayKey(); }
+async function openHelp() {
+  if (!helpLeft()) return;
+  const head = `<h3>🤝 ${tr('Help a village', 'ఒక ఊరికి సాయం')}</h3><p class="sub">${tr(`Send 5 energy to another player. You get ${fmtInt(HELP_REWARD)} coins and a sticker pack.`, `ఇంకో ప్లేయర్‌కి 5 ఎనర్జీ పంపండి. మీకు ${fmtInt(HELP_REWARD)} కాయిన్లు, ఒక స్టిక్కర్ ప్యాక్.`)}</p>`;
+  modal(head + targetCardsHtml('help'));
+  await loadTargets();
+  if (!$('modal').classList.contains('hidden')) modal(head + targetCardsHtml('help'));
+}
+async function helpGo(i) {
+  const t = raidTargets && raidTargets[i];
+  if (!t || !helpLeft()) return;
+  if (!t.bot) { try { await raidPost({ action: 'help', target: t.id }); } catch (e) { if (e.status !== 409) { toast(tr('Could not reach that village.', 'ఆ ఊరిని చేరలేకపోయాం.'), 'bad'); return; } } }
+  S.raid.helpDay = dayKey(); S.slot.coins += HELP_REWARD; giveAlbumPack('basic', 1, true);
+  raidLog(tr(`🤝 You helped ${t.name}`, `🤝 మీరు ${t.name} కి సాయం చేశారు`));
+  sfx('win'); save(); closeModal();
+  toast(tr(`🤝 Thank you! +${fmtInt(HELP_REWARD)} coins, +1 📦`, `🤝 ధన్యవాదాలు! +${fmtInt(HELP_REWARD)} కాయిన్లు, +1 📦`), 'good');
+  if (activeTab === 'slots') renderTab();
+}
+function raidCardHtml() {
+  const R = S.raid;
+  const shields = Array.from({ length: SHIELD_MAX }, (_, k) => `<span class="${k < R.shields ? 'on' : ''}">${ico('shield')}</span>`).join('');
+  const log = R.log.length ? R.log.slice(0, 4).map(l => `<li>${esc(l.text)}</li>`).join('') : `<li class="muted">${tr('No raids yet. Spin 🔨🔨🔨 to raid!', 'ఇంకా దాడులు లేవు. 🔨🔨🔨 వస్తే దాడి!')}</li>`;
+  return `<div class="raid-card" id="raidCard">
+    <div class="rc-top"><b>${ico('swords')} ${tr('Your village', 'మీ ఊరు')}</b><div class="rc-shields" title="${tr('Shields', 'షీల్డ్‌లు')}">${shields}</div>
+      <small class="rc-net ${R.online ? 'on' : ''}">${R.online ? tr('● online', '● ఆన్‌లైన్') : tr('● practice villages', '● ప్రాక్టీస్ ఊళ్ళు')}</small></div>
+    <ul class="rc-log">${log}</ul>
+    <div class="rc-actions">
+      ${R.tokens > 0 ? `<button class="btn red" data-act="raid-open">${ico('hammer')} ${tr('Raid ready!', 'దాడి సిద్ధం!')} (${R.tokens})</button>` : ''}
+      <button class="btn ${helpLeft() ? 'green' : 'ghost'}" data-act="help-open" ${helpLeft() ? '' : 'disabled'}>🤝 ${tr('Help other players', 'ఇతరులకు సాయం')} (${helpLeft() ? 0 : 1}/1)</button>
+    </div></div>`;
+}
+// Called from slotFinish: three hammers give a raid, three shields add a shield
+function slotRaidSymbols(line) {
+  const h = line.filter(k => k === 'hammer').length, sh = line.filter(k => k === 'shield').length;
+  if (h === 3) { S.raid.tokens++; slotStopAuto(); setTimeout(openRaid, 700); return tr('🔨 RAID!', '🔨 దాడి!'); }
+  if (sh === 3) {
+    if (S.raid.shields < SHIELD_MAX) { S.raid.shields++; return tr('🛡️ +1 shield', '🛡️ +1 షీల్డ్'); }
+    S.slot.coins += 5000; return tr('🛡️ Shields full: +5,000 coins', '🛡️ షీల్డ్‌లు నిండాయి: +5,000 కాయిన్లు');
+  }
+  return '';
+}
 function updateSlotLive() {
   if (activeTab !== 'slots' || !$('slotEnergy')) return;
   slotRegen();
@@ -2013,6 +2153,8 @@ function slotFinish(line, bet) {
   const lvlBefore = sl.boss.lvl, hit = slotBattle(line, bet);
   if (hit) parts.push(hit);
   slotCollect(line, bet, p);
+  const rs = slotRaidSymbols(line);
+  if (rs) { parts.push(rs); if ($('raidCard')) $('raidCard').outerHTML = raidCardHtml(); }
   if (sl.boss.lvl !== lvlBefore) setTimeout(refreshSlotEvents, 900); else updateBossHp();
   if ($('colCard')) $('colCard').outerHTML = colCardHtml();
   const res = $('slotResult');
@@ -2943,6 +3085,7 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   document.querySelectorAll('.tab').forEach(s => s.classList.toggle('active', s.id === 'tab-' + tab));
   $('main').scrollTop = 0;
+  if (tab === 'slots') raidSync(false);
   if (tab === 'leaderboard') { lbFetch(!!S.player.name && S.lifetime > lbLastScore); tourFetch(!!S.player.name && tourScore() > tourLastScore); }
   renderTab();
 }
@@ -3206,7 +3349,7 @@ function updateDots() {
   $('dot-daily').classList.toggle('on', canClaimDaily());
   $('dot-spin').classList.toggle('on', spinReady());
   $('dot-scratch').classList.toggle('on', scratchFreeReady());
-  slotRegen(); $('dot-slots').classList.toggle('on', S.slot.energy >= SLOT_MAX || giftReady() || calReady());
+  slotRegen(); $('dot-slots').classList.toggle('on', S.slot.energy >= SLOT_MAX || giftReady() || calReady() || S.raid.tokens > 0 || helpLeft());
   $('dot-album').classList.toggle('on', S.album.packs.basic + S.album.packs.gold > 0);
   $('dot-build').classList.toggle('on', !allBuilt() && S.slot.coins >= stageCost(S.build.done, S.build.stage));
   const hasPets = Object.keys(S.pets.owned).length > 0;
@@ -3338,6 +3481,10 @@ document.addEventListener('click', e => {
     case 'slot-auto': slotAuto = !slotAuto; el.classList.toggle('on', slotAuto); if (slotAuto && !slotBusy) slotSpin(); break;
     case 'piggy-break': breakPiggy(); break;
     case 'gift-claim': claimGift(); break;
+    case 'raid-open': openRaid(); break;
+    case 'raid-go': raidGo(+id); break;
+    case 'help-open': openHelp(); break;
+    case 'help-go': helpGo(+id); break;
     case 'pack-open': openPack(id); break;
     case 'pack-buy': buyPack(id); break;
     case 'star-trade': tradeStars(); break;
@@ -3490,6 +3637,7 @@ function frame(now) {
     if (activeTab === 'stats') renderTab();
     if (activeTab === 'pets') updatePetTimer();
     updateSlotLive();
+    if (activeTab === 'slots') raidSync(false);
     if (activeTab === 'stocks' && Math.floor(Date.now() / 60000) !== stockShownMinute) renderTab();
     if (activeTab === 'missions') updateMissionProgress();
     checkTourWeek();

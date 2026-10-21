@@ -960,3 +960,31 @@ body.lowfx .loader, body.lowfx .bar.fast .bar-fill, body.lowfx .tut-hand { anima
 @keyframes cardFlip { from { transform: perspective(600px) rotateY(90deg) scale(.7); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (max-width: 640px) { .pack-row { grid-template-columns: 1fr; } .album-sets { grid-template-columns: 1fr; } }
 .pk-done .i3d { width: 24px; height: 24px; vertical-align: -6px; }
+
+/* ---------- Raids, shields, help ---------- */
+.btn.green { background: linear-gradient(180deg, #8af0a8, #2fb35a 50%, #1f9a48); color: #fff; box-shadow: 0 4px 0 #136a30; }
+.raid-card { margin-top: 16px; padding: 12px 14px; border-radius: 18px; background: linear-gradient(180deg, #5a2a3a, #3a1a26); border: 2px solid #d86a8a; box-shadow: 0 6px 0 #1e0a12; }
+.rc-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rc-top b { display: flex; align-items: center; gap: 6px; color: #ffd8e4; }
+.rc-top b .i3d { width: 24px; height: 24px; }
+.rc-shields { display: flex; gap: 2px; }
+.rc-shields span .i3d { width: 26px; height: 26px; filter: grayscale(1) brightness(.5); }
+.rc-shields span.on .i3d { filter: none; }
+.rc-net { margin-left: auto; font-size: 12px; color: #ffb0c4; }
+.rc-net.on { color: #7dff9a; }
+.rc-log { list-style: none; margin: 10px 0; padding: 0; font-size: 13px; }
+.rc-log li { padding: 4px 0; border-bottom: 1px solid rgba(255, 255, 255, .08); color: #ffe8ee; }
+.rc-log li.muted { color: #d8a8b8; }
+.rc-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.rc-actions .i3d { width: 22px; height: 22px; vertical-align: -5px; }
+.raid-targets { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 12px; }
+.raid-target { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 8px; border-radius: 16px; background: var(--card2); border: 1px solid var(--border); text-align: center; }
+.raid-target .rt-ico { width: 46px; height: 46px; }
+.raid-target small { color: var(--muted); font-size: 12px; }
+.raid-target small .i3d { width: 16px; height: 16px; vertical-align: -3px; }
+.raid-target .btn .i3d { width: 18px; height: 18px; vertical-align: -4px; }
+.rt-shield { position: absolute; top: 6px; right: 6px; }
+.rt-shield .i3d { width: 26px; height: 26px; }
+.raid-anim { display: grid; place-items: center; height: 110px; }
+.swing { animation: swing .45s ease-in-out infinite alternate !important; transform-origin: 80% 80%; }
+@keyframes swing { from { transform: rotate(-35deg); } to { transform: rotate(25deg); } }
