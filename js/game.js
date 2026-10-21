@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '5.2';
+const GAME_VERSION = '5.3';
 const BIZ_OFF = true; // businesses, managers, upgrades, investors, stocks and worlds are switched off
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
@@ -2061,7 +2061,7 @@ async function raidGo(i) {
   const t = raidTargets && raidTargets[i];
   if (!t || S.raid.tokens <= 0) return;
   S.raid.tokens--;
-  modal(`<div class="raid-anim">${ico('hammer', 'big-ico swing')}</div><p>${tr('Raiding', 'దాడి చేస్తున్నారు')} ${esc(t.name)}…</p>`);
+  modal(`<div class="raid-stage" id="raidStage"><div class="raid-anim">${ico('hammer', 'big-ico swing')}</div></div><p>${tr('Raiding', 'దాడి చేస్తున్నారు')} ${esc(t.name)}…</p>`);
   sfx('big');
   let res;
   if (t.bot) res = t.shield ? { blocked: true } : { amt: Math.max(2000, Math.floor(t.coins * 0.15)) };
@@ -2069,7 +2069,7 @@ async function raidGo(i) {
     try { res = await raidPost({ action: 'raid', target: t.id }); }
     catch (e) { S.raid.tokens++; modal(`<p>${tr('Could not reach that village. Try again.', 'ఆ ఊరిని చేరలేకపోయాం. మళ్ళీ ప్రయత్నించండి.')}</p><div class="modal-actions"><button class="btn" data-act="close">OK</button></div>`); return; }
   }
-  await new Promise(r => setTimeout(r, 900));
+  await raidScene($('raidStage'), !!res.blocked, raidLandmark(t));
   S.stats.raids = (S.stats.raids || 0) + 1;
   if (!res.blocked) addLeague(20);
   let html;
@@ -3278,11 +3278,88 @@ const BTYPES = {
 BTYPE_PARTS.fort = [['Fort walls', 'కోట గోడలు'], ['Main gate', 'ప్రధాన ద్వారం'], ['Towers', 'బురుజులు'], ['Pavilions', 'మండపాలు'], ['Flag', 'జెండా']];
 function lmModel(id) { const L = LANDMARKS[id]; return MODELS[L.model || id] ? MODELS[L.model || id]() : BTYPES[L.type](L.o || {}); }
 function lmParts(L) { return L.parts || BTYPE_PARTS[L.type]; }
+function loadThree() {
+  if (!B3.threeP) B3.threeP = import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js').then(T => (B3.T = T));
+  return B3.threeP;
+}
+// ---- Raid in 3D: a giant hammer swings at the target's landmark; it smashes into flying parts and coins,
+// or bounces off a shield bubble. Resolves when the show is over (or at once if 3D is not available).
+function raidScene(host, blocked, lmId) {
+  return loadThree().then(T => new Promise(done => {
+    const w = Math.min(420, host.clientWidth || 320), h = Math.round(w * 0.62);
+    const r = new T.WebGLRenderer({ antialias: !fxOff(), alpha: true });
+    r.setPixelRatio(Math.min(devicePixelRatio || 1, 1.5)); r.setSize(w, h); r.domElement.className = 'raid-canvas';
+    host.innerHTML = ''; host.appendChild(r.domElement);
+    const sc = new T.Scene(), cam = new T.PerspectiveCamera(42, w / h, 0.1, 100);
+    cam.position.set(4.6, 4.2, 6.2); cam.lookAt(0.4, 1.3, 0);
+    sc.add(new T.HemisphereLight(0xdff0ff, 0x6a8a4a, 1.1));
+    const sun = new T.DirectionalLight(0xfff2d8, 1.4); sun.position.set(6, 12, 6); sc.add(sun);
+    const g = new T.Group(); sc.add(g);
+    const water = b3Mesh(new T.CircleGeometry(30, 32), b3Mat(0x3a9ad8), 0, -0.3, 0, sc); water.rotation.x = -Math.PI / 2;
+    [[0, 0], ...NB].forEach(([q, rr]) => hexTile(hexPos(q, rr), q || rr ? 0x6fbf4a : 0xe8dcc0, 0xd8b878, g));
+    NB.forEach(([q, rr], k) => { if (k % 2) return; const t = new T.Group(), p = hexPos(q, rr); t.position.set(p.x, 0.12, p.z); g.add(t); decoMesh(k % 4 ? 'tree' : 'house', t); });
+    const lm = new T.Group(); lm.position.y = 0.12; lm.scale.setScalar(0.62); g.add(lm);
+    const parts = lmModel(lmId); parts.forEach(p => lm.add(p));
+    // Hammer: a pivot at the handle's end so it can swing down onto the landmark
+    const pivot = new T.Group(); pivot.position.set(3.2, 0.6, 0); sc.add(pivot);
+    const hammer = new T.Group(); pivot.add(hammer);
+    cy(0.12, 0.14, 3.6, 0x8a5a2a, 0, 1.8, 0, hammer, 8);
+    const head = bx(1.0, 1.0, 1.6, 0x9aa4b0, 0, 3.7, 0, hammer); bx(1.04, 0.2, 1.64, 0xd8a040, 0, 3.7, 0, hammer);
+    head.rotation.y = 0;
+    const shield = new T.Mesh(new T.SphereGeometry(2.6, 24, 16), new T.MeshBasicMaterial({ color: 0x5ab8ff, transparent: true, opacity: 0, depthWrite: false }));
+    shield.position.y = 1; sc.add(shield);
+    const coins = [], flying = [];
+    const t0 = performance.now(), HIT = 900, END = 2400;
+    let hit = false;
+    pivot.rotation.z = 0.2;
+    const frame = now => {
+      const t = now - t0;
+      if (!hit) {
+        // wind up, then swing down fast
+        const k = Math.min(1, t / HIT);
+        pivot.rotation.z = k < 0.45 ? 0.2 - 0.7 * (k / 0.45) : -0.5 + 1.7 * Math.pow((k - 0.45) / 0.55, 2); // head lands on the landmark at 1.2
+        if (t >= HIT) {
+          hit = true;
+          if (blocked) { SlotFX.clang(); shield.material.opacity = 0.7; }
+          else {
+            SlotFX.hit();
+            parts.forEach((p, i) => { const a2 = i / parts.length * Math.PI * 2; flying.push({ o: p, v: new T.Vector3(Math.cos(a2) * 0.08, 0.16 + i * 0.03, Math.sin(a2) * 0.08), s: 0.05 + i * 0.02 }); });
+            for (let i = 0; i < 16; i++) {
+              const c = cy(0.22, 0.22, 0.07, 0xffc83d, 0, 1.2, 0, sc, 14); c.rotation.x = Math.PI / 2;
+              const a3 = Math.random() * Math.PI * 2, sp2 = 0.05 + Math.random() * 0.08;
+              coins.push({ o: c, v: new T.Vector3(Math.cos(a3) * sp2, 0.18 + Math.random() * 0.12, Math.sin(a3) * sp2) });
+            }
+            setTimeout(() => SlotFX.land('coin', 2), 250); setTimeout(() => SlotFX.land('coin', 4), 450);
+          }
+        }
+      } else if (blocked) {
+        const k = Math.min(1, (t - HIT) / 600);
+        pivot.rotation.z = 1.2 - 1.1 * Math.sin(k * Math.PI / 2); // bounce back up
+        shield.material.opacity = 0.7 * (1 - k * 0.6) + 0.15 * Math.sin(t / 60) * (1 - k);
+        shield.scale.setScalar(1 + 0.08 * Math.sin(t / 40) * (1 - k));
+      } else {
+        pivot.rotation.z = 1.2 - 0.25 * Math.min(1, (t - HIT) / 400);
+        for (const f of flying) { f.o.position.add(f.v); f.v.y -= 0.012; f.o.rotation.x += f.s; f.o.rotation.z += f.s * 0.7; }
+        for (const c of coins) { c.o.position.add(c.v); c.v.y -= 0.012; c.o.rotation.z += 0.3; }
+      }
+      g.rotation.y = Math.sin(t / 1400) * 0.15;
+      r.render(sc, cam);
+      if (t < END && host.isConnected) requestAnimationFrame(frame);
+      else {
+        sc.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+        shield.material.dispose(); r.dispose(); done();
+      }
+    };
+    requestAnimationFrame(frame);
+  })).catch(() => new Promise(res => setTimeout(res, 900)));
+}
+// Which landmark the target has: a built one from their level, or Charminar for new players
+function raidLandmark(t) { const ids = CITIES.flatMap(C => C.lms); return ids[Math.min(ids.length - 1, Math.max(0, (t.lm || 1) - 1))]; }
 function initBuild3D() {
-  if (B3.T || B3.loading || B3.failed) return;
+  if (B3.renderer || B3.loading || B3.failed) return;
   B3.loading = true;
-  import('https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js').then(T => {
-    B3.T = T; B3.loading = false;
+  loadThree().then(T => {
+    B3.loading = false;
     const low = fxOff();
     const r = B3.renderer = new T.WebGLRenderer({ antialias: !low, alpha: true });
     r.setPixelRatio(Math.min(devicePixelRatio || 1, low ? 1 : 1.5));
@@ -3394,7 +3471,7 @@ function drawCity(ci, anim = -1) {
 function mountBuildView() {
   const host = $('buildView');
   if (!host) return;
-  if (!B3.T) { initBuild3D(); return; }
+  if (!B3.renderer) { initBuild3D(); return; }
   host.querySelectorAll('.build-fallback').forEach(f => f.remove());
   if (B3.renderer.domElement.parentNode !== host) host.prepend(B3.renderer.domElement);
   const w = host.clientWidth || 600, h = Math.round(Math.min(640, Math.max(400, Math.min(w * (w < 640 ? 1.3 : 0.85), innerHeight - 220))));
@@ -3449,7 +3526,7 @@ function renderBuild() {
     }
   }
   const fallback = B3.failed ? `<div class="build-fallback">${ico('worldmap', 'big-ico')}<p>${tr('3D view needs an internet connection.', '3D వ్యూ కోసం ఇంటర్నెట్ కావాలి.')}</p></div>`
-    : B3.T ? '' : `<div class="build-fallback"><div class="loader"></div></div>`;
+    : B3.renderer ? '' : `<div class="build-fallback"><div class="loader"></div></div>`;
   return `<div class="build-view big" id="buildView">${fallback}
     <div class="bv-top">
       <button class="bv-btn map" data-act="build-map">${ico('worldmap')}<span>${tr('MAP', 'మ్యాప్')}</span></button>
@@ -3566,7 +3643,7 @@ function buildPart() {
   const lmDone = t.type === 'part' && t.k === 4 ? lmId : null;
   const cityFinished = plan.tasks.every(x => S.city.done[x.i]);
   B3.sel = -1; save();
-  const keep = B3.T;
+  const keep = B3.renderer;
   renderTab();
   if (keep) { B3.shownKey = ''; drawCity(ci, t.i); }
   updateHeader();
@@ -5214,4 +5291,4 @@ document.addEventListener('visibilitychange', () => {
 });
 requestAnimationFrame(frame);
 
-addEventListener('resize', () => { if (activeTab === 'build' && B3.T) mountBuildView(); });
+addEventListener('resize', () => { if (activeTab === 'build' && B3.renderer) mountBuildView(); });

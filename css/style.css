@@ -1381,3 +1381,7 @@ body.biz-off .cash-wrap { flex: 0 1 auto; width: auto; max-width: 340px; min-wid
 .tr-code { display: inline-block; margin: 8px 0 4px; padding: 8px 18px; border-radius: 14px; background: #fff; color: #3a1a90; font: 800 30px system-ui, sans-serif; letter-spacing: 6px; }
 .tr-err { color: #ff8a7a; font-weight: 700; }
 .tr-sent small { display: block; color: var(--muted); } .tr-code { display: block; width: max-content; margin: 8px auto 6px; }
+
+/* ---------- Raid in 3D ---------- */
+.raid-stage { display: grid; place-items: center; min-height: 120px; border-radius: 16px; overflow: hidden; background: linear-gradient(180deg, #8fd0ff, #c8ecff); }
+.raid-canvas { display: block; max-width: 100%; }
