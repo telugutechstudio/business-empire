@@ -1395,3 +1395,21 @@ body.biz-off .cash-wrap { flex: 0 1 auto; width: auto; max-width: 340px; min-wid
 .dm-chest.ready { border-color: var(--gold); box-shadow: 0 0 22px rgba(255, 210, 90, .55); } .dm-chest.ready .big-ico { animation: lmBounce .8s ease-in-out infinite alternate; }
 .dm-chest.open { opacity: .8; } .dm-count { font-size: 20px; font-weight: 800; color: var(--gold); }
 .row.mission.claimed { opacity: .6; }
+
+/* ---------- States of India ---------- */
+.india-map.states .st-dot { cursor: pointer; } .india-map.states .st-dot circle { fill: #fff; stroke: #1a5a2a; stroke-width: 1.5; opacity: .75; }
+.india-map.states .st-dot.city circle { fill: #ffe9a8; } .india-map.states .st-dot.on circle { fill: #2fb35a; stroke: #fff; opacity: 1; }
+.india-map.states .st-dot text { font: 800 7px system-ui, sans-serif; fill: #fff; pointer-events: none; }
+.st-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 6px; max-height: 190px; overflow-y: auto; margin: 8px 0; }
+.st-chip { display: flex; flex-direction: column; align-items: flex-start; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--border); background: var(--card2); color: #fff; font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.st-chip small { color: var(--muted); font-size: 10px; } .st-chip.on { border-color: #3ccf6e; } .st-chip.on small { color: #7dff9a; }
+.st-head { display: flex; align-items: center; gap: 14px; text-align: left; } .st-head h3 { margin: 0; } .st-head small { color: var(--muted); }
+.stamp { flex: none; display: grid; place-items: center; width: 68px; height: 68px; border-radius: 50%; border: 3px dashed #8a7ac8; color: #8a7ac8; font-size: 26px; font-weight: 800; line-height: 1; transform: rotate(-12deg); }
+.stamp small { font-size: 8px; letter-spacing: 1px; } .stamp.on { border-color: #e04a3a; color: #e04a3a; background: rgba(255, 255, 255, .9); }
+.st-rows { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0; text-align: left; }
+.st-row { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 12px; background: var(--card2); }
+.st-row .i3d { width: 30px; height: 30px; flex: none; } .st-row div { display: flex; flex-direction: column; } .st-row small { color: var(--muted); font-size: 11px; } .st-row b { font-size: 13px; }
+.st-link { margin: 0 0 6px; } .st-link .i3d { width: 20px; height: 20px; vertical-align: -4px; }
+.stamp-new { display: flex; align-items: center; gap: 10px; margin: 8px auto; padding: 6px 12px; border-radius: 14px; border: 0; background: #fff3d0; color: #3a2600; font: inherit; cursor: pointer; }
+.stamp-new .stamp { width: 40px; height: 40px; font-size: 18px; }
+@media (max-width: 520px) { .st-rows { grid-template-columns: 1fr; } }

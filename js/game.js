@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '5.4';
+const GAME_VERSION = '5.5';
 const BIZ_OFF = true; // businesses, managers, upgrades, investors, stocks and worlds are switched off
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
@@ -3635,6 +3635,67 @@ function renderBuild() {
 const mapXY = (lat, lon) => [Math.round((14 + (lon - 68) * 9.6) * 10) / 10, Math.round((10 + (37 - lat) * 10.6) * 10) / 10];
 const INDIA_PATH = 'M' + INDIA_LL.map(([lon, lat]) => mapXY(lat, lon).join(',')).join(' L') + ' Z';
 function cityState(ci) { return ci < S.city.i ? 'done' : ci === S.city.i ? 'now' : 'locked'; }
+// ---- States of India: capital, language, food and dance for every state. Finishing a city there stamps your passport ----
+// [id, name, capital, language, food, dance or festival, capital lat/lon]
+const STATES = [
+  ['AP', ['Andhra Pradesh', 'ఆంధ్రప్రదేశ్'], ['Amaravati', 'అమరావతి'], ['Telugu', 'తెలుగు'], ['Pesarattu, Gongura pickle', 'పెసరట్టు, గోంగూర పచ్చడి'], ['Kuchipudi', 'కూచిపూడి'], [16.51, 80.52]],
+  ['AR', ['Arunachal Pradesh', 'అరుణాచల్ ప్రదేశ్'], ['Itanagar', 'ఇటానగర్'], ['Many tribal languages', 'అనేక గిరిజన భాషలు'], ['Thukpa', 'తుక్పా'], ['Losar festival', 'లోసార్ పండుగ'], [27.08, 93.61]],
+  ['AS', ['Assam', 'అస్సాం'], ['Dispur', 'దిస్పూర్'], ['Assamese', 'అస్సామీ'], ['Masor tenga (fish curry)', 'మసోర్ టెంగా (చేపల కూర)'], ['Bihu', 'బిహు'], [26.14, 91.79]],
+  ['BR', ['Bihar', 'బీహార్'], ['Patna', 'పాట్నా'], ['Hindi, Bhojpuri, Maithili', 'హిందీ, భోజ్‌పురి, మైథిలి'], ['Litti chokha', 'లిట్టి చోఖా'], ['Chhath festival', 'ఛఠ్ పండుగ'], [25.59, 85.14]],
+  ['CG', ['Chhattisgarh', 'ఛత్తీస్‌గఢ్'], ['Raipur', 'రాయ్‌పూర్'], ['Chhattisgarhi, Hindi', 'ఛత్తీస్‌గఢీ, హిందీ'], ['Chila', 'చీలా'], ['Panthi dance', 'పంథీ నృత్యం'], [21.25, 81.63]],
+  ['GA', ['Goa', 'గోవా'], ['Panaji', 'పణజి'], ['Konkani', 'కొంకణి'], ['Fish curry rice', 'చేపల కూర అన్నం'], ['Fugdi dance', 'ఫుగ్డీ నృత్యం'], [15.49, 73.83]],
+  ['GJ', ['Gujarat', 'గుజరాత్'], ['Gandhinagar', 'గాంధీనగర్'], ['Gujarati', 'గుజరాతీ'], ['Dhokla', 'ధోక్లా'], ['Garba', 'గర్బా'], [23.22, 72.65]],
+  ['HR', ['Haryana', 'హర్యానా'], ['Chandigarh', 'చండీగఢ్'], ['Hindi, Haryanvi', 'హిందీ, హర్యాన్వీ'], ['Bajra roti with butter', 'బజ్రా రొట్టె, వెన్న'], ['Phag dance', 'ఫాగ్ నృత్యం'], [30.0, 76.5]],
+  ['HP', ['Himachal Pradesh', 'హిమాచల్ ప్రదేశ్'], ['Shimla', 'సిమ్లా'], ['Hindi, Pahari', 'హిందీ, పహాడీ'], ['Siddu', 'సిద్దు'], ['Nati dance', 'నాటీ నృత్యం'], [31.1, 77.17]],
+  ['JH', ['Jharkhand', 'జార్ఖండ్'], ['Ranchi', 'రాంచీ'], ['Hindi, Santali', 'హిందీ, సంతాలి'], ['Dhuska', 'ధుస్కా'], ['Chhau dance', 'ఛౌ నృత్యం'], [23.34, 85.31]],
+  ['KA', ['Karnataka', 'కర్ణాటక'], ['Bengaluru', 'బెంగళూరు'], ['Kannada', 'కన్నడ'], ['Bisi bele bath', 'బిసి బేళె బాత్'], ['Yakshagana', 'యక్షగానం'], [12.97, 77.59]],
+  ['KL', ['Kerala', 'కేరళ'], ['Thiruvananthapuram', 'తిరువనంతపురం'], ['Malayalam', 'మలయాళం'], ['Sadya feast on a banana leaf', 'అరటి ఆకుపై సద్య విందు'], ['Kathakali', 'కథాకళి'], [8.52, 76.94]],
+  ['MP', ['Madhya Pradesh', 'మధ్యప్రదేశ్'], ['Bhopal', 'భోపాల్'], ['Hindi', 'హిందీ'], ['Poha and jalebi', 'పోహా, జిలేబీ'], ['Matki dance', 'మట్కీ నృత్యం'], [23.26, 77.41]],
+  ['MH', ['Maharashtra', 'మహారాష్ట్ర'], ['Mumbai', 'ముంబై'], ['Marathi', 'మరాఠీ'], ['Vada pav', 'వడా పావ్'], ['Lavani', 'లావణి'], [19.08, 72.88]],
+  ['MN', ['Manipur', 'మణిపూర్'], ['Imphal', 'ఇంఫాల్'], ['Meitei (Manipuri)', 'మైతేయి (మణిపురి)'], ['Eromba', 'ఎరోంబా'], ['Manipuri dance', 'మణిపురి నృత్యం'], [24.82, 93.94]],
+  ['ML', ['Meghalaya', 'మేఘాలయ'], ['Shillong', 'షిల్లాంగ్'], ['Khasi, Garo', 'ఖాసీ, గారో'], ['Jadoh', 'జాదోహ్'], ['Nongkrem dance', 'నోంగ్‌క్రెమ్ నృత్యం'], [25.58, 91.89]],
+  ['MZ', ['Mizoram', 'మిజోరం'], ['Aizawl', 'ఐజాల్'], ['Mizo', 'మిజో'], ['Bai (vegetable stew)', 'బాయ్ (కూరగాయల కూర)'], ['Cheraw bamboo dance', 'చెరా వెదురు నృత్యం'], [23.73, 92.72]],
+  ['NL', ['Nagaland', 'నాగాలాండ్'], ['Kohima', 'కోహిమా'], ['Nagamese, English', 'నాగామీస్, ఇంగ్లీష్'], ['Bamboo shoot dishes', 'వెదురు చిగుళ్ళ వంటలు'], ['Hornbill Festival', 'హార్న్‌బిల్ ఫెస్టివల్'], [25.67, 94.11]],
+  ['OD', ['Odisha', 'ఒడిశా'], ['Bhubaneswar', 'భువనేశ్వర్'], ['Odia', 'ఒడియా'], ['Dalma, rasagola', 'దాల్మా, రసగుల్లా'], ['Odissi', 'ఒడిస్సీ'], [20.3, 85.82]],
+  ['PB', ['Punjab', 'పంజాబ్'], ['Chandigarh', 'చండీగఢ్'], ['Punjabi', 'పంజాబీ'], ['Makki di roti, sarson da saag', 'మక్కీ రొట్టె, సర్సోం సాగ్'], ['Bhangra', 'భాంగ్రా'], [30.9, 75.85]],
+  ['RJ', ['Rajasthan', 'రాజస్థాన్'], ['Jaipur', 'జైపూర్'], ['Rajasthani, Hindi', 'రాజస్థానీ, హిందీ'], ['Dal baati churma', 'దాల్ బాటీ చూర్మా'], ['Ghoomar', 'ఘూమర్'], [26.91, 75.79]],
+  ['SK', ['Sikkim', 'సిక్కిం'], ['Gangtok', 'గ్యాంగ్‌టక్'], ['Nepali', 'నేపాలీ'], ['Momos', 'మోమోస్'], ['Losar festival', 'లోసార్ పండుగ'], [27.33, 88.61]],
+  ['TN', ['Tamil Nadu', 'తమిళనాడు'], ['Chennai', 'చెన్నై'], ['Tamil', 'తమిళం'], ['Idli, dosa, pongal', 'ఇడ్లీ, దోస, పొంగల్'], ['Bharatanatyam', 'భరతనాట్యం'], [13.08, 80.27]],
+  ['TG', ['Telangana', 'తెలంగాణ'], ['Hyderabad', 'హైదరాబాద్'], ['Telugu', 'తెలుగు'], ['Hyderabadi biryani', 'హైదరాబాదీ బిర్యానీ'], ['Bathukamma festival', 'బతుకమ్మ పండుగ'], [17.38, 78.48]],
+  ['TR', ['Tripura', 'త్రిపుర'], ['Agartala', 'అగర్తలా'], ['Bengali, Kokborok', 'బెంగాలీ, కొక్‌బొరోక్'], ['Mui borok', 'మూయి బొరోక్'], ['Hojagiri dance', 'హోజాగిరి నృత్యం'], [23.83, 91.29]],
+  ['UP', ['Uttar Pradesh', 'ఉత్తరప్రదేశ్'], ['Lucknow', 'లక్నో'], ['Hindi', 'హిందీ'], ['Lucknowi kebabs, Agra petha', 'లక్నో కబాబ్, ఆగ్రా పేఠా'], ['Kathak', 'కథక్'], [26.85, 80.95]],
+  ['UK', ['Uttarakhand', 'ఉత్తరాఖండ్'], ['Dehradun', 'డెహ్రాడూన్'], ['Hindi, Garhwali, Kumaoni', 'హిందీ, గఢ్వాలీ, కుమావోనీ'], ['Kafuli', 'కఫూలీ'], ['Choliya sword dance', 'చోలియా కత్తి నృత్యం'], [30.32, 78.03]],
+  ['WB', ['West Bengal', 'పశ్చిమ బెంగాల్'], ['Kolkata', 'కోల్‌కతా'], ['Bengali', 'బెంగాలీ'], ['Rosogolla, fish curry', 'రసగుల్లా, చేపల కూర'], ['Durga Puja festival', 'దుర్గా పూజ పండుగ'], [22.57, 88.36]],
+  ['DL', ['Delhi (capital territory)', 'ఢిల్లీ (రాజధాని ప్రాంతం)'], ['New Delhi', 'న్యూఢిల్లీ'], ['Hindi, Punjabi, Urdu', 'హిందీ, పంజాబీ, ఉర్దూ'], ['Chole bhature', 'ఛోలే భటూరే'], ['Republic Day parade', 'గణతంత్ర దినోత్సవ పరేడ్'], [28.61, 77.21]],
+].map(([id, name, capital, lang, food, dance, ll]) => ({ id, name, capital, lang, food, dance, ll }));
+const CITY_STATE = { hyd: 'TG', delhi: 'DL', agra: 'UP', jaipur: 'RJ', amritsar: 'PB', varanasi: 'UP', kolkata: 'WB', puri: 'OD', mumbai: 'MH', mysuru: 'KA', chennai: 'TN', madurai: 'TN', tirupati: 'AP', vijayawada: 'AP', warangal: 'TG' };
+// A state is stamped once you finish any of its cities
+function stateStamped(id) { return CITIES.some((C, ci) => CITY_STATE[C.id] === id && ci < S.city.i); }
+function stateCities(id) { return CITIES.filter(C => CITY_STATE[C.id] === id); }
+function openStates() {
+  const stamped = STATES.filter(st => stateStamped(st.id)).length;
+  const dots = STATES.map(st => { const [x, y] = mapXY(...st.ll), on = stateStamped(st.id);
+    return `<g class="st-dot ${on ? 'on' : ''} ${stateCities(st.id).length ? 'city' : ''}" data-act="state-info" data-id="${st.id}"><circle cx="${x}" cy="${y}" r="${on ? 6 : 4.5}"/>${on ? `<text x="${x}" y="${y + 2.6}" text-anchor="middle">✓</text>` : ''}</g>`; }).join('');
+  const chips = STATES.map(st => `<button class="st-chip ${stateStamped(st.id) ? 'on' : ''}" data-act="state-info" data-id="${st.id}"><b>${tr(...st.name)}</b><small>${stateStamped(st.id) ? '✓ ' + tr('Stamped', 'స్టాంప్') : tr(...st.capital)}</small></button>`).join('');
+  SlotFX.press();
+  modal(`<h3>${ico('book')} ${tr('States of India', 'భారత రాష్ట్రాలు')}</h3>
+    <p class="sub">${tr(`India has 28 states and 8 union territories. Tap a state to learn about it. Finish a city to stamp its state: <b>${stamped}</b> stamped.`, `భారతదేశంలో 28 రాష్ట్రాలు, 8 కేంద్రపాలిత ప్రాంతాలు. ఒక రాష్ట్రాన్ని నొక్కి తెలుసుకోండి. నగరం పూర్తి చేస్తే ఆ రాష్ట్రానికి స్టాంప్: <b>${stamped}</b> వచ్చాయి.`)}</p>
+    <svg class="india-map states" viewBox="0 0 310 330"><defs><linearGradient id="indG2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fe08a"/><stop offset="1" stop-color="#3f9a3a"/></linearGradient></defs>
+      <path d="${INDIA_PATH}" fill="url(#indG2)" stroke="#fff6c8" stroke-width="2.5" stroke-linejoin="round"/>${dots}</svg>
+    <div class="st-chips">${chips}</div>
+    <div class="modal-actions"><button class="btn ghost" data-act="build-map">${ico('worldmap')} ${tr('City map', 'నగరాల మ్యాప్')}</button><button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button></div>`);
+}
+function stateInfo(id) {
+  const st = STATES.find(x => x.id === id);
+  if (!st) return;
+  const on = stateStamped(id), cities = stateCities(id);
+  const row = (icon, label, val) => `<div class="st-row">${ico(icon)}<div><small>${label}</small><b>${tr(...val)}</b></div></div>`;
+  SlotFX.press();
+  modal(`<div class="st-head"><div class="stamp ${on ? 'on' : ''}">${on ? '✓' : '?'}<small>${on ? tr('STAMPED', 'స్టాంప్') : tr('NOT YET', 'ఇంకా లేదు')}</small></div><div><h3>${tr(...st.name)}</h3>
+      <small>${cities.length ? tr(`In the game: ${cities.map(c => c.name[0]).join(', ')}`, `గేమ్‌లో: ${cities.map(c => c.name[1]).join(', ')}`) : tr('Coming to the game later', 'త్వరలో గేమ్‌లోకి')}</small></div></div>
+    <div class="st-rows">${row('city', tr('Capital', 'రాజధాని'), st.capital)}${row('speech', tr('Language', 'భాష'), st.lang)}${row('curry', tr('Famous food', 'ప్రసిద్ధ వంటకం'), st.food)}${row('party', tr('Dance / festival', 'నృత్యం / పండుగ'), st.dance)}</div>
+    <div class="modal-actions"><button class="btn gold" data-act="states">${tr('All states', 'అన్ని రాష్ట్రాలు')}</button><button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button></div>`);
+}
 function openBuildMap() {
   const pts = CITIES.map(C => mapXY(...C.ll));
   const pins = CITIES.map((C, ci) => {
@@ -3658,7 +3719,7 @@ function openBuildMap() {
       <path d="${INDIA_PATH}" fill="url(#indG)" stroke="#fff6c8" stroke-width="2.5" stroke-linejoin="round"/>
       <polyline points="${pts.slice(0, Math.min(CITIES.length, S.city.i + 2)).map(p => p.join(',')).join(' ')}" class="route"/>${pins}${label}</svg>
     <div class="city-chips">${chips}</div>
-    <div class="modal-actions"><button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button></div>`);
+    <div class="modal-actions"><button class="btn gold" data-act="states">${ico('book')} ${tr('States of India', 'భారత రాష్ట్రాలు')}</button><button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button></div>`);
 }
 // Landmark list of the shown city; each row opens its learning card
 function openBuildParts() {
@@ -3671,6 +3732,7 @@ function openBuildParts() {
   SlotFX.press();
   modal(`<h3>${ico('book')} ${tr(`Learn about ${C.name[0]}`, `${C.name[1]} గురించి నేర్చుకో`)}</h3>
     <p class="sub city-fact">${tr(...C.fact)}</p>
+    <button class="btn ghost st-link" data-act="state-info" data-id="${CITY_STATE[C.id]}">${ico('worldmap')} ${tr(`About ${STATES.find(x => x.id === CITY_STATE[C.id]).name[0]}`, `${STATES.find(x => x.id === CITY_STATE[C.id]).name[1]} గురించి`)}</button>
     <div class="parts-list">${rows}</div>
     <p class="sub">${tr(`Each finished landmark gives coins, gems, energy, a gold pack and +${LANDMARK_BONUS * 100}% on all prizes. Answer its quiz for +10 gems!`, `పూర్తయిన ప్రతి కట్టడం: కాయిన్లు, జెమ్స్, ఎనర్జీ, గోల్డ్ ప్యాక్, అన్ని బహుమతులు +${LANDMARK_BONUS * 100}%. క్విజ్ సరిగ్గా చెబితే +10 జెమ్స్!`)}</p>
     <div class="modal-actions"><button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button></div>`);
@@ -3759,12 +3821,13 @@ function landmarkCelebration(id, thenCity) {
     <div class="modal-actions"><button class="btn gold lm-next" data-act="lm-next" data-id="${thenCity ? 'city' : ''}">${tr('Collect!', 'తీసుకో!')}</button></div>`);
 }
 function cityCelebration() {
-  const C = CITIES[S.city.i], next = CITIES[S.city.i + 1], gems = 25, energy = 20;
+  const C = CITIES[S.city.i], next = CITIES[S.city.i + 1], st = STATES.find(x => x.id === CITY_STATE[C.id]), stamp = st && !stateStamped(st.id), gems = 25 + (stamp ? 5 : 0), energy = 20;
   S.gems += gems; S.slot.energy += energy; giveAlbumPack('gold', 1, true); save();
   SlotFX.jackpot(); confetti($('buildView'), 300);
   modal(`<div class="lm-done"><div class="lm-rays"></div>${ico('worldmap', 'big-ico')}</div>
     <h3>${tr(`${C.name[0]} is complete!`, `${C.name[1]} పూర్తయింది!`)}</h3>
     <div class="lm-tiles">${[['gem', gems, tr('gems', 'జెమ్స్')], ['bolt', energy, tr('energy', 'ఎనర్జీ')], ['pack', 1, tr('gold pack', 'గోల్డ్ ప్యాక్')]].map(([i, b, sm], k) => `<div class="lm-tile" style="animation-delay:${0.25 + k * 0.15}s">${ico(i)}<b>${b}</b><small>${sm}</small></div>`).join('')}</div>
+    ${stamp ? `<button class="stamp-new" data-act="state-info" data-id="${st.id}"><span class="stamp on">✓</span>${tr(`New passport stamp: <b>${st.name[0]}</b> (+5 💎)`, `కొత్త పాస్‌పోర్ట్ స్టాంప్: <b>${st.name[1]}</b> (+5 💎)`)}</button>` : ''}
     <p class="sub">${next ? tr(`Next stop: <b>${next.name[0]}</b>`, `తర్వాతి నగరం: <b>${next.name[1]}</b>`) : tr('You built every city! More coming soon.', 'అన్ని నగరాలూ కట్టేశారు! మరిన్ని త్వరలో.')}</p>
     <div class="modal-actions"><button class="btn gold lm-next" data-act="city-next">${next ? tr(`Travel to ${next.name[0]} ✈️`, `${next.name[1]} కి వెళ్ళు ✈️`) : tr('Great!', 'సూపర్!')}</button></div>`);
 }
@@ -5128,6 +5191,8 @@ document.addEventListener('click', e => {
       break;
     }
     case 'build-map': openBuildMap(); break;
+    case 'states': openStates(); break;
+    case 'state-info': stateInfo(id); break;
     case 'build-parts': openBuildParts(); break;
     case 'lm-info': lmInfo(id); break;
     case 'quiz': answerQuiz(el, id); break;
