@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '5.6';
+const GAME_VERSION = '5.7';
 const BIZ_OFF = true; // businesses, managers, upgrades, investors, stocks and worlds are switched off
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
@@ -3972,11 +3972,12 @@ function openPack(kind) {
       ${isNew ? `<em>${tr('NEW!', 'కొత్తది!')}</em>` : `<em class="dup">+${s.stars}⭐</em>`}${ico(s.icon)}<b>${tr(...s.name)}</b><small>${starsHtml(s.stars)}</small></div>`;
   }).join('');
   const fresh = markFinishedSets();
+  const fb = { ...festState().have }, fcards = festGive(1).map(x => festCardHtml(x, !fb[x.id])).join('');
   S.stats.packs = (S.stats.packs || 0) + 1;
   dcount('packs');
   save();
   sfx('case');
-  modal(`<h3>${ico('pack')} ${tr(...P.name)}</h3><div class="pk-row">${cards}</div>
+  modal(`<h3>${ico('pack')} ${tr(...P.name)}</h3><div class="pk-row">${cards}${fcards}</div>
     ${fresh.map(setClaimHtml).join('')}
     <div class="modal-actions">${A.packs[kind] > 0 && !fresh.length ? `<button class="btn gold" data-act="pack-open" data-id="${kind}">${tr('Open another', 'ఇంకోటి తెరువు')} (${A.packs[kind]})</button>` : ''}
     <button class="btn ghost" data-act="close">${tr('Done', 'సరే')}</button></div>`);
@@ -4135,6 +4136,111 @@ async function claimTrade() {
     modal(tradeHtml('get')); $('tradeBody').insertAdjacentHTML('afterbegin', `<p class="tr-err">${msg}</p>`);
   }
 }
+// ---- Festival albums: during a festival every pack adds one festival sticker, and there is a free festival pack each day.
+// Each sticker teaches one thing about the festival; finishing the six pays a festival prize once. ----
+const FEST_STICKERS = {
+  newyear: [['fireworks', 'Fireworks', 'బాణసంచా', 'Many cities welcome the new year at midnight with fireworks.', 'చాలా నగరాలు అర్ధరాత్రి బాణసంచాతో కొత్త సంవత్సరానికి స్వాగతం పలుకుతాయి.'],
+    ['stopwatch', 'Countdown', 'కౌంట్‌డౌన్', 'People count down the last ten seconds of the year together.', 'సంవత్సరం చివరి పది సెకన్లను అందరూ కలిసి లెక్కపెడతారు.'],
+    ['calendar', 'New calendar', 'కొత్త క్యాలెండర్', 'January is named after Janus, the Roman god of doorways and beginnings.', 'జనవరి పేరు రోమన్ దేవుడు జానస్ (ద్వారాలు, ఆరంభాల దేవుడు) నుండి వచ్చింది.'],
+    ['party', 'Party', 'పార్టీ', 'Friends and families stay up late to celebrate together.', 'స్నేహితులు, కుటుంబాలు రాత్రి ఆలస్యంగా కలిసి వేడుక చేసుకుంటారు.'],
+    ['pencil', 'Resolutions', 'తీర్మానాలు', 'Many people make a promise to build a good new habit.', 'చాలామంది ఒక మంచి కొత్త అలవాటు నేర్చుకుంటామని మాట ఇస్తారు.'],
+    ['sparkler', 'Sparkler', 'చిచ్చుబుడ్డి', 'In India, January 1st is also a day to visit temples for blessings.', 'భారత్‌లో జనవరి 1న చాలామంది ఆశీర్వాదాల కోసం గుడికి వెళ్తారు.']],
+  sankranti: [['kite', 'Kites', 'గాలిపటాలు', 'On Sankranti the sky fills with colourful kites.', 'సంక్రాంతికి ఆకాశమంతా రంగుల గాలిపటాలతో నిండిపోతుంది.'],
+    ['sun', 'Sun', 'సూర్యుడు', 'Makar Sankranti marks the sun moving into Makara (Capricorn).', 'మకర సంక్రాంతి రోజు సూర్యుడు మకర రాశిలోకి ప్రవేశిస్తాడు.'],
+    ['sheaf', 'Harvest', 'పంట', 'It is a harvest festival: new rice is cooked into sweet pongal.', 'ఇది పంటల పండుగ: కొత్త బియ్యంతో తీపి పొంగలి వండుతారు.'],
+    ['fire', 'Bhogi fire', 'భోగి మంట', 'On Bhogi, the first day, old things are burnt in a bonfire.', 'మొదటి రోజు భోగికి పాత వస్తువులను భోగి మంటలో వేస్తారు.'],
+    ['sparkles', 'Muggulu', 'ముగ్గులు', 'Colourful muggulu with gobbemmalu decorate every doorstep.', 'ప్రతి ఇంటి ముందు రంగుల ముగ్గులు, గొబ్బెమ్మలు అలంకరిస్తారు.'],
+    ['ox', 'Kanuma', 'కనుమ', 'On Kanuma, cattle are decorated and thanked for their farm work.', 'కనుమ రోజు పశువులను అలంకరించి, వాటి కష్టానికి కృతజ్ఞత చెబుతారు.']],
+  ugadi: [['seedling', 'New year', 'కొత్త సంవత్సరం', 'Ugadi is the Telugu and Kannada New Year, on the first day of Chaitra.', 'ఉగాది చైత్ర మాసం మొదటి రోజున వచ్చే తెలుగు, కన్నడ కొత్త సంవత్సరం.'],
+    ['mango', 'Raw mango', 'మామిడికాయ', 'Ugadi pachadi mixes six tastes, just like life has many feelings.', 'ఉగాది పచ్చడిలో షడ్రుచులు—జీవితంలోని అన్ని భావాల్లాగే.'],
+    ['calendar', 'Panchangam', 'పంచాంగం', 'People listen to Panchanga Sravanam, the reading of the new year.', 'పంచాంగ శ్రవణం వినడం ఉగాది ఆనవాయితీ.'],
+    ['flatbread', 'Bobbatlu', 'బొబ్బట్లు', 'Bobbatlu, a sweet stuffed flatbread, is a festive favourite.', 'తీపి పూర్ణంతో చేసే బొబ్బట్లు పండుగ ప్రత్యేకం.'],
+    ['hibiscus', 'Mango leaves', 'మామిడి తోరణాలు', 'Doors are decorated with strings of fresh mango leaves.', 'గుమ్మాలకు మామిడి ఆకుల తోరణాలు కడతారు.'],
+    ['sun', 'Spring', 'వసంతం', 'Ugadi comes in spring, when trees grow fresh new leaves.', 'ఉగాది వసంత కాలంలో, చెట్లకు కొత్త చిగుళ్ళు వచ్చే సమయంలో వస్తుంది.']],
+  ganesh: [['elephant', 'Ganesha', 'గణేశుడు', 'Lord Ganesha, the elephant-headed god, removes obstacles.', 'ఏనుగు ముఖం గల వినాయకుడు విఘ్నాలను తొలగిస్తాడు.'],
+    ['candy', 'Undrallu', 'ఉండ్రాళ్ళు', 'Undrallu and kudumulu are made as Ganesha’s favourite treats.', 'వినాయకుడికి ఇష్టమైన ఉండ్రాళ్ళు, కుడుములు చేస్తారు.'],
+    ['seedling', 'Patri', 'పత్రి', 'Twenty-one kinds of leaves, called patri, are offered in the puja.', 'పూజలో 21 రకాల ఆకులు (పత్రి) సమర్పిస్తారు.'],
+    ['moon', 'Moon', 'చంద్రుడు', 'A story says one should not look at the moon on Chavithi night.', 'చవితి రాత్రి చంద్రుణ్ణి చూడకూడదని ఒక కథ చెబుతుంది.'],
+    ['party', 'Pandals', 'మండపాలు', 'Streets put up big pandals with Ganesha idols for many days.', 'వీధుల్లో పెద్ద మండపాల్లో వినాయక విగ్రహాలు పెడతారు.'],
+    ['bubbles', 'Nimajjanam', 'నిమజ్జనం', 'On the last day the idols are immersed in water.', 'చివరి రోజు విగ్రహాలను నీటిలో నిమజ్జనం చేస్తారు.']],
+  dasara: [['bow', 'Victory', 'విజయం', 'Dasara celebrates good winning over evil.', 'దసరా చెడుపై మంచి గెలుపు పండుగ.'],
+    ['diya', 'Navaratri', 'నవరాత్రి', 'Navaratri means nine nights of worship of Goddess Durga.', 'నవరాత్రి అంటే దుర్గాదేవిని పూజించే తొమ్మిది రాత్రులు.'],
+    ['hibiscus', 'Bathukamma', 'బతుకమ్మ', 'In Telangana, women stack flowers into Bathukamma and sing around it.', 'తెలంగాణలో ఆడవాళ్ళు పూలతో బతుకమ్మ పేర్చి చుట్టూ పాటలు పాడతారు.'],
+    ['elephant', 'Jamboo Savari', 'జంబూ సవారీ', 'Mysuru Dasara has a grand procession led by decorated elephants.', 'మైసూరు దసరాలో అలంకరించిన ఏనుగుల గొప్ప ఊరేగింపు జరుగుతుంది.'],
+    ['fire', 'Ravana Dahan', 'రావణ దహనం', 'In North India, huge Ravana effigies are burnt on Vijayadashami.', 'ఉత్తర భారత్‌లో విజయదశమి రోజు పెద్ద రావణ బొమ్మలను దహనం చేస్తారు.'],
+    ['seedling', 'Jammi tree', 'జమ్మి చెట్టు', 'People exchange jammi leaves as gold and wish each other well.', 'జమ్మి ఆకులను బంగారంగా ఇచ్చిపుచ్చుకుని శుభాకాంక్షలు చెప్పుకుంటారు.']],
+  diwali: [['diya', 'Diyas', 'దీపాలు', 'Diwali, the festival of lights, celebrates light over darkness.', 'దీపావళి చీకటిపై వెలుగు గెలుపు పండుగ.'],
+    ['sparkler', 'Sparklers', 'చిచ్చుబుడ్లు', 'Children light sparklers and flowerpots in the evening.', 'సాయంత్రం పిల్లలు చిచ్చుబుడ్లు, కాకరపువ్వొత్తులు కాలుస్తారు.'],
+    ['candy', 'Sweets', 'స్వీట్లు', 'Families share sweets with friends and neighbours.', 'కుటుంబాలు స్నేహితులు, ఇరుగుపొరుగుతో స్వీట్లు పంచుకుంటారు.'],
+    ['sparkles', 'Rangoli', 'రంగోలి', 'Bright rangoli designs welcome guests at the door.', 'రంగుల రంగోలి గుమ్మం దగ్గర అతిథులకు స్వాగతం చెబుతుంది.'],
+    ['moneybag', 'Lakshmi Puja', 'లక్ష్మీ పూజ', 'Lakshmi Puja is done for wealth and good luck.', 'సంపద, శుభం కోసం లక్ష్మీ పూజ చేస్తారు.'],
+    ['firecracker', 'Naraka Chaturdashi', 'నరక చతుర్దశి', 'The day before is Naraka Chaturdashi, when Krishna and Satyabhama defeated Narakasura.', 'ముందు రోజు నరక చతుర్దశి—శ్రీకృష్ణుడు, సత్యభామ నరకాసురుణ్ణి ఓడించిన రోజు.']],
+  christmas: [['xmas', 'Christmas tree', 'క్రిస్మస్ చెట్టు', 'Homes put up a Christmas tree with lights and decorations.', 'ఇళ్ళలో లైట్లు, అలంకరణలతో క్రిస్మస్ చెట్టు పెడతారు.'],
+    ['star', 'Star', 'నక్షత్రం', 'Christmas stars recall the star that led the wise men to baby Jesus.', 'క్రిస్మస్ నక్షత్రం జ్ఞానులను బాల యేసు దగ్గరికి నడిపిన తారను గుర్తు చేస్తుంది.'],
+    ['church', 'Midnight mass', 'అర్ధరాత్రి ప్రార్థన', 'Many people go to church for prayers at midnight.', 'చాలామంది అర్ధరాత్రి ప్రార్థనలకు చర్చికి వెళ్తారు.'],
+    ['bell', 'Bells', 'గంటలు', 'Church bells ring out to celebrate the birth of Jesus.', 'యేసు పుట్టుక సందర్భంగా చర్చి గంటలు మోగుతాయి.'],
+    ['gift', 'Gifts', 'కానుకలు', 'Santa Claus is said to bring gifts for children.', 'పిల్లలకు శాంటా క్లాజ్ కానుకలు తెస్తాడని చెబుతారు.'],
+    ['bakery', 'Plum cake', 'ప్లమ్ కేక్', 'Plum cake is a Christmas favourite across India.', 'భారతదేశమంతటా ప్లమ్ కేక్ క్రిస్మస్ ప్రత్యేకం.']],
+};
+function festItems(fid) { return (FEST_STICKERS[fid] || []).map(([icon, en, te, fen, fte], k) => ({ id: `f:${fid}-${k}`, icon, name: [en, te], fact: [fen, fte] })); }
+function festState() { if (!S.fest) S.fest = { have: {}, claimed: {}, day: '' }; return S.fest; }
+function festNow() { const a = activeFestival(); return a && FEST_STICKERS[a.fest.id] ? a : null; }
+function festGive(n) {
+  const a = festNow(); if (!a) return [];
+  const F = festState(), items = festItems(a.fest.id), got = [];
+  for (let i = 0; i < n; i++) {
+    // usually a sticker you still need, sometimes a duplicate
+    const missing = items.filter(x => !F.have[x.id]);
+    const pick = missing.length && Math.random() < 0.6 ? missing[Math.floor(Math.random() * missing.length)] : items[Math.floor(Math.random() * items.length)];
+    F.have[pick.id] = (F.have[pick.id] || 0) + 1; got.push(pick);
+  }
+  return got;
+}
+function festDone(fid) { const F = festState(); return festItems(fid).every(x => F.have[x.id]); }
+function festPrize() { return { coins: Math.round(30000 * cityScale() / 100) * 100, gems: 30, energy: 25, packs: 2 }; }
+function festCardHtml(s, isNew) { return `<div class="pk-card fest ${isNew ? 'new' : ''}">${isNew ? `<em>${tr('NEW!', 'కొత్తది!')}</em>` : ''}${ico(s.icon)}<b>${tr(...s.name)}</b><small>🎉</small></div>`; }
+function festSectionHtml() {
+  const a = festNow(); if (!a) return '';
+  const f = a.fest, F = festState(), items = festItems(f.id), n = items.filter(x => F.have[x.id]).length, r = festPrize();
+  const free = F.day !== dayKey(), done = festDone(f.id), claimed = F.claimed[f.id];
+  return `<div class="fest-album"><div class="fa-head">${ico(f.icon)}<b>${tr(`${f.name[0]} album`, `${f.name[1]} ఆల్బమ్`)}</b><span>${n}/${items.length}</span><small>${tr('ends in', 'ముగింపు')} ${fmtDur((a.end - Date.now()) / 1000)}</small></div>
+    <p class="sub">${tr('Limited time! Every pack adds a festival sticker. Tap a sticker to learn about the festival.', 'కొద్ది రోజులు మాత్రమే! ప్రతి ప్యాక్‌లో ఒక పండుగ స్టిక్కర్. స్టిక్కర్ నొక్కి పండుగ గురించి తెలుసుకోండి.')}</p>
+    <div class="fa-grid">${items.map(x => `<button class="stk ${F.have[x.id] ? 's3 fest' : 'missing'}" data-act="fest-fact" data-id="${x.id}">${ico(x.icon)}<b>${F.have[x.id] ? tr(...x.name) : '?'}</b></button>`).join('')}</div>
+    <div class="fa-foot">${claimed ? '✅ ' + tr('Festival prize collected!', 'పండుగ బహుమతి తీసుకున్నారు!')
+      : done ? `<button class="btn gold" data-act="fest-claim">${ico('gift')} ${tr('Claim festival prize', 'పండుగ బహుమతి తీసుకో')}</button>`
+      : `${tr('Prize', 'బహుమతి')}: ${ico('coin')} ${fmtInt(r.coins)} · 💎 ${r.gems} · ⚡ ${r.energy} · ${ico('pack')} ${r.packs}`}
+      ${free ? `<button class="btn blue" data-act="fest-pack">${ico('gift')} ${tr('Free festival pack', 'ఫ్రీ పండుగ ప్యాక్')}</button>` : ''}</div></div>`;
+}
+function openFestPack() {
+  const F = festState(); if (!festNow() || F.day === dayKey()) return;
+  F.day = dayKey();
+  const before = { ...F.have }, got = festGive(2);
+  save(); sfx('case');
+  modal(`<h3>${ico('gift')} ${tr('Festival pack', 'పండుగ ప్యాక్')}</h3><div class="pk-row">${got.map(s => festCardHtml(s, !before[s.id])).join('')}</div>
+    <div class="fact-card"><b>${ico('book')} ${tr('Did you know?', 'మీకు తెలుసా?')}</b><p>${tr(...got[0].fact)}</p></div>
+    <div class="modal-actions"><button class="btn gold" data-act="close">${tr('Great!', 'సూపర్!')}</button></div>`);
+  if (activeTab === 'album') renderTab();
+}
+function festFact(id) {
+  const fid = id.slice(2).split('-')[0], s = festItems(fid).find(x => x.id === id);
+  if (!s) return;
+  if (!festState().have[id]) { toast(tr('Collect this sticker to learn its fact!', 'ఈ స్టిక్కర్ సేకరిస్తే దాని విశేషం తెలుస్తుంది!'), 'info'); return; }
+  SlotFX.press();
+  modal(`<div class="lm-info-head">${ico(s.icon, 'big-ico')}<div><h3>${tr(...s.name)}</h3></div></div>
+    <div class="fact-card"><b>${ico('book')} ${tr('Did you know?', 'మీకు తెలుసా?')}</b><p>${tr(...s.fact)}</p></div>
+    <div class="modal-actions"><button class="btn gold" data-act="close">${tr('OK', 'సరే')}</button></div>`);
+}
+function claimFest(el) {
+  const a = festNow(); if (!a) return;
+  const F = festState(), fid = a.fest.id;
+  if (F.claimed[fid] || !festDone(fid)) return;
+  const r = festPrize();
+  F.claimed[fid] = true; earn(r.coins); S.gems += r.gems; S.slot.energy += r.energy; S.album.packs.gold += r.packs;
+  flyTo('coins', el, 'coin', 8); flyTo('gems', el, 'gem', 5, 120); flyTo('pack', el, 'pack', 2, 240);
+  SlotFX.jackpot(); confetti(el, 200); save(); updateHeader();
+  toast(tr(`🎉 ${a.fest.name[0]} album complete! +${fmtInt(r.coins)} coins, +${r.gems} 💎`, `🎉 ${a.fest.name[1]} ఆల్బమ్ పూర్తి! +${fmtInt(r.coins)} కాయిన్లు, +${r.gems} 💎`), 'gem');
+  if (activeTab === 'album') renderTab();
+}
 function renderAlbum() {
   const A = S.album, all = allStickers(), owned = all.filter(s => stickerHave(s.id)).length;
   markFinishedSets();
@@ -4155,7 +4261,7 @@ function renderAlbum() {
   const done = seasonDone();
   return header('album', tr(`Sticker Album · ${seasonInfo().name[0]}`, `స్టిక్కర్ ఆల్బమ్ · ${seasonInfo().name[1]}`),
     tr(`Album ${albumSeason() + 1}: collect all ${all.length} stickers. Finish a set, then tap <b>Claim</b> for its prize. Finish the album to unlock a brand new one!`, `ఆల్బమ్ ${albumSeason() + 1}: మొత్తం ${all.length} స్టిక్కర్లు సేకరించండి. సెట్ పూర్తయ్యాక <b>తీసుకో</b> నొక్కి బహుమతి పొందండి. ఆల్బమ్ పూర్తయితే కొత్తది వస్తుంది!`)) +
-    (done ? `<div class="season-banner">${ico('trophy')}<b>${tr('Album complete!', 'ఆల్బమ్ పూర్తి!')}</b><button class="btn gold" data-act="season-open">${tr('Claim & start new album', 'తీసుకుని కొత్త ఆల్బమ్')}</button></div>` : '') +
+    festSectionHtml() + (done ? `<div class="season-banner">${ico('trophy')}<b>${tr('Album complete!', 'ఆల్బమ్ పూర్తి!')}</b><button class="btn gold" data-act="season-open">${tr('Claim & start new album', 'తీసుకుని కొత్త ఆల్బమ్')}</button></div>` : '') +
     `<div class="album-top"><div class="slot-stat">${ico('album')}<b>${owned}</b><small>/ ${all.length}</small></div>
       <div class="slot-stat stars">⭐<b>${A.stars}</b><small>${tr('stars from duplicates', 'డూప్లికేట్ల స్టార్లు')}</small>
         <button class="btn ghost" data-act="star-trade" ${A.stars < STAR_TRADE ? 'disabled' : ''}>${STAR_TRADE}⭐ → ${ico('pack')}</button></div>
@@ -5055,7 +5161,7 @@ function updateDots() {
   $('dot-spin').classList.toggle('on', spinReady());
   $('dot-scratch').classList.toggle('on', scratchFreeReady());
   slotRegen(); $('dot-slots').classList.toggle('on', S.slot.energy >= slotMax() || giftReady() || calReady() || S.raid.tokens > 0 || helpLeft());
-  $('dot-album').classList.toggle('on', S.album.packs.basic + S.album.packs.gold > 0 || setsReady() > 0 || seasonDone());
+  $('dot-album').classList.toggle('on', S.album.packs.basic + S.album.packs.gold > 0 || setsReady() > 0 || seasonDone() || (!!festNow() && (festState().day !== dayKey() || (festDone(festNow().fest.id) && !festState().claimed[festNow().fest.id]))));
   $('dot-build').classList.toggle('on', !allCitiesDone() && S.cash >= nextTaskCost());
   const hasPets = Object.keys(S.pets.owned).length > 0;
   $('dot-pets').classList.toggle('on', hasPets ? (petsHungry() && petFeedReady()) : PETS.some(p => p.cost.cash ? S.cash >= p.cost.cash : false));
@@ -5201,6 +5307,9 @@ document.addEventListener('click', e => {
     case 'help-go': helpGo(+id); break;
     case 'pack-open': openPack(id); break;
     case 'set-claim': claimSet(id, el); break;
+    case 'fest-fact': festFact(id); break;
+    case 'fest-pack': openFestPack(); break;
+    case 'fest-claim': claimFest(el); break;
     case 'trade-open': openTrade('swap'); break;
     case 'trade-tab': openTrade(id); break;
     case 'trade-swap': swapSticker(id); break;

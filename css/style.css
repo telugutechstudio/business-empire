@@ -1421,3 +1421,13 @@ body.biz-off .cash-wrap { flex: 0 1 auto; width: auto; max-width: 340px; min-wid
 .fact-card b .speak-btn { margin-left: auto; } .st-head .speak-btn { margin: 6px 0 0; }
 .city-fact + .speak-btn { margin: -4px auto 6px; display: flex; width: max-content; }
 .st-head .speak-btn { display: flex; width: max-content; }
+
+/* ---------- Festival album ---------- */
+.fest-album { margin: 0 0 14px; padding: 12px 14px; border-radius: 18px; border: 2px solid #ff9a3d; background: linear-gradient(135deg, #8a1d5a, #4a1a8a); box-shadow: 0 0 22px rgba(255, 150, 60, .35); }
+.fa-head { display: flex; align-items: center; gap: 8px; } .fa-head .i3d { width: 36px; height: 36px; } .fa-head b { font-size: 18px; color: #ffe066; }
+.fa-head span { font-weight: 800; } .fa-head small { margin-left: auto; color: #ffd0e8; }
+.fa-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin: 8px 0; }
+.fa-grid .stk { font: inherit; color: inherit; cursor: pointer; } .stk.fest { border-color: #ff9a3d !important; background: linear-gradient(180deg, #fff3e0, #ffd8a8) !important; color: #4a2000; }
+.fa-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 13px; } .fa-foot .i3d { width: 18px; height: 18px; vertical-align: -4px; }
+.pk-card.fest { border-color: #ff9a3d; background: linear-gradient(180deg, #fff3e0, #ffc88a); }
+@media (max-width: 640px) { .fa-grid { grid-template-columns: repeat(3, 1fr); } }
