@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '4.8';
+const GAME_VERSION = '4.9';
 const BIZ_OFF = true; // businesses, managers, upgrades, investors, stocks and worlds are switched off
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
@@ -291,7 +291,7 @@ function defaultState() {
     spin: { freeAt: 0 },
     player: { id: '', name: '' },
     cloud: { code: '', lastSync: 0 },
-    tutorial: { step: 0, done: BIZ_OFF },
+    tutorial: { step: 0, done: false, v: 2 },
     bizOff: BIZ_OFF,
     festivals: {},
     challenge: null,
@@ -365,7 +365,7 @@ function mergeState(saved) {
   // Players from before the tutorial existed don't need it
   // Switching an old save over: business cash goes away, Spin Game coins become the cash
   if (BIZ_OFF && !saved.bizOff) { out.cash = Math.floor((saved.slot && saved.slot.coins) || 0); out.bizOff = true; }
-  out.tutorial = BIZ_OFF ? { step: 0, done: true } : saved.tutorial ? Object.assign({ step: 0, done: false }, saved.tutorial) : { step: 0, done: (+saved.lifetime || 0) > 5000 };
+  out.tutorial = BIZ_OFF ? (saved.tutorial && saved.tutorial.v === 2 ? Object.assign({ step: 0, done: false, v: 2 }, saved.tutorial) : { step: 0, done: false, v: 2 }) : saved.tutorial ? Object.assign({ step: 0, done: false }, saved.tutorial) : { step: 0, done: (+saved.lifetime || 0) > 5000 };
   out.world = WORLDS.some(w => w.id === saved.world) ? saved.world : 'earth';
   out.worldsUnlocked = Object.assign({ earth: true }, saved.worldsUnlocked || {});
   out.worldRuns = {};
@@ -2344,6 +2344,7 @@ function updateSlotLive() {
 }
 function slotSetBet() {
   if (slotBusy) return;
+  S.tutorial.betTaps = (S.tutorial.betTaps || 0) + 1;
   const a = availBets(), i = a.indexOf(S.slot.bet);
   S.slot.bet = a[(i + 1) % a.length];
   const nextLock = SLOT_BETS.find(b => !a.includes(b));
@@ -3974,38 +3975,61 @@ function renderPets() {
 }
 
 /* ---------------------------- TUTORIAL ------------------------------ */
-// Short guided start. Each step points at one thing and moves on when the player has done it.
+// Short guided start through the Spin Game, Landmarks and Album.
+const q = sel => document.querySelector(sel);
+const tabBtn = tab => [...document.querySelectorAll(`.tab-btn[data-tab=${tab}]`)].find(b => b.getBoundingClientRect().width) || null;
+// Each step lives on one tab, points at one thing, and moves on when the player has done it (or taps Next).
+// `m` is a snapshot taken when the step starts, so a replayed tutorial still waits for a fresh action.
 const TUTORIAL = [
-  { target: () => cards[0] && cards[0].el.querySelector('.biz-icon'), done: () => S.stats.clicks >= 1,
-    text: ['Tap your Tea Stall to make money!', 'డబ్బు సంపాదించడానికి మీ టీ స్టాల్ ట్యాప్ చేయండి!'] },
-  { target: () => cards[0] && cards[0].buyBtn, done: () => S.biz[0].owned >= 3,
-    text: ['Buy more Tea Stalls — more stalls, more money.', 'ఇంకా టీ స్టాల్స్ కొనండి — ఎక్కువ స్టాల్స్, ఎక్కువ డబ్బు.'] },
-  { target: () => cards[1] && (S.cash >= costFor(1, 1) ? cards[1].buyBtn : cards[0].el.querySelector('.biz-icon')), done: () => S.biz[1].owned >= 1,
-    text: ['Save 60 cash and unlock the Food Truck!', '60 క్యాష్ కూడబెట్టి ఫుడ్ ట్రక్ అన్‌లాక్ చేయండి!'] },
-  { target: () => activeTab === 'managers' ? document.querySelector('#tab-managers [data-act=hire]') : document.querySelector('.tab-btn[data-tab=managers]'),
-    done: () => S.biz.some(b => b.manager),
-    text: ['Hire a manager (1K) — they run your business for you, even offline!', 'మేనేజర్‌ను నియమించండి (1K) — మీ బదులు వ్యాపారం నడుపుతారు, ఆఫ్‌లైన్‌లో కూడా!'] },
-  { target: () => document.querySelector('.tab-btn[data-tab=missions]'), done: () => false, finish: true,
-    text: ['Great job, boss! Do Missions, claim Daily rewards and spin the wheel for gems.', 'సూపర్ బాస్! మిషన్లు చేయండి, డైలీ రివార్డ్ తీసుకోండి, జెమ్స్ కోసం వీల్ తిప్పండి.'] },
+  { tab: 'slots', target: () => q('#slotSpinBtn'), done: m => (S.stats.slotSpins || 0) > m.spins,
+    text: ['Tap SPIN! Three coins in a row pay the most. Hold the button for auto spin.', 'స్పిన్ నొక్కండి! మూడు కాయిన్లు వరుసగా వస్తే పెద్ద బహుమతి. బటన్ పట్టుకుంటే ఆటో స్పిన్.'] },
+  { tab: 'slots', target: () => q('#slotBetBtn'), done: m => S.tutorial.betTaps > m.betTaps,
+    text: ['Tap BET to multiply every prize (it uses more energy too). Bigger bets up to ×800 unlock as your energy grows.', 'బెట్ నొక్కితే ప్రతి బహుమతి గుణించబడుతుంది (ఎనర్జీ కూడా ఎక్కువ ఖర్చు). ఎనర్జీ పెరిగే కొద్దీ ×800 వరకు బెట్లు తెరుచుకుంటాయి.'] },
+  { tab: 'slots', target: () => q('#railLeft'), next: true,
+    text: ['Side buttons: Boss fights, weekly Event, Village raids, Piggy bank, free Gifts and Daily energy. A red dot means something is ready!', 'పక్క బటన్లు: బాస్ ఫైట్, వారపు ఈవెంట్, ఊరి దాడులు, పిగ్గీ బ్యాంక్, ఫ్రీ గిఫ్ట్, రోజూ ఎనర్జీ. ఎర్ర చుక్క ఉంటే ఏదో సిద్ధంగా ఉంది!'] },
+  { tab: 'build', target: () => q('.tc-build') || q('#buildView'), done: m => Object.keys(S.city.done).length > m.built || S.city.i > m.city,
+    text: ['Spend coins to build your city! Tap a glowing + tile on the island, then tap Build.', 'కాయిన్లతో మీ నగరం కట్టండి! ద్వీపంపై మెరిసే + టైల్ నొక్కి, తర్వాత కట్టు నొక్కండి.'] },
+  { tab: 'build', target: () => q('.bv-top'), next: true,
+    text: ['MAP shows your trip across India. Learn 📖 has a fact and a quiz for every landmark—right answers win gems!', 'మ్యాప్‌లో భారతదేశ యాత్ర కనిపిస్తుంది. నేర్చుకో 📖 లో ప్రతి కట్టడానికి ఫ్యాక్ట్, క్విజ్—సరైన జవాబుకి జెమ్స్!'] },
+  { tab: 'album', target: () => q('.pack-row'), next: true,
+    text: ['Open sticker packs here. Finish a set of 9 and tap Claim for its prize. A full album unlocks a brand new one!', 'ఇక్కడ స్టిక్కర్ ప్యాక్‌లు తెరవండి. 9 స్టిక్కర్ల సెట్ పూర్తయితే తీసుకో నొక్కి బహుమతి పొందండి. ఆల్బమ్ పూర్తయితే కొత్తది వస్తుంది!'] },
+  { tab: 'slots', target: () => tabBtn('missions'), finish: true,
+    text: ['You are ready, boss! Do Missions for gems and come back daily—energy refills every 6 minutes.', 'మీరు రెడీ బాస్! జెమ్స్ కోసం మిషన్లు చేయండి, రోజూ రండి—ప్రతి 6 నిమిషాలకు ఎనర్జీ నిండుతుంది.'] },
 ];
+const tutSnap = () => ({ spins: S.stats.slotSpins || 0, betTaps: S.tutorial.betTaps || 0, built: Object.keys(S.city.done).length, city: S.city.i });
 let tutFocus = null;
 function updateTutorial() {
   const box = $('tutor');
-  const off = S.tutorial.done || S.world !== 'earth' || !$('modal').classList.contains('hidden');
-  if (off) { box.classList.add('hidden'); setTutFocus(null); return; }
+  const off = S.tutorial.done || !$('modal').classList.contains('hidden');
+  if (off) { box.classList.add('hidden'); setTutFocus(null); $('tutHand').classList.add('hidden'); return; }
+  S.tutorial.betTaps = S.tutorial.betTaps || 0;
+  if (!S.tutorial.m) S.tutorial.m = tutSnap();
   let st = TUTORIAL[S.tutorial.step];
-  while (st && st.done()) { S.tutorial.step++; st = TUTORIAL[S.tutorial.step]; sfx('cash'); }
-  if (!st) { S.tutorial.done = true; box.classList.add('hidden'); setTutFocus(null); return; }
-  // On the wrong tab, point back at Businesses first
-  const onRightTab = st.finish || activeTab === 'business' || (S.tutorial.step === 3 && activeTab === 'managers');
-  const target = onRightTab ? st.target() : document.querySelector('.tab-btn[data-tab=business]');
+  while (st && st.done && st.done(S.tutorial.m)) { tutAdvance(); st = TUTORIAL[S.tutorial.step]; sfx('cash'); }
+  if (!st) { endTutorial(); return; }
+  // On the wrong tab, point at the tab button first
+  const onTab = activeTab === st.tab;
+  const target = onTab ? st.target() : tabBtn(st.tab);
   setTutFocus(target);
   box.classList.remove('hidden');
-  setHTML($('tutorText'), `<b>${tr('Step', 'స్టెప్')} ${S.tutorial.step + 1}/${TUTORIAL.length}</b> ${tr(...st.text)}`);
-  $('tutorNext').classList.toggle('hidden', !st.finish);
-  $('tutorNext').textContent = tr('Finish', 'పూర్తి');
+  setHTML($('tutorText'), `<b>${tr('Step', 'స్టెప్')} ${S.tutorial.step + 1}/${TUTORIAL.length}</b> ${onTab ? tr(...st.text) : tr(`Open ${{ slots: 'Spin Game', build: 'Landmarks', album: 'Album' }[st.tab]} first.`, `ముందు ${{ slots: 'స్పిన్ గేమ్', build: 'ల్యాండ్‌మార్కులు', album: 'ఆల్బమ్' }[st.tab]} తెరవండి.`)}`);
+  const showNext = onTab && (st.next || st.finish);
+  $('tutorNext').classList.toggle('hidden', !showNext);
+  $('tutorNext').textContent = st.finish ? tr('Finish', 'పూర్తి') : tr('Next', 'తర్వాత');
   $('tutorSkip').textContent = tr('Skip', 'స్కిప్');
+  // Keep the help box away from what it points at
+  const r = target && target.getBoundingClientRect();
+  box.classList.toggle('top', !!(r && r.width && r.top + r.height / 2 > innerHeight * 0.5));
   placeHand(target);
+}
+function tutAdvance() { S.tutorial.step++; S.tutorial.m = tutSnap(); save(); }
+function tutNext() {
+  const st = TUTORIAL[S.tutorial.step];
+  if (st && st.finish) { endTutorial(); return; }
+  tutAdvance(); SlotFX.press();
+  const nx = TUTORIAL[S.tutorial.step];
+  if (nx && nx.tab !== activeTab && (st.tab !== nx.tab)) switchTab(nx.tab);
+  updateTutorial();
 }
 function setTutFocus(el) {
   if (tutFocus === el) return;
@@ -4786,8 +4810,9 @@ document.addEventListener('click', e => {
     case 'pet-feed': feedPets(); renderTab(); break;
     case 'festival': if (activeFestival()) modal(festivalHtml()); break;
     case 'fest-claim': claimFestival(); closeModal(); break;
-    case 'tut-skip': case 'tut-next': endTutorial(); break;
-    case 'tut-replay': S.tutorial = { step: 0, done: false }; switchTab(BIZ_OFF ? 'slots' : 'business'); toast(tr('📖 Tutorial restarted!', '📖 ట్యుటోరియల్ మళ్ళీ మొదలైంది!'), 'good'); break;
+    case 'tut-skip': endTutorial(); break;
+    case 'tut-next': tutNext(); break;
+    case 'tut-replay': S.tutorial = { step: 0, done: false, v: 2 }; switchTab(BIZ_OFF ? 'slots' : 'business'); toast(tr('📖 Tutorial restarted!', '📖 ట్యుటోరియల్ మళ్ళీ మొదలైంది!'), 'good'); break;
     case 'share': shareGame(); break;
     case 'share-done': shareDone(); closeModal(); break;
     case 'share-copy': copyText(challengeUrl()); shareDone(); break;
