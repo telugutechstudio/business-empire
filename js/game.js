@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '3.5';
+const GAME_VERSION = '3.6';
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
 let S = null; // game state, initialised below
@@ -295,7 +295,7 @@ function defaultState() {
     tour: { week: '', base: 0, posted: false, pending: '', rewarded: {} },
     stocks: {},
     scratch: { day: '', card: null },
-    slot: { energy: 30, at: 0, bet: 1, coins: 0, piggy: 0, gift: { at: 0, chest: 0 }, cal: { last: '', streak: 0 } },
+    slot: { energy: 30, at: 0, bet: 1, coins: 0, piggy: 0, gift: { at: 0, chest: 0 }, cal: { last: '', streak: 0 }, boss: { lvl: 1, hp: 300 }, col: { week: '', n: 0, got: 0, item: 0 } },
     build: { done: 0, stage: 0, view: null },
     stats: { clicks: 0, briefcases: 0, prestiges: 0, upgradesBought: 0, playTime: 0, bestRun: 0, missionsDone: 0, spins: 0, dailyClaims: 0, shares: 0 },
     boosts: { hype: 0, hypeCd: 0, rush: 0, golden: 0 },
@@ -344,6 +344,8 @@ function mergeState(saved) {
   out.slot = Object.assign({ energy: 30, at: 0, bet: 1, coins: 0, piggy: 0 }, saved.slot || {});
   out.slot.gift = Object.assign({ at: 0, chest: 0 }, out.slot.gift || {});
   out.slot.cal = Object.assign({ last: '', streak: 0 }, out.slot.cal || {});
+  out.slot.boss = Object.assign({ lvl: 1, hp: 300 }, out.slot.boss || {});
+  out.slot.col = Object.assign({ week: '', n: 0, got: 0, item: 0 }, out.slot.col || {});
   out.stocks = saved.stocks && typeof saved.stocks === 'object' ? saved.stocks : {};
   out.pets = Object.assign({ owned: {}, fedAt: 0 }, saved.pets || {});
   out.challenge = saved.challenge && typeof saved.challenge === 'object' ? saved.challenge : null;
@@ -1696,7 +1698,7 @@ function revealScratch() {
 // Energy refills over time; each spin costs energy times the bet and pays coins, cash, gems or energy.
 const SLOT_MAX = 50, SLOT_REGEN = 6 * 60 * 1000, SLOT_BETS = [1, 2, 3, 5, 10], PIGGY_GEMS = 10, PIGGY_CAP = 250000;
 const SLOT_SYMS = [
-  { k: 'coin', w: 30 }, { k: 'cherry', w: 22 }, { k: 'moneybag', w: 16 }, { k: 'bolt', w: 12 }, { k: 'pig', w: 8 }, { k: 'gem', w: 6 },
+  { k: 'coin', w: 30 }, { k: 'cherry', w: 22 }, { k: 'moneybag', w: 16 }, { k: 'bolt', w: 12 }, { k: 'pig', w: 8 }, { k: 'gem', w: 6 }, { k: 'swords', w: 14 },
 ];
 const SLOT_CELL = 88; // px height of one symbol on a reel
 let slotBusy = false, slotAuto = false;
@@ -1732,6 +1734,7 @@ function slotPrize(line, bet) {
     if (top === 'moneybag') p.cash = bonusCash(90 * bet);
     if (top === 'bolt') p.energy = bet;
     if (top === 'pig' || top === 'gem') p.coins = 1000 * bet;
+    if (top === 'swords') p.small = false;
   } else p.coins = 500 * bet; // a little something every spin
   return p;
 }
@@ -1743,6 +1746,7 @@ function slotPaytableHtml() {
     ['bolt', tr('+10 energy', '+10 ఎనర్జీ'), tr('energy back', 'ఎనర్జీ తిరిగి')],
     ['pig', tr('Piggy bank opens free!', 'పిగ్గీ బ్యాంక్ ఫ్రీగా తెరుచుకుంటుంది!'), tr('1,000 coins', '1,000 కాయిన్లు')],
     ['gem', tr('3 gems', '3 జెమ్స్'), tr('1,000 coins', '1,000 కాయిన్లు')],
+    ['swords', tr('Critical hit: 100 × bet damage', 'క్రిటికల్ హిట్: 100 × బెట్ దెబ్బ'), tr('Each ⚔️ hits the boss for 10 × bet', 'ప్రతి ⚔️ బాస్‌కి 10 × బెట్ దెబ్బ')],
   ];
   return `<div class="paytable"><div class="pt-head"><span>${tr('Symbol', 'గుర్తు')}</span><span>×3</span><span>×2</span></div>` +
     rows.map(([k, a, b]) => `<div class="pt-row"><span>${ico(k)}${ico(k)}${ico(k)}</span><span>${a}</span><span>${b}</span></div>`).join('') +
@@ -1757,11 +1761,12 @@ function renderSlots() {
   slotRegen();
   const sl = S.slot, last = sl.last || ['coin', 'cherry', 'moneybag'];
   const piggyPct = Math.min(100, sl.piggy / PIGGY_CAP * 100);
-  return header('slot', tr('Spin Game', 'స్పిన్ గేమ్'), tr('Spend energy to spin. Coins will build landmarks soon; cash and gems help your businesses.', 'ఎనర్జీతో స్పిన్ చేయండి. కాయిన్లతో త్వరలో ల్యాండ్‌మార్కులు కడతారు; క్యాష్, జెమ్స్ మీ వ్యాపారాలకు.')) +
+  return header('slot', tr('Spin Game', 'స్పిన్ గేమ్'), tr('Spend energy to spin. Coins build Landmarks, ⚔️ hits the boss, and cash and gems help your businesses.', 'ఎనర్జీతో స్పిన్ చేయండి. కాయిన్లతో ల్యాండ్‌మార్కులు కడతారు, ⚔️ బాస్‌ని కొడుతుంది, క్యాష్, జెమ్స్ మీ వ్యాపారాలకు.')) +
     `<div class="slot-top">
       <div class="slot-stat">${ico('battery')}<b id="slotEnergy">${sl.energy}</b><small>/ ${SLOT_MAX}</small><em id="slotTimer"></em></div>
       <div class="slot-stat coins">${ico('coin')}<b id="slotCoins">${fmtInt(sl.coins)}</b><small>${tr('coins', 'కాయిన్లు')}</small></div>
     </div>
+    <div class="event-row">${bossCardHtml()}${colCardHtml()}</div>
     <div class="slot-machine">
       <div class="slot-lights"></div>
       <div class="reels">${last.map((k, i) => reelHtml(k, i)).join('')}<div class="payline"></div></div>
@@ -1836,6 +1841,102 @@ function claimCalendar() {
   sfx('win'); toast(msg, 'good');
   save(); renderTab();
 }
+// ---- Boss battle: ⚔️ on the reels hits the boss; beat it for coins, gems and energy ----
+const BOSSES = [
+  { icon: 'alienm', name: ['Space Pirate', 'స్పేస్ పైరేట్'] },
+  { icon: 'robot', name: ['Robo Raider', 'రోబో రైడర్'] },
+  { icon: 'lion', name: ['Jungle King', 'అడవి రాజు'] },
+  { icon: 'ufo', name: ['UFO Boss', 'యూఎఫ్‌ఓ బాస్'] },
+  { icon: 'dragon', name: ['Gold Dragon', 'బంగారు డ్రాగన్'] },
+];
+function bossMaxHp(lvl) { return Math.round(300 * Math.pow(1.6, lvl - 1) / 10) * 10; }
+function bossOf(lvl) { return BOSSES[(lvl - 1) % BOSSES.length]; }
+function bossReward(lvl) { return { coins: 30000 * lvl, gems: 4 + lvl, energy: 15 }; }
+function bossCardHtml() {
+  const b = S.slot.boss, B = bossOf(b.lvl), max = bossMaxHp(b.lvl), r = bossReward(b.lvl);
+  return `<div class="boss-card" id="bossCard">
+    <div class="boss-side you">${ico('manager')}<small>${tr('You', 'మీరు')}</small></div>
+    <div class="boss-mid">
+      <div class="boss-name">${ico('swords')} ${tr(...B.name)} <span>${tr('Lv', 'లెవల్')} ${b.lvl}</span></div>
+      <div class="boss-hp"><div style="width:${Math.max(0, b.hp) / max * 100}%"></div><b>${fmtInt(Math.max(0, b.hp))} / ${fmtInt(max)}</b></div>
+      <div class="boss-prize">${tr('Win', 'గెలిస్తే')}: ${ico('coin')} ${fmtInt(r.coins)} · 💎 ${r.gems} · ⚡ ${r.energy}</div>
+    </div>
+    <div class="boss-side foe" id="bossFoe">${ico(B.icon)}</div>
+  </div>`;
+}
+// Each ⚔️ deals 10 × bet; three of them are a critical hit for 100 × bet
+function slotBattle(line, bet) {
+  const n = line.filter(k => k === 'swords').length;
+  if (!n) return '';
+  const b = S.slot.boss, dmg = (n === 3 ? 100 : 10 * n) * bet;
+  b.hp -= dmg;
+  const foe = $('bossFoe');
+  if (foe) {
+    restartAnim(foe, 'shake');
+    const f = document.createElement('span'); f.className = 'dmg-float'; f.textContent = `-${fmtInt(dmg)}`;
+    foe.appendChild(f); setTimeout(() => f.remove(), 1100);
+  }
+  sfx(n === 3 ? 'big' : 'err');
+  let msg = n === 3 ? tr(`⚔️ Critical hit! -${fmtInt(dmg)}`, `⚔️ క్రిటికల్ హిట్! -${fmtInt(dmg)}`) : `⚔️ -${fmtInt(dmg)}`;
+  if (b.hp <= 0) {
+    const B = bossOf(b.lvl), r = bossReward(b.lvl);
+    S.slot.coins += r.coins; S.gems += r.gems; S.slot.energy += r.energy;
+    S.stats.bosses = (S.stats.bosses || 0) + 1;
+    msg = tr(`🏆 ${B.name[0]} defeated! +${fmtInt(r.coins)} coins, +${r.gems} 💎, +${r.energy} ⚡`, `🏆 ${B.name[1]} ఓడిపోయాడు! +${fmtInt(r.coins)} కాయిన్లు, +${r.gems} 💎, +${r.energy} ⚡`);
+    b.lvl++; b.hp = bossMaxHp(b.lvl);
+    setTimeout(() => { toast(msg, 'good'); sfx('win'); confetti($('bossCard'), 160); }, 300);
+  }
+  return msg;
+}
+// ---- Weekly collection: every spin collects the week's item; milestones pay out ----
+const COL_ITEMS = [
+  { icon: 'mango', name: ['Mango harvest', 'మామిడి పంట'] },
+  { icon: 'lotus', name: ['Lotus pond', 'కమలాల కొలను'] },
+  { icon: 'kite', name: ['Kite festival', 'గాలిపటాల పండుగ'] },
+  { icon: 'diya', name: ['Festival of lights', 'దీపాల పండుగ'] },
+];
+const COL_STEPS = [
+  { at: 100, energy: 10 }, { at: 300, coins: 25000 }, { at: 600, gems: 5 }, { at: 1000, energy: 30 }, { at: 1500, coins: 120000, gems: 15 },
+];
+function colWeek() {
+  const C = S.slot.col, wk = tourWeekKey();
+  if (C.week !== wk) { C.week = wk; C.n = 0; C.got = 0; C.item = (Math.floor(tourWeekStart() / (7 * 86400000)) % COL_ITEMS.length + COL_ITEMS.length) % COL_ITEMS.length; }
+  return COL_ITEMS[C.item];
+}
+function colCardHtml() {
+  const C = S.slot.col, it = colWeek(), max = COL_STEPS[COL_STEPS.length - 1].at;
+  const marks = COL_STEPS.map((st, k) => `<i class="${k < C.got ? 'got' : ''}" style="left:${st.at / max * 100}%" title="${st.at}"></i>`).join('');
+  const next = COL_STEPS[C.got];
+  const prize = next ? [next.coins ? `${ico('coin')} ${fmtInt(next.coins)}` : '', next.gems ? `💎 ${next.gems}` : '', next.energy ? `⚡ ${next.energy}` : ''].filter(Boolean).join(' · ') : tr('All prizes won! New event next week.', 'అన్ని బహుమతులూ గెలిచారు! వచ్చే వారం కొత్త ఈవెంట్.');
+  return `<div class="col-card" id="colCard">
+    <div class="col-head">${ico(it.icon)}<b>${tr(...it.name)}</b><small>${tr('ends in', 'ముగింపు')} ${fmtDur(tourEndsIn())}</small></div>
+    <div class="col-bar"><div style="width:${Math.min(100, C.n / max * 100)}%"></div>${marks}<b>${fmtInt(Math.min(C.n, max))} / ${fmtInt(next ? next.at : max)}</b></div>
+    <div class="col-next">${next ? tr('Next prize', 'తర్వాతి బహుమతి') + ': ' : ''}${prize}</div>
+  </div>`;
+}
+function slotCollect(line, bet, p) {
+  const C = S.slot.col, it = colWeek();
+  if (C.got >= COL_STEPS.length) return;
+  C.n += bet * (1 + Math.floor(Math.random() * 3)) + (p.big ? 10 * bet : 0);
+  while (C.got < COL_STEPS.length && C.n >= COL_STEPS[C.got].at) {
+    const st = COL_STEPS[C.got]; C.got++;
+    if (st.coins) S.slot.coins += st.coins;
+    if (st.gems) S.gems += st.gems;
+    if (st.energy) S.slot.energy += st.energy;
+    const what = [st.coins ? `+${fmtInt(st.coins)} ${tr('coins', 'కాయిన్లు')}` : '', st.gems ? `+${st.gems} 💎` : '', st.energy ? `+${st.energy} ⚡` : ''].filter(Boolean).join(', ');
+    setTimeout(() => { toast(`${emo(it.icon)} ${tr(`${it.name[0]} prize: ${what}`, `${it.name[1]} బహుమతి: ${what}`)}`, 'good'); confetti($('colCard'), 80); }, 400);
+  }
+}
+function refreshSlotEvents() {
+  if ($('bossCard')) $('bossCard').outerHTML = bossCardHtml();
+  if ($('colCard')) $('colCard').outerHTML = colCardHtml();
+}
+function updateBossHp() {
+  const b = S.slot.boss, max = bossMaxHp(b.lvl), el = document.querySelector('#bossCard .boss-hp');
+  if (!el) return;
+  el.firstElementChild.style.width = Math.max(0, b.hp) / max * 100 + '%';
+  el.querySelector('b').textContent = `${fmtInt(Math.max(0, b.hp))} / ${fmtInt(max)}`;
+}
 function updateSlotLive() {
   if (activeTab !== 'slots' || !$('slotEnergy')) return;
   slotRegen();
@@ -1902,6 +2003,11 @@ function slotFinish(line, bet) {
   if (p.gems) { S.gems += p.gems; parts.push(`+${p.gems} 💎`); }
   if (p.energy) { sl.energy += p.energy; parts.push(`+${p.energy} ⚡`); }
   if (p.piggy) { const v = sl.piggy; sl.coins += v; sl.piggy = 0; parts.push(tr(`🐷 Piggy bank! +${fmtInt(v)}`, `🐷 పిగ్గీ బ్యాంక్! +${fmtInt(v)}`) + ' ' + ico('coin')); }
+  const lvlBefore = sl.boss.lvl, hit = slotBattle(line, bet);
+  if (hit) parts.push(hit);
+  slotCollect(line, bet, p);
+  if (sl.boss.lvl !== lvlBefore) setTimeout(refreshSlotEvents, 900); else updateBossHp();
+  if ($('colCard')) $('colCard').outerHTML = colCardHtml();
   const res = $('slotResult');
   if (res) {
     res.innerHTML = (p.big ? tr('JACKPOT! ', 'జాక్‌పాట్! ') : '') + parts.join('  ·  ');
