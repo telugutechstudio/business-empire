@@ -25,7 +25,7 @@ export default async (req) => {
   try { body = await req.json(); } catch { return json({ error: 'bad json' }, 400); }
   const id = String(body.id || '');
   if (!validId(id)) return json({ error: 'bad id' }, 400);
-  const store = getStore('raid');
+  const store = getStore({ name: 'raid', consistency: 'strong' });
   const get = key => store.get('p:' + key, { type: 'json' });
   const put = (key, rec) => store.setJSON('p:' + key, rec);
 
