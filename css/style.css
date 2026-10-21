@@ -1338,3 +1338,14 @@ body.biz-off .cash-wrap { flex: 0 1 auto; width: auto; max-width: 340px; min-wid
 /* Tutorial box moves to the top when it would cover what it points at */
 .tutor.top { top: 92px; bottom: auto; }
 @media (max-width: 760px) { .tutor.top { top: 84px; bottom: auto; } .tutor-text { font-size: 14px; } }
+
+/* ---------- Helping pet on the Spin Game ---------- */
+.sg-pet { position: relative; display: flex; align-items: center; gap: 4px; padding: 4px 10px 4px 6px; border-radius: 999px; background: linear-gradient(180deg, #8af0c8, #2fb38a); color: #063a2a; font-weight: 800; font-size: 12px; box-shadow: 0 4px 0 #136a50; }
+.sg-pet .i3d { width: 32px; height: 32px; animation: float 2.4s ease-in-out infinite; }
+.sg-pet.empty { background: linear-gradient(180deg, #c8c0e8, #8a7ac8); color: #fff; box-shadow: 0 4px 0 #4a3a8a; }
+.sg-pet.hungry { filter: saturate(.5); } .sg-pet i { font-style: normal; position: absolute; right: -6px; top: -8px; }
+.pet-pop { position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); white-space: nowrap; padding: 3px 10px; border-radius: 10px; background: #fff; color: #1a6a40; font-size: 12px; font-weight: 800; box-shadow: 0 3px 8px rgba(0, 0, 0, .4); animation: petPop 1.8s ease-out forwards; pointer-events: none; z-index: 5; }
+@keyframes petPop { 0% { opacity: 0; transform: translate(-50%, 10px) scale(.6); } 15% { opacity: 1; transform: translate(-50%, -4px) scale(1.05); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -24px); } }
+.pet-card.active { border-color: var(--gold) !important; box-shadow: 0 0 18px rgba(255, 210, 90, .5); }
+.pet-card .pet-on { background: #2fb35a; color: #fff; }
+@media (max-width: 760px) { .sg-pet { padding: 3px 8px 3px 4px; } .sg-pet .i3d { width: 26px; height: 26px; } .sg-pet b { font-size: 11px; } }

@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '4.9';
+const GAME_VERSION = '5.0';
 const BIZ_OFF = true; // businesses, managers, upgrades, investors, stocks and worlds are switched off
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
@@ -295,7 +295,7 @@ function defaultState() {
     bizOff: BIZ_OFF,
     festivals: {},
     challenge: null,
-    pets: { owned: {}, fedAt: 0 },
+    pets: { owned: {}, fedAt: 0, active: '' },
     tour: { week: '', base: 0, posted: false, pending: '', rewarded: {} },
     stocks: {},
     scratch: { day: '', card: null },
@@ -360,7 +360,8 @@ function mergeState(saved) {
   out.slot.boss = Object.assign({ lvl: 1, hp: 300 }, out.slot.boss || {});
   out.slot.col = Object.assign({ week: '', n: 0, got: 0, item: 0 }, out.slot.col || {});
   out.stocks = saved.stocks && typeof saved.stocks === 'object' ? saved.stocks : {};
-  out.pets = Object.assign({ owned: {}, fedAt: 0 }, saved.pets || {});
+  out.pets = Object.assign({ owned: {}, fedAt: 0, active: '' }, saved.pets || {});
+  if (!out.pets.active) out.pets.active = Object.keys(out.pets.owned).sort((a, b) => out.pets.owned[b] - out.pets.owned[a])[0] || '';
   out.challenge = saved.challenge && typeof saved.challenge === 'object' ? saved.challenge : null;
   // Players from before the tutorial existed don't need it
   // Switching an old save over: business cash goes away, Spin Game coins become the cash
@@ -1760,7 +1761,7 @@ function availBets() { return SLOT_BETS.filter(b => b === 1 || S.slot.energy >= 
 function clampBet() { const a = availBets(); if (!a.includes(S.slot.bet)) S.slot.bet = a.filter(b => b <= S.slot.bet).pop() || 1; }
 const PRIZE = { coin3: 8000, cherry3: 4000, bag3: 6000, coin2: 1000, cherry2: 600, bag2: 800, other2: 250, none: 150 };
 function prizeUnit() { return cityScale() * spinMult(); }
-function prizeOf(k, bet = 1) { return Math.round(PRIZE[k] * bet * prizeUnit() / 10) * 10; }
+function prizeOf(k, bet = 1) { return Math.round(PRIZE[k] * bet * prizeUnit() * (k.endsWith('3') ? 1 + petPower('jackpot') : 1) / 10) * 10; }
 const SLOT_SYMS = [
   { k: 'coin', w: 30 }, { k: 'cherry', w: 22 }, { k: 'moneybag', w: 16 }, { k: 'bolt', w: 12 }, { k: 'pig', w: 8 }, { k: 'gem', w: 6 }, { k: 'swords', w: 14 }, { k: 'hammer', w: 9 }, { k: 'shield', w: 9 },
 ];
@@ -1770,10 +1771,11 @@ function slotRegen() {
   const sl = S.slot, now = Date.now();
   if (!sl.at) sl.at = now;
   if (sl.energy >= slotMax()) { sl.at = now; return; }
-  const n = Math.floor((now - sl.at) / SLOT_REGEN);
-  if (n > 0) { sl.energy = Math.min(slotMax(), sl.energy + n); sl.at = sl.energy >= slotMax() ? now : sl.at + n * SLOT_REGEN; }
+  const every = slotRegenMs(), n = Math.floor((now - sl.at) / every);
+  if (n > 0) { sl.energy = Math.min(slotMax(), sl.energy + n); sl.at = sl.energy >= slotMax() ? now : sl.at + n * every; }
 }
-function slotNextIn() { return S.slot.energy >= slotMax() ? 0 : Math.max(0, (S.slot.at + SLOT_REGEN - Date.now()) / 1000); }
+function slotRegenMs() { return SLOT_REGEN / (1 + petPower('regen')); }
+function slotNextIn() { return S.slot.energy >= slotMax() ? 0 : Math.max(0, (S.slot.at + slotRegenMs() - Date.now()) / 1000); }
 function slotPick() {
   const total = SLOT_SYMS.reduce((t, x) => t + x.w, 0);
   let r = Math.random() * total;
@@ -1905,7 +1907,8 @@ function bossCardHtml() {
 function slotBattle(line, bet) {
   const n = line.filter(k => k === 'swords').length;
   if (!n) return '';
-  const b = S.slot.boss, dmg = (n === 3 ? 100 : 10 * n) * bet;
+  const b = S.slot.boss, dmg = Math.round((n === 3 ? 100 : 10 * n) * bet * (1 + petPower('boss')));
+  if (petPower('boss')) setTimeout(() => petPop(`+${Math.round(petPower('boss') * 100)}% ⚔️`), 200);
   b.hp -= dmg;
   const foe = $('bossCard') ? $('bossFoe') : $('dmgLayer');
   if (foe) {
@@ -2062,7 +2065,7 @@ async function raidGo(i) {
     html = `${ico('shield', 'big-ico')}<h3>${tr('Blocked!', 'ఆపేశారు!')}</h3><p>${tr(`${esc(t.name)} had a shield. You still get ${fmtInt(coins)} coins for trying.`, `${esc(t.name)} దగ్గర షీల్డ్ ఉంది. ప్రయత్నానికి ${fmtInt(coins)} కాయిన్లు.`)}</p>`;
     sfx('err');
   } else {
-    res.amt = Math.min(res.amt, Math.round(9000 * cityScale())); // a raid never pays more than a good spin streak
+    res.amt = Math.round(Math.min(res.amt, 9000 * cityScale()) * (1 + petPower('raid'))); // capped, then the pet's share on top
     earn(res.amt);
     raidLog(tr(`🔨 You raided ${t.name}: +${fmtInt(res.amt)} coins`, `🔨 ${t.name} మీద దాడి: +${fmtInt(res.amt)} కాయిన్లు`));
     html = `${ico('moneybag', 'big-ico')}<h3>${tr('Great raid!', 'భలే దాడి!')}</h3><div class="stat-big">+${fmtInt(res.amt)} ${ico('coin')}</div>`;
@@ -2310,6 +2313,7 @@ function renderSlots() {
   return `<div class="sg">
     <div class="sg-top">
       <div class="sg-energy">${ico('battery')}<div class="sg-ebar"><div id="slotEbar" style="width:${pct}%"></div><b id="slotEnergy">${sl.energy} / ${slotMax()}</b></div><em id="slotTimer"></em></div>
+      ${petBadgeHtml()}
       <button class="sg-vip" data-act="sg-open" data-id="vip">${ico('crown')}<b>${tr(...vipTier().name)}</b></button>
     </div>
     <div class="sg-stage"><div id="dmgLayer"></div>
@@ -2380,6 +2384,7 @@ function slotSpin() {
   slotBusy = true;
   if (sl.energy >= slotMax()) sl.at = Date.now(); // the refill clock starts when you drop below full
   sl.energy -= bet;
+  if (Math.random() < petPower('free')) { sl.energy += bet; setTimeout(() => petPop(tr('Free spin!', 'ఫ్రీ స్పిన్!')), 300); }
   sl.piggy = Math.min(piggyCap(), sl.piggy + Math.round(60 * bet * cityScale()));
   S.stats.slotSpins = (S.stats.slotSpins || 0) + 1;
   addVip(bet); addLeague(bet);
@@ -2544,6 +2549,7 @@ function slotFinish(line, bet) {
     line.forEach(k => { cnt[k] = (cnt[k] || 0) + 1; });
     line.forEach((k, i) => { if (cnt[k] >= 2 && $('reel' + i)) $('reel' + i).classList.add('win'); });
     res.className = 'slot-result ' + (p.big ? 'big' : p.small ? '' : 'win');
+    if (coinWin && (petPower('profit') || (p.big && petPower('jackpot')))) setTimeout(() => petPop(`+${Math.round((petPower('profit') || petPower('jackpot')) * 100)}% ${emo('coin')}`), 500);
     if (coinWin) rollUp(res, coinWin, v => `+${fmtInt(v)} ${ico('coin')}${extra}`);
     else res.innerHTML = parts.join('  ·  ') || tr('So close!', 'కొద్దిలో పోయింది!');
     if (p.big) {
@@ -3668,6 +3674,7 @@ function openPack(kind) {
   A.packs[kind]--;
   const P = PACKS[kind], got = [];
   for (let i = 0; i < P.n; i++) got.push(drawSticker(kind === 'gold' && i === P.n - 1 ? 4 : 1));
+  if (Math.random() < petPower('sticker')) got.push(drawSticker(2)); // the unicorn slips in a bonus sticker
   const cards = got.map((s, i) => {
     const isNew = !A.have[s.id];
     A.have[s.id] = (A.have[s.id] || 0) + 1;
@@ -3860,17 +3867,18 @@ function renderStocks() {
 }
 
 /* ---------------------------- PETS ---------------------------------- */
-// Pets give lasting bonuses. Feed them at least once a day, or a hungry pet only gives half its bonus.
+// One pet at a time comes along to the Spin Game and helps in its own way. Feed it every day,
+// or a hungry pet only helps half as much. Gems level it up.
 const PETS = [
-  { id: 'dog',     icon: 'dog',     name: ['Puppy', 'కుక్కపిల్ల'],   kind: 'profit',  per: 0.10, cost: { cash: 2e4 } },
-  { id: 'cat',     icon: 'cat',     name: ['Kitty', 'పిల్లి'],        kind: 'profit',  per: 0.15, cost: { cash: 1e5 } },
-  { id: 'rabbit',  icon: 'rabbit',  name: ['Bunny', 'కుందేలు'],       kind: 'profit',  per: 0.20, cost: { gems: 30 } },
-  { id: 'owl',     icon: 'owl',     name: ['Wise Owl', 'గుడ్లగూబ'],    kind: 'offline', per: 0.25, cost: { cash: 3e5 } },
-  { id: 'panda',   icon: 'panda',   name: ['Panda', 'పాండా'],         kind: 'profit',  per: 0.30, cost: { cash: 1e6 } },
+  { id: 'dog',     icon: 'dog',     name: ['Puppy', 'కుక్కపిల్ల'],   kind: 'raid',    per: 0.10, cost: { cash: 2e4 } },
+  { id: 'cat',     icon: 'cat',     name: ['Kitty', 'పిల్లి'],        kind: 'free',    per: 0.025, cost: { cash: 6e4 } },
+  { id: 'rabbit',  icon: 'rabbit',  name: ['Bunny', 'కుందేలు'],       kind: 'profit',  per: 0.05, cost: { gems: 30 } },
+  { id: 'owl',     icon: 'owl',     name: ['Wise Owl', 'గుడ్లగూబ'],    kind: 'regen',   per: 0.06, cost: { cash: 2e5 } },
+  { id: 'panda',   icon: 'panda',   name: ['Panda', 'పాండా'],         kind: 'boss',    per: 0.15, cost: { cash: 5e5 } },
   { id: 'peacock', icon: 'peacock', name: ['Peacock', 'నెమలి'],       kind: 'gems',    per: 1,    cost: { gems: 80 } },
-  { id: 'tiger',   icon: 'tiger',   name: ['Tiger', 'పులి'],          kind: 'profit',  per: 0.50, cost: { cash: 3e6 } },
-  { id: 'unicorn', icon: 'unicorn', name: ['Unicorn', 'యూనికార్న్'],  kind: 'profit',  per: 0.75, cost: { gems: 200 } },
-  { id: 'dragon',  icon: 'dragon',  name: ['Dragon', 'డ్రాగన్'],      kind: 'profit',  per: 1.50, cost: { gems: 500 } },
+  { id: 'tiger',   icon: 'tiger',   name: ['Tiger', 'పులి'],          kind: 'raid',    per: 0.18, cost: { cash: 1.5e6 } },
+  { id: 'unicorn', icon: 'unicorn', name: ['Unicorn', 'యూనికార్న్'],  kind: 'sticker', per: 0.06, cost: { gems: 200 } },
+  { id: 'dragon',  icon: 'dragon',  name: ['Dragon', 'డ్రాగన్'],      kind: 'jackpot', per: 0.12, cost: { gems: 500 } },
 ];
 const PET_MAX_LVL = 10;
 const PET_HUNGRY_AFTER = 24 * 3600 * 1000;
@@ -3879,17 +3887,38 @@ function petLvl(id) { return S.pets.owned[id] || 0; }
 function petsHungry() { return Date.now() - S.pets.fedAt > PET_HUNGRY_AFTER; }
 function petFeedReady() { return Date.now() - S.pets.fedAt >= PET_FEED_EVERY; }
 function petLevelCost(lvl) { return 5 * lvl; }
-function petBonus(kind) {
-  const happy = petsHungry() ? 0.5 : 1;
-  let m = 1;
-  for (const p of PETS) if (p.kind === kind && petLvl(p.id)) m *= 1 + p.per * petLvl(p.id) * happy;
-  return m;
+function activePet() { const id = S.pets.active; return id && petLvl(id) ? PETS.find(p => p.id === id) : null; }
+// How strong the helping pet's power is right now (0 when no pet of that kind is along)
+function petPower(kind) { const p = activePet(); return p && p.kind === kind ? p.per * petLvl(p.id) * (petsHungry() ? 0.5 : 1) : 0; }
+function petBonus(kind) { return 1 + petPower(kind); }
+function petPop(text) {
+  const b = $('petBadge'); if (!b) return;
+  restartAnim(b, 'bump'); SlotFX.land('pop');
+  const d = document.createElement('div'); d.className = 'pet-pop'; d.textContent = text; b.appendChild(d); setTimeout(() => d.remove(), 1800);
+}
+function petBadgeHtml() {
+  const p = activePet();
+  if (!p) return `<button class="sg-pet empty" id="petBadge" data-act="tab" data-tab="pets">${ico('paws')}<b>${tr('Pet', 'పెట్')}</b></button>`;
+  return `<button class="sg-pet ${petsHungry() ? 'hungry' : ''}" id="petBadge" data-act="tab" data-tab="pets" title="${esc(tr(...p.name) + ': ' + petDesc(p))}">${ico(p.icon)}<b>${tr('Lv', 'లె')} ${petLvl(p.id)}</b>${petsHungry() ? '<i>😢</i>' : ''}</button>`;
 }
 function petDesc(p, lvl = Math.max(1, petLvl(p.id))) {
   const pct = Math.round(p.per * lvl * 100);
-  if (p.kind === 'offline') return tr(`Offline earnings +${pct}%`, `ఆఫ్‌లైన్ సంపాదన +${pct}%`);
-  if (p.kind === 'gems') return tr(`+${lvl} gems every time you feed`, `తినిపించిన ప్రతిసారి +${lvl} జెమ్స్`);
-  return tr(`All profits +${pct}%`, `అన్ని లాభాలు +${pct}%`);
+  return {
+    raid: tr(`Raids bring +${pct}% coins`, `దాడుల్లో +${pct}% కాయిన్లు`),
+    free: tr(`${pct}% chance a spin is free`, `${pct}% అవకాశం స్పిన్ ఫ్రీ`),
+    profit: tr(`All spin coins +${pct}%`, `అన్ని స్పిన్ కాయిన్లు +${pct}%`),
+    regen: tr(`Energy refills ${pct}% faster`, `ఎనర్జీ ${pct}% వేగంగా నిండుతుంది`),
+    boss: tr(`Boss damage +${pct}%`, `బాస్‌కి +${pct}% దెబ్బ`),
+    gems: tr(`+${lvl} gems every time you feed`, `తినిపించిన ప్రతిసారి +${lvl} జెమ్స్`),
+    sticker: tr(`${pct}% chance of a bonus sticker in each pack`, `ప్రతి ప్యాక్‌లో ${pct}% అవకాశం బోనస్ స్టిక్కర్`),
+    jackpot: tr(`Three-of-a-kind coins +${pct}%`, `మూడు ఒకేలా వస్తే +${pct}% కాయిన్లు`),
+  }[p.kind];
+}
+function usePet(id) {
+  if (!petLvl(id)) return;
+  S.pets.active = id; SlotFX.press();
+  const p = PETS.find(x => x.id === id);
+  toast(tr(`${emo(p.icon)} ${p.name[0]} comes along to help!`, `${emo(p.icon)} ${p.name[1]} మీతో వచ్చి సాయం చేస్తుంది!`), 'good');
 }
 function buyPet(id) {
   const p = PETS.find(x => x.id === id);
@@ -3898,6 +3927,7 @@ function buyPet(id) {
   if (p.cost.cash) S.cash -= p.cost.cash; else S.gems -= p.cost.gems;
   if (!Object.keys(S.pets.owned).length) S.pets.fedAt = Date.now();
   S.pets.owned[id] = 1;
+  if (!activePet()) S.pets.active = id;
   sfx('win');
   toast(tr(`${emo(p.icon)} ${p.name[0]} joined your family!`, `${emo(p.icon)} ${p.name[1]} మీ కుటుంబంలో చేరింది!`), 'good');
   confetti(document.querySelector(`[data-pet="${id}"]`), 120);
@@ -3916,7 +3946,7 @@ function feedPets() {
   if (!Object.keys(S.pets.owned).length || !petFeedReady()) { sfx('err'); return; }
   S.pets.fedAt = Date.now();
   let gems = 0;
-  for (const p of PETS) if (p.kind === 'gems' && petLvl(p.id)) gems += petLvl(p.id);
+  const ap = activePet(); if (ap && ap.kind === 'gems') gems += petLvl(ap.id);
   S.gems += gems;
   S.stats.feeds = (S.stats.feeds || 0) + 1;
   sfx('win');
@@ -3959,17 +3989,18 @@ function renderPets() {
       action = p.cost.cash
         ? `<button class="btn" data-act="pet-buy" data-id="${p.id}" data-cost="${p.cost.cash}">${tr('Adopt', 'తీసుకో')} ${money(p.cost.cash)}</button>`
         : `<button class="btn blue" data-act="pet-buy" data-id="${p.id}" data-gems="${p.cost.gems}">${tr('Adopt', 'తీసుకో')} 💎${p.cost.gems}</button>`;
-    } else if (lvl < PET_MAX_LVL) {
-      action = `<button class="btn purple" data-act="pet-lvl" data-id="${p.id}" data-gems="${petLevelCost(lvl)}">${tr('Level up', 'లెవెల్ అప్')} 💎${petLevelCost(lvl)}</button>`;
-    } else action = `<span class="badge">⭐ ${tr('Max level', 'గరిష్ట లెవెల్')}</span>`;
+    } else {
+      const use = S.pets.active === p.id ? `<span class="badge pet-on">⭐ ${tr('Helping you', 'సాయం చేస్తోంది')}</span>` : `<button class="btn gold" data-act="pet-use" data-id="${p.id}">${tr('Take along', 'తీసుకెళ్ళు')}</button>`;
+      action = use + (lvl < PET_MAX_LVL ? `<button class="btn purple" data-act="pet-lvl" data-id="${p.id}" data-gems="${petLevelCost(lvl)}">${tr('Level up', 'లెవెల్ అప్')} 💎${petLevelCost(lvl)}</button>` : `<span class="badge">${tr('Max level', 'గరిష్ట లెవెల్')}</span>`);
+    }
     const stars = lvl ? `<div class="pet-lvl">${tr('Level', 'లెవెల్')} ${lvl}/${PET_MAX_LVL}<div class="mbar"><div style="width:${lvl / PET_MAX_LVL * 100}%"></div></div></div>` : '';
-    return `<div class="pet-card ${lvl ? 'owned' : 'locked'} ${lvl && hungry ? 'hungry' : ''}" data-pet="${p.id}">
+    return `<div class="pet-card ${lvl ? 'owned' : 'locked'} ${lvl && hungry ? 'hungry' : ''} ${S.pets.active === p.id ? 'active' : ''}" data-pet="${p.id}">
       <div class="pet-pic">${ico(p.icon)}</div>
       <div class="title">${tr(...p.name)}</div>
       <div class="desc">${petDesc(p)}</div>${stars}${action}</div>`;
   }).join('');
-  const total = petBonus('profit');
-  return header('paws', tr('Pets', 'పెట్స్'), tr(`Pets boost your empire in every world. Pet profit bonus: <b>x${fmt(total)}</b>`, `పెట్స్ అన్ని ప్రపంచాల్లో మీ సామ్రాజ్యాన్ని పెంచుతాయి. పెట్ లాభం బోనస్: <b>x${fmt(total)}</b>`)) +
+  const ap = activePet();
+  return header('paws', tr('Pets', 'పెట్స్'), tr(`Take one pet along to the Spin Game. Each pet has its own power.${ap ? ` Helping now: <b>${ap.name[0]}</b> · ${petDesc(ap)}` : ''}`, `ఒక పెట్‌ను స్పిన్ గేమ్‌కి తీసుకెళ్ళండి. ప్రతి పెట్‌కి ఒక ప్రత్యేక శక్తి.${ap ? ` ఇప్పుడు సాయం: <b>${ap.name[1]}</b> · ${petDesc(ap)}` : ''}`)) +
     `<div class="pet-status ${hungry && ownedCount ? 'hungry' : ''}">${ico(hungry && ownedCount ? 'bowl' : 'sparkheart')}<div class="info">${status}</div>${feedBtn}</div>
     <div class="pet-grid">${cardsHtml}</div>`;
 }
@@ -4807,6 +4838,7 @@ document.addEventListener('click', e => {
     case 'stock-sell': sellStock(+el.dataset.k); renderTab(); break;
     case 'pet-buy': buyPet(id); renderTab(); break;
     case 'pet-lvl': levelPet(id); renderTab(); break;
+    case 'pet-use': usePet(id); renderTab(); break;
     case 'pet-feed': feedPets(); renderTab(); break;
     case 'festival': if (activeFestival()) modal(festivalHtml()); break;
     case 'fest-claim': claimFestival(); closeModal(); break;
