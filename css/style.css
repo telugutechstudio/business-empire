@@ -778,3 +778,47 @@ body.lowfx .loader, body.lowfx .bar.fast .bar-fill, body.lowfx .tut-hand { anima
   .pet-pic .i3d { width: 56px; height: 56px; }
   .pet-card .btn { width: 100%; padding: 8px 6px; font-size: 13px; }
 }
+
+/* ---------- Spin Game (slot machine) ---------- */
+.slot-top { display: flex; gap: 10px; margin-bottom: 12px; }
+.slot-stat { flex: 1; display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-radius: 16px; background: linear-gradient(180deg, var(--card2), var(--card)); border: 1px solid var(--border); }
+.slot-stat .i3d { width: 34px; height: 34px; }
+.slot-stat b { font-size: 22px; color: #7dff9a; }
+.slot-stat.coins b { color: var(--gold); }
+.slot-stat small { color: var(--muted); }
+.slot-stat em { margin-left: auto; font-style: normal; font-size: 13px; color: var(--muted); }
+.slot-machine { position: relative; padding: 18px 16px 16px; border-radius: 26px; text-align: center;
+  background: linear-gradient(180deg, #ff6a3d, #c8301e 55%, #8a1d12); border: 4px solid #ffd25a; box-shadow: 0 10px 0 #5a1208, 0 18px 30px rgba(0, 0, 0, .45), inset 0 2px 0 rgba(255, 255, 255, .35); }
+.slot-lights { position: absolute; inset: 6px; border-radius: 20px; pointer-events: none;
+  background: radial-gradient(circle, #fff6b0 0 3px, transparent 4px) 0 0 / 22px 22px; opacity: .55; -webkit-mask: linear-gradient(#000 0 0) top / 100% 12px no-repeat, linear-gradient(#000 0 0) bottom / 100% 12px no-repeat; mask: linear-gradient(#000 0 0) top / 100% 12px no-repeat, linear-gradient(#000 0 0) bottom / 100% 12px no-repeat; animation: blink 1.2s steps(2) infinite; }
+.reels { position: relative; display: flex; gap: 10px; justify-content: center; padding: 10px; border-radius: 18px; background: #3a0f08; box-shadow: inset 0 6px 14px rgba(0, 0, 0, .6); }
+.reel { width: 92px; height: 264px; overflow: hidden; border-radius: 14px; background: linear-gradient(180deg, #d8d0c0, #fffaf0 30%, #fffaf0 70%, #d8d0c0); position: relative; box-shadow: inset 0 0 12px rgba(0, 0, 0, .35); }
+.reel.win { box-shadow: inset 0 0 0 4px #3ccf6e, 0 0 18px #3ccf6e; }
+.strip { will-change: transform; }
+.sym { height: 88px; display: grid; place-items: center; }
+.sym .i3d { width: 62px; height: 62px; }
+.payline { position: absolute; left: 6px; right: 6px; top: 50%; height: 3px; margin-top: -1.5px; background: rgba(255, 210, 90, .55); pointer-events: none; }
+.slot-result { min-height: 26px; margin: 12px 0 10px; font-weight: 700; color: #fff3c8; text-shadow: 0 2px 4px rgba(0, 0, 0, .5); }
+.slot-result.win { color: #9dffb4; }
+.slot-result.big { color: #ffe066; font-size: 20px; animation: pop3d .4s; }
+.slot-controls { display: flex; gap: 10px; align-items: center; justify-content: center; }
+.spin-big { min-width: 150px; padding: 14px 18px; font-size: 24px; letter-spacing: 1px; display: flex; flex-direction: column; line-height: 1.1; }
+.spin-big small { font-size: 12px; letter-spacing: 0; opacity: .8; }
+.bet-btn, .auto-btn { padding: 10px 12px; font-weight: 700; }
+.bet-btn .i3d { width: 20px; height: 20px; }
+.auto-btn.on { background: linear-gradient(180deg, #8af0a8, #2fb35a); color: #133a13; box-shadow: 0 4px 0 #1a7a3a; }
+.piggy-card { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 12px 14px; border-radius: 18px; background: linear-gradient(180deg, var(--card2), var(--card)); border: 1px solid var(--border); }
+.piggy-ico .i3d { width: 52px; height: 52px; }
+.piggy-card .info { flex: 1; }
+.piggy-card .mbar { height: 8px; border-radius: 6px; background: rgba(0, 0, 0, .35); overflow: hidden; margin: 6px 0; }
+.piggy-card .mbar div { height: 100%; background: linear-gradient(90deg, #ff8ad8, #ffc83d); }
+.pt-wrap { margin-top: 14px; border-radius: 16px; background: var(--card); border: 1px solid var(--border); padding: 10px 14px; }
+.pt-wrap summary { cursor: pointer; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.pt-wrap summary .i3d { width: 24px; height: 24px; }
+.paytable { margin-top: 8px; }
+.pt-head, .pt-row { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid rgba(255, 255, 255, .06); font-size: 13px; }
+.pt-head { color: var(--muted); font-weight: 600; }
+.pt-row .i3d { width: 22px; height: 22px; }
+@keyframes blink { 50% { opacity: .15; } }
+@media (max-width: 420px) { .reel { width: 78px; } .sym .i3d { width: 54px; height: 54px; } .spin-big { min-width: 120px; font-size: 21px; } }
+.slot-result .i3d { width: 22px; height: 22px; vertical-align: -5px; }
