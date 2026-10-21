@@ -1,6 +1,6 @@
 // Service worker: lets Business Empire install as an app and run offline.
 // Network-first, so updates show up right away; the cache is the offline fallback.
-const CACHE = 'tycoon-empire-v25';
+const CACHE = 'tycoon-empire-v26';
 const ASSETS = [
   './',
   'index.html',

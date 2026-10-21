@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '4.5';
+const GAME_VERSION = '4.6';
 const BIZ_OFF = true; // businesses, managers, upgrades, investors, stocks and worlds are switched off
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
@@ -301,6 +301,7 @@ function defaultState() {
     scratch: { day: '', card: null },
     slot: { energy: 30, at: 0, bet: 1, coins: 0, piggy: 0, vip: 0, gift: { at: 0, chest: 0 }, cal: { last: '', streak: 0 }, boss: { lvl: 1, hp: 300 }, col: { week: '', n: 0, got: 0, item: 0 } },
     build: { done: 0, stage: 0, view: null },
+    city: { i: 0, done: {}, view: null, migrated: false },
     album: { have: {}, packs: { basic: 2, gold: 0 }, stars: 0, sets: {} },
     league: { week: '', tier: 0, pts: 0, lastRank: 0 },
     raid: { shields: 1, tokens: 0, helpDay: '', log: [], online: false },
@@ -351,6 +352,7 @@ function mergeState(saved) {
   out.album = Object.assign({ have: {}, stars: 0, sets: {} }, saved.album || {});
   out.album.packs = Object.assign({ basic: saved.album ? 0 : 2, gold: 0 }, out.album.packs || {});
   out.build = Object.assign({ done: 0, stage: 0, view: null }, saved.build || {});
+  out.city = Object.assign({ i: 0, done: {}, view: null, migrated: !saved.build }, saved.city || {});
   out.slot = Object.assign({ energy: 30, at: 0, bet: 1, coins: 0, piggy: 0, vip: 0 }, saved.slot || {});
   out.league = Object.assign({ week: '', tier: 0, pts: 0, lastRank: 0 }, saved.league || {});
   out.slot.gift = Object.assign({ at: 0, chest: 0 }, out.slot.gift || {});
@@ -1990,7 +1992,7 @@ async function raidSync(force) {
   if (!force && Date.now() - raidLastSync < 120000) return;
   raidLastSync = Date.now();
   try {
-    const { inbox } = await raidPost({ action: 'sync', name: raidName(), coins: Math.floor(S.cash), shields: S.raid.shields, lm: S.build.done });
+    const { inbox } = await raidPost({ action: 'sync', name: raidName(), coins: Math.floor(S.cash), shields: S.raid.shields, lm: landmarksDone() });
     S.raid.online = true;
     const news = [];
     for (const m of inbox || []) {
@@ -2003,8 +2005,8 @@ async function raidSync(force) {
 }
 function botTargets() {
   const names = BOT_NAMES.slice().sort(() => Math.random() - 0.5).slice(0, 4);
-  return names.map((n, k) => ({ id: 'bot-' + k, bot: true, name: tr(`${n}'s village`, `${n} గారి ఊరు`), lm: Math.max(0, S.build.done + Math.floor(rand(-1, 2))),
-    coins: Math.floor(Math.max(20000, S.cash * rand(0.4, 1.6)) + 20000 * S.build.done), shield: Math.random() < 0.25 }));
+  return names.map((n, k) => ({ id: 'bot-' + k, bot: true, name: tr(`${n}'s village`, `${n} గారి ఊరు`), lm: Math.max(0, landmarksDone() + Math.floor(rand(-1, 2))),
+    coins: Math.floor(Math.max(20000, S.cash * rand(0.4, 1.6)) + 20000 * landmarksDone()), shield: Math.random() < 0.25 }));
 }
 async function loadTargets() {
   raidTargets = null;
@@ -2047,7 +2049,7 @@ async function raidGo(i) {
   if (!res.blocked) addLeague(20);
   let html;
   if (res.blocked) {
-    const coins = 3000 * (1 + S.build.done); earn(coins);
+    const coins = 3000 * (1 + landmarksDone()); earn(coins);
     raidLog(tr(`🛡️ ${t.name} blocked your raid (+${fmtInt(coins)} for trying)`, `🛡️ ${t.name} మీ దాడిని ఆపారు (ప్రయత్నానికి +${fmtInt(coins)})`));
     html = `${ico('shield', 'big-ico')}<h3>${tr('Blocked!', 'ఆపేశారు!')}</h3><p>${tr(`${esc(t.name)} had a shield. You still get ${fmtInt(coins)} coins for trying.`, `${esc(t.name)} దగ్గర షీల్డ్ ఉంది. ప్రయత్నానికి ${fmtInt(coins)} కాయిన్లు.`)}</p>`;
     sfx('err');
@@ -2557,30 +2559,88 @@ function breakPiggy() {
   save(); if (!$('modal').classList.contains('hidden')) closeModal(); renderTab();
 }
 
-/* ---------------------------- LANDMARKS (build with coins) --------- */
-// Each landmark has five parts. Coins from the Spin Game pay for each part; a finished landmark adds +10% profits for good.
-const LANDMARKS = [
-  { id: 'charminar', icon: 'mosque', name: ['Charminar', 'చార్మినార్'], city: ['Hyderabad', 'హైదరాబాద్'],
-    parts: [['Base and arches', 'పునాది, ఆర్చిలు'], ['Upper floor', 'పై అంతస్తు'], ['Four minarets', 'నాలుగు మినార్లు'], ['Minaret balconies', 'మినార్ బాల్కనీలు'], ['Domes', 'గుమ్మటాలు']] },
-  { id: 'golconda', icon: 'castle', name: ['Golconda Fort', 'గోల్కొండ కోట'], city: ['Hyderabad', 'హైదరాబాద్'],
-    parts: [['Rocky hill', 'రాతి కొండ'], ['Fort walls', 'కోట గోడలు'], ['Watch towers', 'బురుజులు'], ['Bala Hissar', 'బాలా హిస్సార్'], ['Royal flag', 'రాజ జెండా']] },
-  { id: 'tirupati', icon: 'htemple', name: ['Temple Gopuram', 'ఆలయ గోపురం'], city: ['Tirupati', 'తిరుపతి'],
-    parts: [['Temple base', 'ఆలయ పునాది'], ['Lower tiers', 'కింది అంతస్తులు'], ['Upper tiers', 'పై అంతస్తులు'], ['Vimana roof', 'విమాన గోపురం'], ['Golden kalasams', 'బంగారు కలశాలు']] },
-  { id: 'buddha', icon: 'lotus', name: ['Buddha Statue', 'బుద్ధ విగ్రహం'], city: ['Hussain Sagar', 'హుస్సేన్ సాగర్'],
-    parts: [['Rock in the lake', 'సరస్సులో రాయి'], ['Lotus base', 'కమల పీఠం'], ['Robe', 'వస్త్రం'], ['Head and shoulders', 'తల, భుజాలు'], ['Blessing hand and halo', 'అభయ హస్తం, ప్రభ']] },
-  { id: 'taj', icon: 'mosque', name: ['Taj Mahal', 'తాజ్ మహల్'], city: ['Agra', 'ఆగ్రా'],
-    parts: [['Marble platform', 'పాలరాతి వేదిక'], ['Main hall', 'ప్రధాన భవనం'], ['Great dome', 'పెద్ద గుమ్మటం'], ['Four minarets', 'నాలుగు మినార్లు'], ['Gardens and pool', 'తోటలు, కొలను']] },
-  { id: 'indiagate', icon: 'classical', name: ['India Gate', 'ఇండియా గేట్'], city: ['New Delhi', 'న్యూఢిల్లీ'],
-    parts: [['Stone base', 'రాతి పునాది'], ['Two pillars', 'రెండు స్తంభాలు'], ['Great arch', 'పెద్ద ఆర్చి'], ['Cornice', 'పై అంచు'], ['Eternal flame', 'అమర జ్యోతి']] },
+/* ---------------------------- CITIES & LANDMARKS (build with coins) --------- */
+// An India map of cities. Each city is a hexagon island: tap a glowing + tile to build it with coins.
+// Tiles are houses, trees and the five parts of each landmark; some tiles carry a gift of coins and energy.
+// Finish every tile of a city to open the next one.
+const LANDMARKS = {
+  charminar: { icon: 'mosque', name: ['Charminar', 'చార్మినార్'], parts: [['Base and arches', 'పునాది, ఆర్చిలు'], ['Upper floor', 'పై అంతస్తు'], ['Four minarets', 'నాలుగు మినార్లు'], ['Minaret balconies', 'మినార్ బాల్కనీలు'], ['Domes', 'గుమ్మటాలు']] },
+  golconda: { icon: 'castle', name: ['Golconda Fort', 'గోల్కొండ కోట'], parts: [['Rocky hill', 'రాతి కొండ'], ['Fort walls', 'కోట గోడలు'], ['Watch towers', 'బురుజులు'], ['Bala Hissar', 'బాలా హిస్సార్'], ['Royal flag', 'రాజ జెండా']] },
+  buddha: { icon: 'lotus', name: ['Buddha Statue', 'బుద్ధ విగ్రహం'], parts: [['Rock in the lake', 'సరస్సులో రాయి'], ['Lotus base', 'కమల పీఠం'], ['Robe', 'వస్త్రం'], ['Head and shoulders', 'తల, భుజాలు'], ['Blessing hand and halo', 'అభయ హస్తం, ప్రభ']] },
+  indiagate: { icon: 'classical', name: ['India Gate', 'ఇండియా గేట్'], parts: [['Stone base', 'రాతి పునాది'], ['Two pillars', 'రెండు స్తంభాలు'], ['Great arch', 'పెద్ద ఆర్చి'], ['Cornice', 'పై అంచు'], ['Eternal flame', 'అమర జ్యోతి']] },
+  qutub: { icon: 'tower', name: ['Qutub Minar', 'కుతుబ్ మినార్'], parts: [['First storey', 'మొదటి అంతస్తు'], ['Second storey', 'రెండో అంతస్తు'], ['Third storey', 'మూడో అంతస్తు'], ['Marble storeys', 'పాలరాతి అంతస్తులు'], ['Top cupola', 'పై గుమ్మటం']] },
+  lotus: { icon: 'lotus', name: ['Lotus Temple', 'లోటస్ టెంపుల్'], parts: [['Base and pools', 'పునాది, కొలనులు'], ['Outer petals', 'బయటి రేకులు'], ['Middle petals', 'మధ్య రేకులు'], ['Inner petals', 'లోపలి రేకులు'], ['Crown and steps', 'పైభాగం, మెట్లు']] },
+  redfort: { icon: 'castle', name: ['Red Fort', 'ఎర్రకోట'], parts: [['Red walls', 'ఎర్ర గోడలు'], ['Lahori Gate', 'లాహోరీ గేట్'], ['Corner towers', 'మూల బురుజులు'], ['Chhatris', 'ఛత్రీలు'], ['National flag', 'జాతీయ జెండా']] },
+  taj: { icon: 'mosque', name: ['Taj Mahal', 'తాజ్ మహల్'], parts: [['Marble platform', 'పాలరాతి వేదిక'], ['Main hall', 'ప్రధాన భవనం'], ['Great dome', 'పెద్ద గుమ్మటం'], ['Four minarets', 'నాలుగు మినార్లు'], ['Gardens and pool', 'తోటలు, కొలను']] },
+  agrafort: { icon: 'castle', name: ['Agra Fort', 'ఆగ్రా కోట'], parts: [['Sandstone walls', 'రాతి గోడలు'], ['Amar Singh Gate', 'అమర్ సింగ్ గేట్'], ['Bastions', 'బురుజులు'], ['Marble pavilions', 'పాలరాతి మండపాలు'], ['Flag', 'జెండా']] },
+  tirupati: { icon: 'htemple', name: ['Temple Gopuram', 'ఆలయ గోపురం'], parts: [['Temple base', 'ఆలయ పునాది'], ['Lower tiers', 'కింది అంతస్తులు'], ['Upper tiers', 'పై అంతస్తులు'], ['Vimana roof', 'విమాన గోపురం'], ['Golden kalasams', 'బంగారు కలశాలు']] },
+};
+const CITIES = [
+  { id: 'hyd', name: ['Hyderabad', 'హైదరాబాద్'], pin: [125, 226], lms: ['charminar', 'golconda', 'buddha'] },
+  { id: 'delhi', name: ['New Delhi', 'న్యూఢిల్లీ'], pin: [114, 102], lms: ['indiagate', 'qutub', 'lotus', 'redfort'] },
+  { id: 'agra', name: ['Agra', 'ఆగ్రా'], pin: [128, 120], left: true, lms: ['taj', 'agrafort'] },
+  { id: 'tirupati', name: ['Tirupati', 'తిరుపతి'], pin: [134, 268], lms: ['tirupati'] },
 ];
-const BUILD_BASE = 15000, LANDMARK_BONUS = 0.1;
-function stageCost(li, st) { return Math.round(BUILD_BASE * Math.pow(1.5, st) * Math.pow(3, li) / 100) * 100; }
-function landmarkBonus() { return 1 + LANDMARK_BONUS * (S.build ? S.build.done : 0); }
-function buildCurrent() { return LANDMARKS[Math.min(S.build.done, LANDMARKS.length - 1)]; }
-function allBuilt() { return S.build.done >= LANDMARKS.length; }
+const LANDMARK_BONUS = 0.1, HEX_R = 1.15;
+const LM_CENTERS = [[0, 0], [3, -1], [-2, 3], [-3, 0]];
+const NB = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, -1], [-1, 1]];
+const hexPos = (q, r) => ({ x: HEX_R * Math.sqrt(3) * (q + r / 2), z: HEX_R * 1.5 * r });
+const hexDist = (a, b) => (Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[0] + a[1] - b[0] - b[1])) / 2;
+const PLAN = {};
+// The tiles of a city in build order: a ring of houses and trees around each landmark, with its five parts in between
+function cityPlan(ci) {
+  if (PLAN[ci]) return PLAN[ci];
+  const C = CITIES[ci], centers = C.lms.map((_, i) => LM_CENTERS[i]);
+  const flower = new Set();
+  centers.forEach(([q, r]) => { flower.add(q + ',' + r); NB.forEach(([a, b]) => flower.add((q + a) + ',' + (r + b))); });
+  const ring = centers.map(() => []);
+  for (let q = -7; q <= 7; q++) for (let r = -7; r <= 7; r++) {
+    if (flower.has(q + ',' + r)) continue;
+    const ds = centers.map(c => hexDist([q, r], c)), dmin = Math.min(...ds);
+    if (dmin === 2) ring[ds.indexOf(dmin)].push([q, r]);
+  }
+  const tasks = [];
+  centers.forEach((c, li) => {
+    const deco = ring[li].sort((a, b) => hexDist(a, [0, 0]) - hexDist(b, [0, 0]) || Math.atan2(a[1], a[0]) - Math.atan2(b[1], b[0]));
+    let d = 0;
+    const pushDeco = n => { for (let j = 0; j < n && d < deco.length; j++, d++) tasks.push({ type: 'deco', li, hex: deco[d], gift: d % 3 === 2, kind: hashKind(deco[d], ci) }); };
+    pushDeco(2);
+    for (let k = 0; k < 5; k++) { tasks.push({ type: 'part', li, k, hex: c }); pushDeco(2); }
+    pushDeco(99);
+  });
+  tasks.forEach((t, i) => { t.i = i; });
+  return (PLAN[ci] = { tasks, centers });
+}
+function hashKind([q, r], ci) { const h = Math.abs((q * 73856093) ^ (r * 19349663) ^ (ci * 83492791)) % 10; return h < 4 ? 'tree' : h < 7 ? 'house' : h < 8 ? 'rock' : h < 9 ? 'palm' : 'bush'; }
+function cityBase(ci) { return 15000 * Math.pow(3, ci); }
+function taskCost(ci, t) { const b = cityBase(ci) * Math.pow(1.6, t.li); return Math.round((t.type === 'part' ? b * (1 + 0.35 * t.k) : b * 0.2) / 100) * 100; }
+function taskReward(ci, t) { return t.gift ? { coins: Math.round(taskCost(ci, t) * 1.5 / 100) * 100, energy: 8 } : null; }
+function taskName(ci, t) {
+  if (t.type === 'part') { const L = LANDMARKS[CITIES[ci].lms[t.li]]; return `${tr(...L.name)}: ${tr(...L.parts[t.k])}`; }
+  return { tree: tr('Trees', 'చెట్లు'), house: tr('House', 'ఇల్లు'), rock: tr('Rock garden', 'రాతి తోట'), palm: tr('Palm trees', 'కొబ్బరి చెట్లు'), bush: tr('Garden', 'తోట') }[t.kind];
+}
+function taskIcon(ci, t) { return t.type === 'part' ? LANDMARKS[CITIES[ci].lms[t.li]].icon : { tree: 'tree', house: 'hut', rock: 'rock', palm: 'tree', bush: 'seedling' }[t.kind]; }
+function cityDone(ci) { return ci < S.city.i; }
+function taskBuilt(ci, i) { return cityDone(ci) || (ci === S.city.i && !!S.city.done[i]); }
+function lmPartsBuilt(ci, li) { return cityPlan(ci).tasks.filter(t => t.type === 'part' && t.li === li && taskBuilt(ci, t.i)).length; }
+function landmarksDone() { let n = 0; CITIES.forEach((C, ci) => C.lms.forEach((_, li) => { if (lmPartsBuilt(ci, li) >= 5) n++; })); return n; }
+function landmarkBonus() { return 1 + LANDMARK_BONUS * (S.city ? landmarksDone() : 0); }
+function allCitiesDone() { return S.city.i >= CITIES.length; }
+function availableTasks() { if (allCitiesDone()) return []; return cityPlan(S.city.i).tasks.filter(t => !S.city.done[t.i]).slice(0, 3); }
+function cityProgress(ci) { const T = cityPlan(ci).tasks; return { done: T.filter(t => taskBuilt(ci, t.i)).length, total: T.length }; }
+function selTask() { const a = availableTasks(); return a.find(t => t.i === B3.sel) || a[0] || null; }
+function nextTaskCost() { const a = availableTasks(); return a.length ? Math.min(...a.map(t => taskCost(S.city.i, t))) : Infinity; }
+// Old saves built single landmarks: carry Charminar, Golconda and the Buddha statue over to Hyderabad
+function migrateBuild() {
+  if (S.city.migrated) return;
+  S.city.migrated = true;
+  const old = S.build && S.build.done || 0;
+  const map = { charminar: 1, golconda: 2, buddha: 4 };
+  cityPlan(0).tasks.forEach(t => { if (old >= map[CITIES[0].lms[t.li]]) S.city.done[t.i] = true; });
+}
 
-// ---- 3D island (three.js is loaded only when this tab is first opened) ----
-const B3 = { T: null, loading: false, failed: false, renderer: null, scene: null, camera: null, holder: null, parts: [], ghost: null, shownKey: '', yaw: 0.7, drag: null, anims: [], raf: 0, lastT: 0, water: null };
+// ---- 3D city island (three.js is loaded only when this tab is first opened) ----
+const B3 = { T: null, loading: false, failed: false, renderer: null, scene: null, camera: null, holder: null, shownKey: '', yaw: 0.6, drag: null, anims: [], raf: 0, lastT: 0, water: null, pick: [], floaters: [], focus: { x: 0, z: 0 }, sel: -1, tex: {} };
 function b3Mat(c, extra) { const T = B3.T; B3.mats = B3.mats || {}; const k = c + (extra ? JSON.stringify(extra) : ''); return B3.mats[k] || (B3.mats[k] = new T.MeshLambertMaterial(Object.assign({ color: c }, extra || {}))); }
 function b3Mesh(geo, c, x, y, z, parent) { const m = new B3.T.Mesh(geo, typeof c === 'number' ? b3Mat(c) : c); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; parent.add(m); return m; }
 function bx(w, h, d, c, x, y, z, p) { return b3Mesh(new B3.T.BoxGeometry(w, h, d), c, x, y, z, p); }
@@ -2655,7 +2715,48 @@ const MODELS = {
     bx(0.6, 0.4, 0.6, 0x333333, 0, 0.5, 1.6, P[4]); const fl = co(0.12, 0.4, new B3.T.MeshBasicMaterial({ color: 0xff8a1a }), 0, 0.9, 1.6, P[4], 8); fl.castShadow = false; P[4].userData.flame = fl;
     return P;
   },
+  qutub() {
+    const P = [0, 1, 2, 3, 4].map(() => new B3.T.Group()), red = 0xb0583a, sand = 0xd8b890, marble = 0xe8dcc8;
+    bx(2.4, 0.3, 2.4, sand, 0, 0.15, 0, P[0]); cy(0.75, 0.95, 2.0, red, 0, 1.3, 0, P[0], 24);
+    for (const y of [0.8, 1.6]) cy(0.9, 0.9, 0.06, 0x7a3a22, 0, y, 0, P[0], 24);
+    cy(1.0, 1.0, 0.14, sand, 0, 2.37, 0, P[1], 24); cy(0.62, 0.74, 1.5, red, 0, 3.15, 0, P[1], 24);
+    cy(0.85, 0.85, 0.12, sand, 0, 3.95, 0, P[2], 24); cy(0.52, 0.6, 1.1, 0xc8784a, 0, 4.55, 0, P[2], 22);
+    cy(0.72, 0.72, 0.1, sand, 0, 5.15, 0, P[3], 22); cy(0.42, 0.5, 0.9, marble, 0, 5.65, 0, P[3], 20); cy(0.36, 0.42, 0.55, red, 0, 6.38, 0, P[3], 20);
+    cy(0.5, 0.5, 0.08, sand, 0, 6.68, 0, P[4], 18); sp(0.3, marble, 0, 6.9, 0, P[4], 1.1); co(0.05, 0.4, 0xd4a83a, 0, 7.35, 0, P[4]);
+    return P;
+  },
+  lotus() {
+    const P = [0, 1, 2, 3, 4].map(() => new B3.T.Group()), white = 0xf4f2ee;
+    cy(2.5, 2.7, 0.3, 0xe8e4dc, 0, 0.15, 0, P[0], 9);
+    const pool = b3Mesh(new B3.T.RingGeometry(1.9, 2.4, 9), b3Mat(0x3a8ad8), 0, 0.32, 0, P[0]); pool.rotation.x = -Math.PI / 2; pool.castShadow = false;
+    const ring = (part, rad, y, sc, tilt, off) => {
+      for (let i = 0; i < 9; i++) {
+        const piv = new B3.T.Group(); piv.position.y = y; piv.rotation.y = i / 9 * Math.PI * 2 + off; part.add(piv);
+        const pt = sp(0.9, white, rad, 0, 0, piv); pt.scale.set(sc[0], sc[1], sc[2]); pt.rotation.z = -tilt;
+      }
+    };
+    ring(P[1], 1.35, 0.95, [0.25, 1.1, 0.5], 0.55, 0);
+    ring(P[2], 0.9, 1.35, [0.22, 1.1, 0.42], 0.3, Math.PI / 9);
+    ring(P[3], 0.45, 1.75, [0.2, 1.05, 0.34], 0.08, 0);
+    sp(0.38, white, 0, 2.65, 0, P[4], 1.3); bx(0.8, 0.12, 0.6, 0xe8e4dc, 0, 0.36, 2.0, P[4]); bx(0.8, 0.12, 0.4, 0xe8e4dc, 0, 0.24, 2.4, P[4]);
+    return P;
+  },
+  redfort() { return fortModel(0xb8452a); },
+  agrafort() { return fortModel(0xa85a3a); },
 };
+function fortModel(red) {
+  const P = [0, 1, 2, 3, 4].map(() => new B3.T.Group()), dark = 0x4a2418, marble = 0xf2ece0;
+  bx(4.4, 1.0, 1.4, red, 0, 0.5, 0, P[0]);
+  for (let x = -2.05; x <= 2.06; x += 0.41) bx(0.22, 0.24, 0.22, red, x, 1.12, 0.6, P[0]);
+  bx(1.4, 1.7, 1.6, red, 0, 0.85, 0.1, P[1]); bx(0.6, 0.9, 0.06, dark, 0, 0.6, 0.92, P[1]);
+  const top = cy(0.3, 0.3, 0.06, dark, 0, 1.05, 0.93, P[1], 16); top.rotation.x = Math.PI / 2;
+  for (const x of [-2.1, 2.1]) { cy(0.42, 0.46, 1.9, red, x, 0.95, 0, P[2], 8); }
+  for (const x of [-2.1, 2.1]) { for (const dx of [-0.18, 0.18]) cy(0.03, 0.03, 0.35, marble, x + dx, 2.07, 0, P[3], 6); sp(0.28, marble, x, 2.35, 0, P[3], 0.9); }
+  for (const x of [-0.45, 0.45]) sp(0.22, marble, x, 1.95, 0.1, P[3], 0.9);
+  cy(0.025, 0.025, 1.0, 0x5a3418, 0, 2.2, 0.1, P[4], 6);
+  [[0xff9933, 2.6], [0xffffff, 2.48], [0x138808, 2.36]].forEach(([c, y]) => { const f = bx(0.55, 0.12, 0.02, c, 0.3, y, 0.1, P[4]); f.castShadow = false; });
+  return P;
+}
 function initBuild3D() {
   if (B3.T || B3.loading || B3.failed) return;
   B3.loading = true;
@@ -2667,45 +2768,107 @@ function initBuild3D() {
     r.shadowMap.enabled = !low; r.shadowMap.type = T.PCFSoftShadowMap;
     r.domElement.className = 'build-canvas';
     const sc = B3.scene = new T.Scene();
-    B3.camera = new T.PerspectiveCamera(38, 1, 0.1, 200);
+    B3.camera = new T.PerspectiveCamera(40, 1, 0.1, 300);
     sc.add(new T.HemisphereLight(0xdff0ff, 0x6a8a4a, 1.0));
-    const sun = new T.DirectionalLight(0xfff2d8, 1.5); sun.position.set(8, 14, 6); sun.castShadow = !low;
-    sun.shadow.mapSize.set(1024, 1024); Object.assign(sun.shadow.camera, { left: -9, right: 9, top: 9, bottom: -9 }); sc.add(sun);
-    // Sea, sand, grass: a hexagon island like a game board
-    B3.water = b3Mesh(new T.CircleGeometry(40, 48), b3Mat(0x2a7ab8), 0, -0.55, 0, sc); B3.water.rotation.x = -Math.PI / 2;
-    const sand = cy(7.3, 7.6, 0.7, 0xe8d29a, 0, -0.3, 0, sc, 6); sand.rotation.y = Math.PI / 6;
-    const grass = cy(6.5, 6.7, 0.35, 0x6fbf4a, 0, 0.12, 0, sc, 6); grass.rotation.y = Math.PI / 6;
-    const ring = b3Mesh(new T.RingGeometry(3.6, 4.0, 6), b3Mat(0xd8c08a), 0, 0.31, 0, sc); ring.rotation.x = -Math.PI / 2; ring.rotation.z = Math.PI / 6; ring.receiveShadow = true;
-    for (const [x, z] of [[5, 1.5], [4.6, -2.4], [-5, 0.8], [-4.4, -2.8], [-2, 5], [2.3, 4.9], [-1, -5.2], [1.8, -5]]) {
-      cy(0.12, 0.16, 0.8, 0x7a5232, x, 0.7, z, sc, 6); b3Mesh(new T.IcosahedronGeometry(0.62, 0), 0x3f9a3a, x, 1.4, z, sc);
-    }
-    for (const [x, z, c] of [[4.2, 3.6, 0x4da3ff], [-4.6, 3.2, 0xff8ad8]]) { bx(0.9, 0.7, 0.9, 0xf6efe0, x, 0.65, z, sc); const rf = co(0.8, 0.5, c, x, 1.25, z, sc, 4); rf.rotation.y = Math.PI / 4; }
-    B3.holder = new T.Group(); B3.holder.position.y = 0.3; sc.add(B3.holder);
-    // Drag to turn the island
-    const cv = r.domElement;
-    cv.addEventListener('pointerdown', e => { B3.drag = { x: e.clientX, yaw: B3.yaw }; cv.setPointerCapture(e.pointerId); });
-    cv.addEventListener('pointermove', e => { if (B3.drag) B3.yaw = B3.drag.yaw - (e.clientX - B3.drag.x) * 0.01; });
-    const up = () => { B3.drag = null; };
-    cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+    const sun = new T.DirectionalLight(0xfff2d8, 1.5); sun.position.set(10, 18, 8); sun.castShadow = !low;
+    sun.shadow.mapSize.set(2048, 2048); Object.assign(sun.shadow.camera, { left: -16, right: 16, top: 16, bottom: -16, far: 60 }); sc.add(sun);
+    B3.water = b3Mesh(new T.CircleGeometry(80, 64), b3Mat(0x3a9ad8), 0, -0.45, 0, sc); B3.water.rotation.x = -Math.PI / 2;
+    B3.holder = new T.Group(); sc.add(B3.holder);
+    const loader = new T.TextureLoader();
+    for (const k of ['gift', 'construction']) { B3.tex[k] = loader.load(iconUrl(k)); B3.tex[k].colorSpace = T.SRGBColorSpace; }
+    const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+    g.fillStyle = 'rgba(255,255,255,.9)'; g.beginPath(); g.arc(64, 64, 46, 0, 7); g.fill();
+    g.fillStyle = '#3a8ad8'; g.fillRect(56, 34, 16, 60); g.fillRect(34, 56, 60, 16);
+    B3.tex.plus = new T.CanvasTexture(c); B3.tex.plus.colorSpace = T.SRGBColorSpace;
+    // Drag to turn the island, tap a + tile to pick it
+    const cv = r.domElement, ray = new T.Raycaster(), v2 = new T.Vector2();
+    cv.addEventListener('pointerdown', e => { B3.drag = { x: e.clientX, y: e.clientY, yaw: B3.yaw, moved: false }; cv.setPointerCapture(e.pointerId); });
+    cv.addEventListener('pointermove', e => { if (!B3.drag) return; if (Math.abs(e.clientX - B3.drag.x) > 6) B3.drag.moved = true; B3.yaw = B3.drag.yaw - (e.clientX - B3.drag.x) * 0.01; });
+    cv.addEventListener('pointerup', e => {
+      const d = B3.drag; B3.drag = null;
+      if (!d || d.moved) return;
+      const rect = cv.getBoundingClientRect();
+      v2.set((e.clientX - rect.left) / rect.width * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+      ray.setFromCamera(v2, B3.camera);
+      const hits = ray.intersectObjects(B3.pick, true), hit = hits.find(h => !h.object.userData.big) || hits[0];
+      if (!hit) return;
+      let o = hit.object; while (o && o.userData.task == null) o = o.parent;
+      if (o) { B3.sel = o.userData.task; SlotFX.press(); renderTab(); }
+    });
+    cv.addEventListener('pointercancel', () => { B3.drag = null; });
     mountBuildView();
   }).catch(() => { B3.loading = false; B3.failed = true; if (activeTab === 'build') renderTab(); });
 }
-// Show landmark i with `st` parts built; the next part shows as a yellow outline
-function b3Show(i, st, animatePart = -1) {
-  const T = B3.T, key = i + ':' + st;
-  if (B3.shownKey === key && animatePart < 0) return;
+function decoMesh(kind, g) {
+  if (kind === 'tree') { cy(0.08, 0.12, 0.6, 0x7a5232, -0.25, 0.3, 0.1, g, 6); b3Mesh(new B3.T.IcosahedronGeometry(0.42, 0), 0x3f9a3a, -0.25, 0.85, 0.1, g); cy(0.07, 0.1, 0.45, 0x7a5232, 0.35, 0.22, -0.25, g, 6); b3Mesh(new B3.T.IcosahedronGeometry(0.32, 0), 0x4fae3a, 0.35, 0.62, -0.25, g); }
+  else if (kind === 'house') { const col = [0xf6efe0, 0xffe0b0, 0xd8f0ff, 0xffd6e0][Math.floor(Math.abs(g.position.x * 7 + g.position.z * 3)) % 4]; bx(0.9, 0.7, 0.8, col, 0, 0.35, 0, g); const rf = co(0.78, 0.55, [0xd84a3a, 0x4da3ff, 0xff8a3d][Math.floor(Math.abs(g.position.z * 5)) % 3], 0, 0.97, 0, g, 4); rf.rotation.y = Math.PI / 4; bx(0.22, 0.4, 0.04, 0x5a3418, 0, 0.2, 0.41, g); }
+  else if (kind === 'rock') { b3Mesh(new B3.T.DodecahedronGeometry(0.42, 0), 0x9a958c, -0.15, 0.25, 0, g); b3Mesh(new B3.T.DodecahedronGeometry(0.28, 0), 0xaaa59c, 0.35, 0.18, 0.2, g); }
+  else if (kind === 'palm') { for (const [x, z] of [[-0.2, 0], [0.3, 0.2]]) { cy(0.06, 0.09, 1.1, 0x8a6a46, x, 0.55, z, g, 6); for (let i = 0; i < 5; i++) { const l = bx(0.12, 0.03, 0.7, 0x3f8f3a, x + Math.sin(i * 1.26) * 0.3, 1.1, z + Math.cos(i * 1.26) * 0.3, g); l.rotation.y = i * 1.26; l.rotation.x = 0.4; } } }
+  else { for (const [x, z, s] of [[-0.3, 0.1, 0.3], [0.2, -0.2, 0.25], [0.3, 0.3, 0.22]]) b3Mesh(new B3.T.IcosahedronGeometry(s, 0), 0x4a9a30, x, s * 0.8, z, g); for (const [x, z] of [[0, 0.35], [-0.35, -0.3]]) sp(0.07, 0xff6a8a, x, 0.2, z, g); }
+}
+function hexTile(pos, top, side, parent, h = 0.5) {
+  const g = new B3.T.Group(); g.position.set(pos.x, 0, pos.z); parent.add(g);
+  cy(HEX_R * 0.985, HEX_R * 1.02, h, side, 0, -h / 2 + 0.05, 0, g, 6);
+  cy(HEX_R * 0.97, HEX_R * 0.97, 0.12, top, 0, 0.06, 0, g, 6);
+  return g;
+}
+// Draw city ci; `anim` names a task index that was just built, to make it rise
+function drawCity(ci, anim = -1) {
+  const T = B3.T, key = ci + ':' + JSON.stringify(S.city.done) + ':' + S.city.i + ':' + B3.sel;
+  if (B3.shownKey === key && anim < 0) return;
   B3.shownKey = key;
-  B3.holder.clear();
-  const P = MODELS[LANDMARKS[i].id]();
-  B3.parts = P;
-  P.forEach((g, k) => { g.visible = k < st; B3.holder.add(g); });
-  if (st < 5) {
-    const box = new T.Box3().setFromObject(P[st]);
-    const helper = new T.Box3Helper(box, 0xffd23d);
-    helper.material.transparent = true; helper.material.opacity = 0.8;
-    B3.holder.add(helper); B3.ghost = helper;
-  } else B3.ghost = null;
-  if (animatePart >= 0 && P[animatePart]) { P[animatePart].scale.set(1, 0.01, 1); B3.anims.push({ g: P[animatePart], t: 0 }); }
+  B3.holder.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.isSprite) o.material.dispose(); });
+  B3.holder.clear(); B3.pick = []; B3.floaters = []; B3.flames = [];
+  const plan = cityPlan(ci), live = ci === S.city.i, avail = new Set(live ? availableTasks().map(t => t.i) : []);
+  if (live && !avail.has(B3.sel)) B3.sel = avail.size ? [...avail][0] : -1;
+  // Landmark plazas: shown once the landmark's ring has started
+  plan.centers.forEach((c, li) => {
+    const started = plan.tasks.some(t => t.li === li && (taskBuilt(ci, t.i) || avail.has(t.i)));
+    if (!started) { [c, ...NB.map(([a, b]) => [c[0] + a, c[1] + b])].forEach(h => hexTile(hexPos(...h), 0x9ccf6a, 0xc8a46a, B3.holder, 0.4)); return; }
+    const built = lmPartsBuilt(ci, li), p0 = hexPos(...c);
+    [c, ...NB.map(([a, b]) => [c[0] + a, c[1] + b])].forEach(h => hexTile(hexPos(...h), built ? 0xe8dcc0 : 0xd8c8a0, 0xc8a46a, B3.holder));
+    const holder = new T.Group(); holder.position.set(p0.x, 0.12, p0.z); holder.scale.setScalar(0.8); B3.holder.add(holder);
+    const P = MODELS[CITIES[ci].lms[li]]();
+    const box = built < 5 ? new T.Box3().setFromObject(P[built]) : null; // measured before the parts join the scaled holder
+    const partTask = plan.tasks.find(t => t.type === 'part' && t.li === li && t.k === built);
+    P.forEach((g, k) => { g.visible = k < built; holder.add(g); if (g.userData.flame) B3.flames.push(g.userData.flame); });
+    if (anim >= 0 && plan.tasks[anim].type === 'part' && plan.tasks[anim].li === li) { const g = P[plan.tasks[anim].k]; g.scale.set(1, 0.01, 1); B3.anims.push({ g, t: 0 }); }
+    if (partTask && avail.has(partTask.i)) {
+      const helper = new T.Box3Helper(box, partTask.i === B3.sel ? 0xffd23d : 0xffffff); helper.material.transparent = true; holder.add(helper);
+      const mk = new T.Sprite(new T.SpriteMaterial({ map: B3.tex.construction, depthTest: false }));
+      mk.scale.set(1.3, 1.3, 1); const my = Math.max(2.4, box.max.y * 0.8 + 1); mk.position.set(p0.x, my, p0.z); mk.userData.task = partTask.i; mk.userData.big = true; B3.holder.add(mk); B3.pick.push(mk);
+      B3.floaters.push({ o: mk, y: my, ph: li });
+      // the whole plaza can be tapped too
+      const hit = cy(HEX_R * 1.9, HEX_R * 1.9, 0.3, new T.MeshBasicMaterial({ visible: false }), p0.x, 0.3, p0.z, B3.holder, 6); hit.userData.task = partTask.i; hit.userData.big = true; B3.pick.push(hit);
+    }
+  });
+  for (const t of plan.tasks) {
+    if (t.type !== 'deco') continue;
+    const pos = hexPos(...t.hex);
+    if (taskBuilt(ci, t.i)) {
+      const g = hexTile(pos, 0x6fbf4a, 0xd8b878, B3.holder);
+      decoMesh(t.kind, g);
+      if (t.i === anim) { g.scale.set(1, 0.01, 1); B3.anims.push({ g, t: 0 }); }
+    } else if (!avail.has(t.i)) hexTile(pos, 0x9ccf6a, 0xc8a46a, B3.holder, 0.4);
+    else {
+      const sel = t.i === B3.sel;
+      const g = new T.Group(); g.position.set(pos.x, 0, pos.z); B3.holder.add(g);
+      const m = cy(HEX_R * 0.95, HEX_R * 0.95, 0.18, new T.MeshLambertMaterial({ color: sel ? 0xffd25a : 0x8fd0ff, transparent: true, opacity: sel ? 0.85 : 0.55 }), 0, 0, 0, g, 6);
+      m.castShadow = false; m.userData.task = t.i; B3.pick.push(m);
+      const plus = new T.Sprite(new T.SpriteMaterial({ map: B3.tex.plus, depthTest: false })); plus.scale.set(0.8, 0.8, 1); plus.position.set(pos.x, 0.7, pos.z); plus.userData.task = t.i; B3.holder.add(plus); B3.pick.push(plus);
+      B3.floaters.push({ o: plus, y: 0.7, ph: t.i });
+      if (t.gift) { const gs = new T.Sprite(new T.SpriteMaterial({ map: B3.tex.gift, depthTest: false })); gs.scale.set(0.9, 0.9, 1); gs.position.set(pos.x, 1.55, pos.z); gs.userData.task = t.i; B3.holder.add(gs); B3.pick.push(gs); B3.floaters.push({ o: gs, y: 1.55, ph: t.i + 1 }); }
+    }
+  }
+  const land = new Set(), beach = new Map();
+  plan.centers.forEach(c => [c, ...NB.map(([a, b]) => [c[0] + a, c[1] + b])].forEach(h => land.add(h + '')));
+  plan.tasks.forEach(t => land.add(t.hex + ''));
+  land.forEach(k => { const [q, r] = k.split(',').map(Number); NB.forEach(([a, b]) => { const h = [q + a, r + b]; if (!land.has(h + '')) beach.set(h + '', h); }); });
+  beach.forEach(h => hexTile(hexPos(...h), 0xf0dca0, 0xd8b878, B3.holder, 0.3).position.y = -0.1);
+  // Point the camera at whatever is being built now
+  const target = live ? (plan.tasks[B3.sel] || plan.tasks.find(t => !S.city.done[t.i])) : null;
+  const fp = target ? hexPos(...plan.centers[target.li]) : { x: 0, z: 0 };
+  B3.focusTo = fp;
 }
 function mountBuildView() {
   const host = $('buildView');
@@ -2713,120 +2876,143 @@ function mountBuildView() {
   if (!B3.T) { initBuild3D(); return; }
   host.querySelectorAll('.build-fallback').forEach(f => f.remove());
   if (B3.renderer.domElement.parentNode !== host) host.prepend(B3.renderer.domElement);
-  const w = host.clientWidth || 600, h = Math.round(Math.min(620, Math.max(380, Math.min(w * 0.8, innerHeight - 230))));
+  const w = host.clientWidth || 600, h = Math.round(Math.min(640, Math.max(400, Math.min(w * (w < 640 ? 1.3 : 0.85), innerHeight - 220))));
   B3.renderer.setSize(w, h); B3.camera.aspect = w / h; B3.camera.updateProjectionMatrix();
-  const view = S.build.view != null && S.build.view < S.build.done ? S.build.view : null;
-  if (lmCelebrate >= 0) b3Show(lmCelebrate, 5);
-  else if (view != null) b3Show(view, 5); else if (allBuilt()) b3Show(LANDMARKS.length - 1, 5); else b3Show(S.build.done, S.build.stage);
+  drawCity(viewCity());
   if (!B3.raf) { B3.lastT = performance.now(); B3.raf = requestAnimationFrame(b3Loop); }
 }
+function viewCity() { return S.city.view != null && S.city.view < S.city.i ? S.city.view : Math.min(S.city.i, CITIES.length - 1); }
 function b3Loop(now) {
   if (activeTab !== 'build' || document.hidden || !B3.renderer.domElement.isConnected) { B3.raf = 0; return; }
   B3.raf = requestAnimationFrame(b3Loop);
   if (now - B3.lastT < (fxOff() ? 64 : 31)) return;
   const dt = Math.min(0.1, (now - B3.lastT) / 1000); B3.lastT = now;
-  if (!B3.drag) B3.yaw += dt * 0.12;
+  if (!B3.drag) B3.yaw += dt * 0.06;
+  const f = B3.focus, ft = B3.focusTo || f;
+  f.x += (ft.x - f.x) * Math.min(1, dt * 2.5); f.z += (ft.z - f.z) * Math.min(1, dt * 2.5);
   const zk = B3.zoomFrom ? Math.min(1, (now - B3.zoomFrom) / 1400) : 1;
   if (zk >= 1) B3.zoomFrom = 0;
-  const cam = B3.camera; const d = 15.5 * Math.min(1.6, Math.max(1, 1.7 / cam.aspect)) * (1 + 1.4 * Math.pow(1 - zk, 3));
-  if (zk < 1) B3.yaw += dt * 1.2 * (1 - zk); // pull back on narrow screens
-  cam.position.set(Math.sin(B3.yaw) * d, 8.5, Math.cos(B3.yaw) * d); cam.lookAt(0, 1.8, 0);
+  const cam = B3.camera, d = 15 * Math.min(1.45, Math.max(1, 1.2 / cam.aspect)) * (1 + 1.4 * Math.pow(1 - zk, 3));
+  if (zk < 1) B3.yaw += dt * 1.2 * (1 - zk);
+  cam.position.set(f.x + Math.sin(B3.yaw) * d, d * 0.95 + (1 - zk) * 6, f.z + Math.cos(B3.yaw) * d); cam.lookAt(f.x, 0.8, f.z);
   for (let k = B3.anims.length - 1; k >= 0; k--) {
     const a = B3.anims[k]; a.t += dt / 0.9;
-    const t = Math.min(1, a.t), e = 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2); // ease out with a little bounce
+    const t = Math.min(1, a.t), e = 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);
     a.g.scale.y = Math.max(0.01, e);
     if (t >= 1) { a.g.scale.y = 1; B3.anims.splice(k, 1); }
   }
-  if (B3.ghost) B3.ghost.material.opacity = 0.45 + Math.sin(now / 300) * 0.35;
-  B3.parts.forEach(g => { if (g.userData.flame) g.userData.flame.scale.y = 0.8 + Math.random() * 0.4; });
-  B3.water.position.y = -0.55 + Math.sin(now / 900) * 0.03;
+  B3.floaters.forEach(fl => { fl.o.position.y = fl.y + Math.sin(now / 400 + fl.ph) * 0.12; });
+  (B3.flames || []).forEach(fl => { fl.scale.y = 0.8 + Math.random() * 0.4; });
+  B3.water.position.y = -0.45 + Math.sin(now / 900) * 0.03;
   B3.renderer.render(B3.scene, cam);
 }
-// ---- Build tab ----
-// ---- Build tab: the 3D island fills the screen; map and parts open from buttons on top of it ----
-let lmCelebrate = -1;
+
+// ---- Build tab UI: the island fills the screen; India map and landmark list open from buttons ----
 function renderBuild() {
-  const B = S.build, viewing = lmCelebrate < 0 && B.view != null && B.view < B.done;
-  const shownIdx = lmCelebrate >= 0 ? lmCelebrate : viewing ? B.view : allBuilt() ? LANDMARKS.length - 1 : B.done;
-  const L = LANDMARKS[shownIdx], st = lmCelebrate >= 0 || viewing || allBuilt() ? 5 : B.stage;
-  const dots = L.parts.map((p, k) => `<span class="${k < st ? 'on' : k === st ? 'next' : ''}"></span>`).join('');
+  const ci = viewCity(), C = CITIES[ci], live = ci === S.city.i, prog = cityProgress(ci);
   let bottom;
-  if (lmCelebrate >= 0) bottom = `<button class="btn gold bv-main" data-act="lm-next">${tr('Next landmark ➜', 'తర్వాతి కట్టడం ➜')}</button>`;
-  else if (viewing) bottom = `<button class="btn gold bv-main" data-act="build-view" data-id="-1">${tr('Back to building', 'కట్టడానికి తిరిగి')}</button>`;
-  else if (allBuilt()) bottom = `<div class="bv-note">${tr('Every landmark is built! More cities soon.', 'అన్ని కట్టడాలూ పూర్తి! మరిన్ని నగరాలు త్వరలో.')}</div>`;
+  if (!live) bottom = `<button class="btn gold bv-main" data-act="build-view" data-id="-1">${allCitiesDone() ? tr('All cities built!', 'అన్ని నగరాలూ పూర్తి!') : tr(`Back to ${CITIES[S.city.i].name[0]}`, `${CITIES[S.city.i].name[1]} కి తిరిగి`)}</button>`;
   else {
-    const cost = stageCost(B.done, B.stage), ok = S.cash >= cost;
-    bottom = `<button class="btn ${ok ? 'gold' : 'ghost'} bv-main build-btn" data-act="build-part" ${ok ? '' : 'disabled'}>
-        ${ico('construction')}<span><b>${tr('Build', 'కట్టు')}: ${tr(...L.parts[B.stage])}</b><small>${ico('coin')} ${fmtInt(cost)}</small></span></button>
-      ${ok ? '' : `<button class="btn blue bv-get" data-act="tab" data-tab="slots">${ico('slot')} ${tr('Get coins', 'కాయిన్లు')}</button>`}`;
+    const t = selTask();
+    if (!t) bottom = `<button class="btn gold bv-main" data-act="city-next">${CITIES[ci + 1] ? tr(`Travel to ${CITIES[ci + 1].name[0]} ✈️`, `${CITIES[ci + 1].name[1]} కి వెళ్ళు ✈️`) : tr('City complete!', 'నగరం పూర్తి!')}</button>`;
+    else {
+      const cost = taskCost(ci, t), ok = S.cash >= cost, rw = taskReward(ci, t);
+      bottom = `<div class="task-card">
+        <div class="tc-ico">${ico(taskIcon(ci, t))}</div>
+        <div class="tc-info"><small>${tr('Next task', 'తర్వాతి పని')}</small><b>${taskName(ci, t)}</b>
+          ${rw ? `<span class="tc-gift">${ico('gift')} +${fmtInt(rw.coins)} ${ico('coin')} +${rw.energy} ⚡</span>` : t.type === 'part' ? `<span class="tc-gift">+5 ⚡ +1 ${ico('pack')}</span>` : ''}</div>
+        <button class="btn ${ok ? 'gold' : 'ghost'} tc-build" data-act="build-part" ${ok ? '' : 'disabled'}><b>${tr('Build', 'కట్టు')}</b><small>${ico('coin')} ${fmtInt(cost)}</small></button>
+        ${ok ? '' : `<button class="btn blue tc-get" data-act="tab" data-tab="slots">${ico('slot')}</button>`}
+      </div>`;
+    }
   }
-  const fallback = B3.failed ? `<div class="build-fallback">${ico(L.icon, 'big-ico')}<p>${tr('3D view needs an internet connection.', '3D వ్యూ కోసం ఇంటర్నెట్ కావాలి.')}</p></div>`
+  const fallback = B3.failed ? `<div class="build-fallback">${ico('worldmap', 'big-ico')}<p>${tr('3D view needs an internet connection.', '3D వ్యూ కోసం ఇంటర్నెట్ కావాలి.')}</p></div>`
     : B3.T ? '' : `<div class="build-fallback"><div class="loader"></div></div>`;
   return `<div class="build-view big" id="buildView">${fallback}
     <div class="bv-top">
-      <button class="bv-btn" data-act="build-map">${ico('worldmap')}<span>${tr('Map', 'మ్యాప్')}</span></button>
-      <div class="bv-title"><b>${tr(...L.name)}</b><small>${tr(...L.city)} · ${shownIdx + 1}/${LANDMARKS.length}</small><div class="bv-dots">${dots}</div></div>
-      <button class="bv-btn" data-act="build-parts">${ico('construction')}<span>${tr('Parts', 'భాగాలు')}</span></button>
+      <button class="bv-btn map" data-act="build-map">${ico('worldmap')}<span>${tr('MAP', 'మ్యాప్')}</span></button>
+      <div class="bv-title"><b>${tr(...C.name)}</b><div class="city-bar"><div style="width:${prog.done / prog.total * 100}%"></div><span>${prog.done} / ${prog.total}</span></div>
+        <small>${tr('Landmarks', 'కట్టడాలు')}: ${C.lms.filter((_, li) => lmPartsBuilt(ci, li) >= 5).length}/${C.lms.length}</small></div>
+      <button class="bv-btn" data-act="build-parts">${ico('construction')}<span>${tr('Landmarks', 'కట్టడాలు')}</span></button>
     </div>
     <div class="bv-bonus">${ico('chart')} +${Math.round((landmarkBonus() - 1) * 100)}%</div>
     <div class="bv-bottom">${bottom}</div>
   </div>`;
 }
+const INDIA_PATH = 'M105,10 L130,8 L150,25 L140,45 L160,60 L175,70 L200,78 L215,95 L240,100 L262,92 L285,98 L295,115 L275,125 L262,140 L255,150 L240,150 L235,165 L220,170 L212,185 L200,190 L195,205 L185,215 L178,230 L170,245 L162,262 L155,280 L148,300 L140,318 L132,330 L124,318 L118,300 L110,282 L104,262 L98,240 L94,222 L88,205 L80,195 L65,192 L52,185 L40,172 L48,160 L38,150 L30,140 L45,130 L60,128 L70,115 L80,100 L85,85 L78,70 L90,55 L95,35 Z';
 function openBuildMap() {
-  const B = S.build;
-  const stops = LANDMARKS.map((L, i) => {
-    const state = i < B.done ? 'built' : i === B.done ? 'now' : 'locked';
-    return `<button class="map-stop ${state}" data-act="build-view" data-id="${state === 'built' ? i : -1}" ${state === 'locked' ? 'disabled' : ''}>
-      ${ico(state === 'locked' ? 'lock' : L.icon)}<span>${tr(...L.name)}</span><small>${state === 'built' ? '✅ ' + tr('Built', 'పూర్తి') : state === 'now' ? `🏗️ ${B.stage}/5` : tr('Locked', 'లాక్')}</small></button>`;
+  const pins = CITIES.map((C, ci) => {
+    const st = ci < S.city.i ? 'done' : ci === S.city.i ? 'now' : 'locked', [x, y] = C.pin, p = cityProgress(ci);
+    return `<g class="pin ${st}" ${st !== 'locked' ? `data-act="build-view" data-id="${ci === S.city.i ? -1 : ci}"` : ''}>
+      <circle cx="${x}" cy="${y}" r="13" class="pin-ring"/><circle cx="${x}" cy="${y}" r="8" class="pin-dot"/>
+      <text x="${C.left ? x - 16 : x + 16}" y="${y + 4}" class="pin-label" text-anchor="${C.left ? 'end' : 'start'}">${esc(tr(...C.name))}</text>
+      <text x="${C.left ? x - 16 : x + 16}" y="${y + 17}" class="pin-sub" text-anchor="${C.left ? 'end' : 'start'}">${st === 'done' ? '✓' : st === 'now' ? `${p.done}/${p.total}` : '🔒'}</text></g>`;
   }).join('');
+  const route = CITIES.map(C => C.pin.join(',')).join(' ');
   SlotFX.press();
-  modal(`<h3>${ico('worldmap')} ${tr('Landmark map', 'కట్టడాల మ్యాప్')}</h3>
-    <p class="sub">${tr(`Each finished landmark: +${LANDMARK_BONUS * 100}% coin prizes for good. Tap a built one to visit it.`, `పూర్తయిన ప్రతి కట్టడం: శాశ్వతంగా +${LANDMARK_BONUS * 100}% కాయిన్ బహుమతులు. కట్టినదాన్ని నొక్కితే చూడవచ్చు.`)}</p>
-    <div class="build-map">${stops}</div><div class="modal-actions"><button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button></div>`);
+  modal(`<h3>${ico('worldmap')} ${tr('India map', 'భారత దేశ మ్యాప్')}</h3>
+    <p class="sub">${tr('Build every tile of a city to travel to the next one. Tap a city you have finished to visit it.', 'ఒక నగరంలో అన్ని పనులు పూర్తి చేస్తే తర్వాతి నగరం తెరుచుకుంటుంది. పూర్తయిన నగరాన్ని నొక్కితే చూడవచ్చు.')}</p>
+    <svg class="india-map" viewBox="0 0 320 340"><defs><linearGradient id="indG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fe08a"/><stop offset="1" stop-color="#3f9a3a"/></linearGradient></defs>
+      <path d="${INDIA_PATH}" fill="url(#indG)" stroke="#fff6c8" stroke-width="3" stroke-linejoin="round"/>
+      <polyline points="${route}" class="route"/>${pins}</svg>
+    <div class="modal-actions"><button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button></div>`);
 }
 function openBuildParts() {
-  const B = S.build, viewing = B.view != null && B.view < B.done, idx = viewing ? B.view : Math.min(B.done, LANDMARKS.length - 1), L = LANDMARKS[idx];
-  const st = viewing || allBuilt() ? 5 : B.stage;
-  const rows = L.parts.map((p, k) => `<div class="part-row ${k < st ? 'done' : k === st ? 'next' : ''}">
-    <span class="pr-n">${k < st ? '✓' : k + 1}</span><b>${tr(...p)}</b>
-    <small>${k < st ? tr('Built', 'పూర్తి') : `${ico('coin')} ${fmtInt(stageCost(idx, k))}`}</small></div>`).join('');
+  const ci = viewCity(), C = CITIES[ci];
+  const rows = C.lms.map((id, li) => {
+    const L = LANDMARKS[id], n = lmPartsBuilt(ci, li);
+    return `<div class="part-row ${n >= 5 ? 'done' : n > 0 ? 'next' : ''}"><span class="pr-n">${n >= 5 ? '✓' : li + 1}</span>
+      <b>${ico(L.icon)} ${tr(...L.name)}</b><small>${n >= 5 ? tr('Built · +10%', 'పూర్తి · +10%') : `${n}/5 ${tr('parts', 'భాగాలు')}`}</small></div>`;
+  }).join('');
   SlotFX.press();
-  modal(`<h3>${ico(L.icon)} ${tr(...L.name)}</h3><p class="sub">${tr('Every part pays coins, energy and a sticker pack. The last part also gives gems and a gold pack.', 'ప్రతి భాగానికి కాయిన్లు, ఎనర్జీ, స్టిక్కర్ ప్యాక్. చివరి భాగానికి జెమ్స్, గోల్డ్ ప్యాక్ కూడా.')}</p>
+  modal(`<h3>${ico('construction')} ${tr(`${C.name[0]} landmarks`, `${C.name[1]} కట్టడాలు`)}</h3>
+    <p class="sub">${tr('Each finished landmark: gems, energy, a gold pack and +10% on all prizes for good.', 'పూర్తయిన ప్రతి కట్టడం: జెమ్స్, ఎనర్జీ, గోల్డ్ ప్యాక్, శాశ్వతంగా అన్ని బహుమతులు +10%.')}</p>
     <div class="parts-list">${rows}</div><div class="modal-actions"><button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button></div>`);
 }
 function buildPart() {
-  if (allBuilt()) return;
-  const B = S.build, cost = stageCost(B.done, B.stage);
+  if (allCitiesDone()) return;
+  const ci = S.city.i, plan = cityPlan(ci), t = selTask();
+  if (!t || S.city.done[t.i] || !availableTasks().some(a => a.i === t.i)) return;
+  const cost = taskCost(ci, t);
   if (S.cash < cost) { toast(tr('Not enough coins. Spin to win more!', 'కాయిన్లు సరిపోవు. స్పిన్ చేసి గెలవండి!'), 'bad'); return; }
-  S.cash -= cost;
-  const L = buildCurrent(), part = B.stage;
-  B.stage++; B.view = null;
-  const cash = bonusCash(300 * (B.done + 1)); earn(cash); S.slot.energy += 5; giveAlbumPack('basic', 1, true); addLeague(30);
+  S.cash -= cost; S.city.done[t.i] = true; addLeague(t.type === 'part' ? 30 : 10);
+  const from = document.querySelector('.tc-build') || $('buildView');
+  const rw = taskReward(ci, t);
+  if (rw) { earn(rw.coins); S.slot.energy += rw.energy; flyTo('coins', from, 'coin', 6); toast(tr(`🎁 Gift! +${fmtInt(rw.coins)} coins, +${rw.energy} ⚡`, `🎁 బహుమతి! +${fmtInt(rw.coins)} కాయిన్లు, +${rw.energy} ⚡`), 'good'); SlotFX.big(); }
+  else SlotFX.land('pop');
+  if (t.type === 'part') { S.slot.energy += 5; giveAlbumPack('basic', 1, true); flyTo('pack', from, 'pack', 1); }
   sfx('buy');
-  toast(tr(`🏗️ ${L.parts[part][0]} built! +${money(cash)} coins, +5 ⚡, +1 📦`, `🏗️ ${L.parts[part][1]} పూర్తి! +${money(cash)} కాయిన్లు, +5 ⚡, +1 📦`), 'good');
-  let finished = false;
-  if (B.stage >= 5) {
-    finished = true;
-    const gems = 20 * (B.done + 1);
-    const bonus = bonusCash(3600 * (B.done + 1));
-    B.done++; B.stage = 0; B.view = null; S.gems += gems; S.slot.energy += 25; earn(bonus); giveAlbumPack('gold', 1, true);
-    lmCelebrate = B.done - 1; // show the finished landmark until the player moves on
-    setTimeout(() => {
-      SlotFX.jackpot(); confetti($('buildView'), 240);
-      const next = LANDMARKS[B.done];
-      const tile = (icon, big, small, k) => `<div class="lm-tile" style="animation-delay:${0.25 + k * 0.15}s">${ico(icon)}<b>${big}</b><small>${small}</small></div>`;
-      modal(`<div class="lm-done"><div class="lm-rays"></div>${ico(L.icon, 'big-ico')}</div>
-        <h3>${tr(`${L.name[0]} is complete!`, `${L.name[1]} పూర్తయింది!`)}</h3>
-        <div class="lm-tiles">${tile('coin', fmtInt(bonus), tr('coins', 'కాయిన్లు'), 0)}${tile('gem', gems, tr('gems', 'జెమ్స్'), 1)}${tile('bolt', 25, tr('energy', 'ఎనర్జీ'), 2)}${tile('pack', 1, tr('gold pack', 'గోల్డ్ ప్యాక్'), 3)}${tile('chart', '+' + LANDMARK_BONUS * 100 + '%', tr('all prizes', 'అన్ని బహుమతులు'), 4)}</div>
-        ${next ? `<p class="sub">${tr(`Next up: <b>${next.name[0]}</b>, ${next.city[0]}`, `తర్వాత: <b>${next.name[1]}</b>, ${next.city[1]}`)}</p>` : `<p class="sub">${tr('You built every landmark!', 'అన్ని కట్టడాలూ కట్టేశారు!')}</p>`}
-        <div class="modal-actions"><button class="btn gold lm-next" data-act="lm-next">${next ? tr('Collect & next landmark ➜', 'తీసుకుని తర్వాతి కట్టడం ➜') : tr('Collect', 'తీసుకో')}</button></div>`);
-    }, 1100);
-  }
-  save();
+  // Finished landmark?
+  let lmDone = null;
+  if (t.type === 'part' && t.k === 4) lmDone = { li: t.li, L: LANDMARKS[CITIES[ci].lms[t.li]] };
+  const cityFinished = plan.tasks.every(x => S.city.done[x.i]);
+  B3.sel = -1; save();
   const keep = B3.T;
   renderTab();
-  if (keep) b3Show(finished ? B.done - 1 : B.done, finished ? 5 : B.stage, finished ? 4 : part);
+  if (keep) { B3.shownKey = ''; drawCity(ci, t.i); }
   updateHeader();
+  if (lmDone) setTimeout(() => landmarkCelebration(lmDone.L, cityFinished), 1100);
+  else if (cityFinished) setTimeout(cityCelebration, 900);
+}
+function landmarkCelebration(L, thenCity) {
+  const n = landmarksDone(), gems = 20 * n, bonus = bonusCash(3600 * n);
+  S.gems += gems; S.slot.energy += 25; earn(bonus); giveAlbumPack('gold', 1, true); save();
+  SlotFX.jackpot(); confetti($('buildView'), 240);
+  const tile = (icon, big, small, k) => `<div class="lm-tile" style="animation-delay:${0.25 + k * 0.15}s">${ico(icon)}<b>${big}</b><small>${small}</small></div>`;
+  modal(`<div class="lm-done"><div class="lm-rays"></div>${ico(L.icon, 'big-ico')}</div>
+    <h3>${tr(`${L.name[0]} is complete!`, `${L.name[1]} పూర్తయింది!`)}</h3>
+    <div class="lm-tiles">${tile('coin', fmtInt(bonus), tr('coins', 'కాయిన్లు'), 0)}${tile('gem', gems, tr('gems', 'జెమ్స్'), 1)}${tile('bolt', 25, tr('energy', 'ఎనర్జీ'), 2)}${tile('pack', 1, tr('gold pack', 'గోల్డ్ ప్యాక్'), 3)}${tile('chart', '+' + LANDMARK_BONUS * 100 + '%', tr('all prizes', 'అన్ని బహుమతులు'), 4)}</div>
+    <div class="modal-actions"><button class="btn gold lm-next" data-act="lm-next" data-id="${thenCity ? 'city' : ''}">${tr('Collect!', 'తీసుకో!')}</button></div>`);
+}
+function cityCelebration() {
+  const C = CITIES[S.city.i], next = CITIES[S.city.i + 1], gems = 50, energy = 50;
+  S.gems += gems; S.slot.energy += energy; giveAlbumPack('gold', 2, true); save();
+  SlotFX.jackpot(); confetti($('buildView'), 300);
+  modal(`<div class="lm-done"><div class="lm-rays"></div>${ico('worldmap', 'big-ico')}</div>
+    <h3>${tr(`${C.name[0]} is complete!`, `${C.name[1]} పూర్తయింది!`)}</h3>
+    <div class="lm-tiles">${[['gem', gems, tr('gems', 'జెమ్స్')], ['bolt', energy, tr('energy', 'ఎనర్జీ')], ['pack', 2, tr('gold packs', 'గోల్డ్ ప్యాక్‌లు')]].map(([i, b, sm], k) => `<div class="lm-tile" style="animation-delay:${0.25 + k * 0.15}s">${ico(i)}<b>${b}</b><small>${sm}</small></div>`).join('')}</div>
+    <p class="sub">${next ? tr(`Next stop: <b>${next.name[0]}</b>`, `తర్వాతి నగరం: <b>${next.name[1]}</b>`) : tr('You built every city! More coming soon.', 'అన్ని నగరాలూ కట్టేశారు! మరిన్ని త్వరలో.')}</p>
+    <div class="modal-actions"><button class="btn gold lm-next" data-act="city-next">${next ? tr(`Travel to ${next.name[0]} ✈️`, `${next.name[1]} కి వెళ్ళు ✈️`) : tr('Great!', 'సూపర్!')}</button></div>`);
 }
 
 /* ---------------------------- ALBUM (sticker collection) ----------- */
@@ -3669,7 +3855,8 @@ function renderStats() {
       [tr('Spins', 'స్పిన్‌లు'), fmtInt(S.stats.slotSpins || 0)],
       [tr('Bosses beaten', 'ఓడించిన బాస్‌లు'), fmtInt(S.stats.bosses || 0)],
       [tr('Raids', 'దాడులు'), fmtInt(S.stats.raids || 0)],
-      [tr('Landmarks built', 'కట్టిన ల్యాండ్‌మార్కులు'), S.build.done + ' / ' + LANDMARKS.length],
+      [tr('Landmarks built', 'కట్టిన ల్యాండ్‌మార్కులు'), landmarksDone() + ' / ' + Object.keys(LANDMARKS).length],
+      [tr('Cities built', 'కట్టిన నగరాలు'), Math.min(S.city.i, CITIES.length) + ' / ' + CITIES.length],
       [tr('Stickers', 'స్టిక్కర్లు'), Object.keys(S.album.have).length + ' / ' + ALL_STICKERS.length],
       [tr('VIP', 'VIP'), tr(...vipTier().name)],
       [tr('Lucky spins', 'లక్కీ స్పిన్‌లు'), fmtInt(S.stats.spins || 0)],
@@ -3779,7 +3966,7 @@ function updateDots() {
   $('dot-scratch').classList.toggle('on', scratchFreeReady());
   slotRegen(); $('dot-slots').classList.toggle('on', S.slot.energy >= slotMax() || giftReady() || calReady() || S.raid.tokens > 0 || helpLeft());
   $('dot-album').classList.toggle('on', S.album.packs.basic + S.album.packs.gold > 0);
-  $('dot-build').classList.toggle('on', !allBuilt() && S.cash >= stageCost(S.build.done, S.build.stage));
+  $('dot-build').classList.toggle('on', !allCitiesDone() && S.cash >= nextTaskCost());
   const hasPets = Object.keys(S.pets.owned).length > 0;
   $('dot-pets').classList.toggle('on', hasPets ? (petsHungry() && petFeedReady()) : PETS.some(p => p.cost.cash ? S.cash >= p.cost.cash : false));
 }
@@ -3929,12 +4116,22 @@ document.addEventListener('click', e => {
     case 'lm-next': {
       const from = el.getBoundingClientRect().width ? el : $('buildView');
       flyTo('coins', from, 'coin', 10); flyTo('gems', from, 'gem', 5, 120); flyTo('pack', from, 'pack', 2, 240);
-      lmCelebrate = -1; closeModal(); SlotFX.whoosh();
-      B3.zoomFrom = performance.now(); renderTab(); break;
+      closeModal(); SlotFX.whoosh(); renderTab();
+      if (id === 'city') setTimeout(cityCelebration, 900);
+      break;
+    }
+    case 'city-next': {
+      if (allCitiesDone()) { closeModal(); break; }
+      const from = el.getBoundingClientRect().width ? el : $('buildView');
+      if (!$('modal').classList.contains('hidden')) { flyTo('gems', from, 'gem', 6); flyTo('energy', from, 'bolt', 5, 120); flyTo('pack', from, 'pack', 2, 240); }
+      S.city.i++; S.city.done = {}; S.city.view = null; B3.sel = -1; save();
+      closeModal(); SlotFX.whoosh(); B3.zoomFrom = performance.now(); renderTab();
+      if (!allCitiesDone()) toast(tr(`✈️ Welcome to ${CITIES[S.city.i].name[0]}!`, `✈️ ${CITIES[S.city.i].name[1]} కి స్వాగతం!`), 'good');
+      break;
     }
     case 'build-map': openBuildMap(); break;
     case 'build-parts': openBuildParts(); break;
-    case 'build-view': S.build.view = +id >= 0 ? +id : null; closeModal(); renderTab(); break;
+    case 'build-view': S.city.view = +id >= 0 ? +id : null; B3.zoomFrom = performance.now(); closeModal(); renderTab(); break;
     case 'ad': watchAd(); break;
     case 'ad-go': { const f = pendingShowAd; pendingShowAd = null; closeModal(); if (f) f(); break; }
     case 'scratch-buy': buyScratch(); break;
@@ -4146,6 +4343,7 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 }
 
 const hadSave = load();
+migrateBuild();
 hydrateIcons();
 applyLowFx();
 applyStaticText();

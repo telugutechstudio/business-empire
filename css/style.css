@@ -1225,3 +1225,35 @@ body.lowfx .rail-btn .i3d, body.lowfx .tab.active { animation: none; }
 .lm-next { font-size: 18px; padding: 14px 22px; animation: spinIdle 2.2s ease-in-out infinite; }
 @media (max-width: 520px) { .lm-tiles { grid-template-columns: repeat(3, 1fr); } }
 body.biz-off .cash-wrap { flex: 0 1 auto; width: auto; max-width: 340px; min-width: 200px; margin: 0 auto; justify-self: center; }
+
+/* ---------- City map: task card, progress bar, India map ---------- */
+.city-bar { position: relative; height: 16px; margin: 6px 0 3px; border-radius: 8px; background: rgba(255, 255, 255, .18); overflow: hidden; }
+.city-bar > div { height: 100%; background: linear-gradient(90deg, #3ccf6e, #9dff6a); transition: width .5s; }
+.city-bar span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff; text-shadow: 0 1px 2px #000; }
+.bv-btn.map { background: linear-gradient(180deg, #ffb340, #e07a10); box-shadow: 0 5px 0 #8a4a00; }
+.bv-bottom .task-card { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 10px; width: min(560px, 100%); padding: 10px 12px; border-radius: 18px;
+  background: linear-gradient(180deg, rgba(40, 20, 100, .92), rgba(20, 10, 60, .92)); border: 2px solid #ffd25a; box-shadow: 0 6px 18px rgba(0, 0, 0, .45); color: #fff; animation: tileIn .35s cubic-bezier(.2, 1.5, .4, 1); }
+.tc-ico .i3d { width: 46px; height: 46px; }
+.tc-info { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; text-align: left; }
+.tc-info small { color: #c6b8f2; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+.tc-info b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; }
+.tc-gift { margin-top: 3px; font-size: 12px; font-weight: 700; color: #9dffb4; }
+.tc-gift .i3d { width: 16px; height: 16px; vertical-align: -3px; }
+.tc-build { display: flex; flex-direction: column; align-items: center; padding: 8px 16px; line-height: 1.2; box-shadow: 0 5px 0 #b06200; }
+.tc-build b { font-size: 16px; } .tc-build small { font-size: 13px; white-space: nowrap; }
+.tc-build small .i3d { width: 16px; height: 16px; vertical-align: -3px; }
+.tc-get { padding: 8px 10px; } .tc-get .i3d { width: 28px; height: 28px; }
+.india-map { display: block; width: 100%; max-width: 380px; margin: 8px auto; background: radial-gradient(circle at 50% 40%, #4ab0e8, #1a5a9a); border-radius: 18px; border: 3px solid #ffd25a; }
+.india-map .route { fill: none; stroke: #fff; stroke-width: 2.5; stroke-dasharray: 6 5; opacity: .85; }
+.india-map .pin { cursor: pointer; }
+.india-map .pin.locked { cursor: default; opacity: .75; }
+.india-map .pin-ring { fill: rgba(255, 255, 255, .35); }
+.india-map .pin-dot { fill: #8a8a9a; stroke: #fff; stroke-width: 2.5; }
+.india-map .pin.done .pin-dot { fill: #2fb35a; }
+.india-map .pin.now .pin-dot { fill: #ff4a3a; }
+.india-map .pin.now .pin-ring { fill: rgba(255, 74, 58, .45); transform-box: fill-box; transform-origin: center; animation: pinPulse 1.4s ease-out infinite; }
+.india-map .pin-label { font: 700 13px system-ui, sans-serif; fill: #fff; paint-order: stroke; stroke: #1a1040; stroke-width: 3px; }
+.india-map .pin-sub { font: 700 11px system-ui, sans-serif; fill: #ffe9a8; paint-order: stroke; stroke: #1a1040; stroke-width: 3px; }
+@keyframes pinPulse { from { transform: scale(.6); opacity: 1; } to { transform: scale(1.8); opacity: 0; } }
+@media (max-width: 640px) { .bv-bottom .task-card { grid-template-columns: auto 1fr auto; } .tc-get { display: none; } .tc-ico .i3d { width: 36px; height: 36px; } .city-bar { min-width: 120px; } }
+.build-view .bv-bonus { bottom: 104px; }
