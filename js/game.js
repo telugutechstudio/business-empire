@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '5.7';
+const GAME_VERSION = '5.8';
 const BIZ_OFF = true; // businesses, managers, upgrades, investors, stocks and worlds are switched off
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
@@ -3735,6 +3735,156 @@ function speakFact(el, kind, id) {
   speechSynthesis.speak(u);
 }
 function speakBtn(kind, id) { return `<button class="speak-btn" data-act="speak" data-kind="${kind}" data-id="${id}" title="${esc(tr('Listen', 'వినండి'))}">${ico('speaker')}<span>${tr('Listen', 'వినండి')}</span></button>`; }
+// ---- More cities: Vizag to Darjeeling ----
+Object.assign(BTYPE_PARTS, {
+  submarine: [['Display stands', 'ప్రదర్శన స్టాండ్లు'], ['Hull', 'శరీరం'], ['Conning tower', 'కానింగ్ టవర్'], ['Fins and propeller', 'రెక్కలు, ప్రొపెల్లర్'], ['Periscope and flag', 'పెరిస్కోప్, జెండా']],
+  statue: [['Rock base', 'రాతి పునాది'], ['Pedestal', 'పీఠం'], ['Robe', 'వస్త్రం'], ['Head and shoulders', 'తల, భుజాలు'], ['Hands', 'చేతులు']],
+  train: [['Tracks', 'పట్టాలు'], ['Engine', 'ఇంజిన్'], ['Coaches', 'బోగీలు'], ['Chimney and wheels', 'పొగగొట్టం, చక్రాలు'], ['Steam and station', 'ఆవిరి, స్టేషన్']],
+});
+Object.assign(BTYPES, {
+  submarine() {
+    const P = G5(), hullC = 0x2a3a4a;
+    bx(4.6, 0.2, 1.8, 0xd8c8a0, 0, 0.1, 0, P[0]); for (const x of [-1.3, 1.3]) bx(0.4, 0.7, 1.2, 0x8a8a8a, x, 0.55, 0, P[0]);
+    const h = cy(0.75, 0.75, 3.6, hullC, 0, 1.6, 0, P[1], 20); h.rotation.z = Math.PI / 2;
+    sp(0.75, hullC, -1.8, 1.6, 0, P[1]); const tail = co(0.75, 1.2, hullC, 2.4, 1.6, 0, P[1], 20); tail.rotation.z = -Math.PI / 2;
+    bx(3.0, 0.08, 0.5, 0x8a3a2a, 0, 1.0, 0, P[1]);
+    bx(1.1, 0.9, 0.5, hullC, -0.5, 2.7, 0, P[2]); bx(1.2, 0.08, 0.6, 0x5a6a7a, -0.5, 3.16, 0, P[2]);
+    bx(0.6, 0.05, 1.8, hullC, 2.5, 1.6, 0, P[3]); bx(0.6, 1.4, 0.05, hullC, 2.5, 1.6, 0, P[3]);
+    for (let i = 0; i < 3; i++) { const b = bx(0.05, 0.6, 0.15, 0xd8b040, 3.05, 1.6, 0, P[3]); b.rotation.x = i * Math.PI / 3; }
+    cy(0.04, 0.04, 1.0, 0x8a8a8a, -0.3, 3.6, 0, P[4], 6); bx(0.2, 0.08, 0.08, 0x8a8a8a, -0.22, 4.1, 0, P[4]);
+    cy(0.02, 0.02, 0.9, 0xdddddd, -0.8, 3.6, 0, P[4], 6); [[0xff9933, 3.98], [0xffffff, 3.88], [0x138808, 3.78]].forEach(([c, y]) => noShadow(bx(0.45, 0.1, 0.02, c, -0.55, y, 0, P[4])));
+    return P;
+  },
+  statue(o) {
+    const P = G5(), st = o.c || 0xa8a29a;
+    b3Mesh(new B3.T.DodecahedronGeometry(1.6, 0), 0x8a857a, 0, 0.4, 0, P[0]).scale.set(1.2, 0.45, 1.2);
+    bx(1.4, 1.2, 1.4, 0xb8b2a8, 0, 1.3, 0, P[1]); bx(1.6, 0.15, 1.6, 0x9a958c, 0, 1.95, 0, P[1]);
+    cy(0.45, 0.7, 2.4, st, 0, 3.2, 0, P[2], 16);
+    sp(0.62, st, 0, 4.4, 0, P[3], 0.55); cy(0.15, 0.17, 0.25, st, 0, 4.7, 0, P[3]); sp(0.34, st, 0, 5.05, 0, P[3]); sp(0.2, st, 0, 5.45, 0, P[3], 0.8);
+    const arm = cy(0.12, 0.14, 1.0, st, 0.55, 3.9, 0.35, P[4], 8); arm.rotation.x = 0.7;
+    const arm2 = cy(0.12, 0.14, 1.1, st, -0.55, 3.7, 0.2, P[4], 8); arm2.rotation.z = -0.15;
+    bx(0.08, 0.5, 0.3, 0xc8b070, 0.6, 4.3, 0.75, P[4]);
+    return P;
+  },
+  train() {
+    const P = G5(), blue = 0x2a5ad8, coach = 0x3a8ad8;
+    for (const z of [-0.45, 0.45]) bx(5.0, 0.08, 0.08, 0x6a6a6a, 0, 0.2, z, P[0]);
+    for (let x = -2.4; x <= 2.41; x += 0.4) bx(0.15, 0.08, 1.2, 0x7a5232, x, 0.12, 0, P[0]);
+    const boiler = cy(0.42, 0.42, 1.4, blue, 1.4, 0.95, 0, P[1], 16); boiler.rotation.z = Math.PI / 2;
+    bx(0.8, 1.2, 1.0, blue, 0.4, 1.1, 0, P[1]); bx(0.9, 0.1, 1.1, 0x1a2a6a, 0.4, 1.75, 0, P[1]);
+    for (const x of [-0.8, -2.0]) { bx(1.1, 0.9, 0.95, coach, x, 0.95, 0, P[2]); bx(1.2, 0.08, 1.05, 0xd84a3a, x, 1.44, 0, P[2]); for (const wx of [-0.3, 0.05, 0.4]) for (const z of [-0.48, 0.48]) bx(0.22, 0.25, 0.03, 0xfff2c0, x + wx, 1.05, z, P[2]); }
+    cy(0.12, 0.17, 0.5, 0x2a2a2a, 1.85, 1.55, 0, P[3], 10);
+    for (const x of [1.6, 1.0, 0.3, -0.5, -1.1, -1.7, -2.3]) for (const z of [-0.5, 0.5]) { const w = cy(0.2, 0.2, 0.08, 0x1a1a1a, x, 0.42, z, P[3], 12); w.rotation.x = Math.PI / 2; }
+    for (const [x, y, r] of [[1.9, 2.1, 0.22], [1.6, 2.5, 0.3], [1.1, 2.85, 0.38]]) noShadow(sp(r, 0xf4f4f4, x, y, 0, P[4]));
+    bx(0.1, 0.9, 0.1, 0x5a3418, -2.4, 0.65, 1.0, P[4]); bx(0.8, 0.3, 0.06, 0xffd25a, -2.4, 1.2, 1.0, P[4]);
+    return P;
+  },
+});
+Object.assign(LANDMARKS, {
+  // Visakhapatnam
+  kailasagiri: { icon: 'mountain', type: 'garden', name: ['Kailasagiri', 'కైలాసగిరి'], y: '2003',
+    fact: ['Kailasagiri is a hilltop park over the sea with a ropeway and huge statues of Shiva and Parvati.', 'కైలాసగిరి సముద్రం పైన కొండ మీద ఉన్న పార్క్. ఇక్కడ రోప్‌వే, శివపార్వతుల పెద్ద విగ్రహాలు ఉన్నాయి.'],
+    quiz: [['How do many visitors ride up to Kailasagiri?', 'చాలామంది కైలాసగిరి పైకి ఎలా వెళ్తారు?'], [['Ropeway', 'రోప్‌వే'], ['Boat', 'పడవ'], ['Camel', 'ఒంటె']]] },
+  kursura: { icon: 'canoe', type: 'submarine', name: ['Submarine Museum', 'సబ్‌మెరైన్ మ్యూజియం'], y: '2002',
+    fact: ['INS Kursura served in the Indian Navy for over 30 years. Now it rests on RK Beach as a museum you can walk inside.', 'ఐఎన్‌ఎస్ కుర్సుర భారత నౌకాదళంలో 30 ఏళ్ళకు పైగా పనిచేసింది. ఇప్పుడు ఆర్కే బీచ్‌లో లోపలికి వెళ్ళి చూడగలిగే మ్యూజియం.'],
+    quiz: [['INS Kursura on RK Beach is a?', 'ఆర్కే బీచ్‌లోని ఐఎన్‌ఎస్ కుర్సుర ఏమిటి?'], [['Submarine', 'జలాంతర్గామి'], ['Aeroplane', 'విమానం'], ['Train', 'రైలు']]] },
+  simhachalam: { icon: 'htemple', type: 'gopuram', o: { c: 0xe8dcc8, tiers: 6 }, name: ['Simhachalam Temple', 'సింహాచలం ఆలయం'], y: ['11th century', '11వ శతాబ్దం'],
+    fact: ['Lord Varaha Lakshmi Narasimha at Simhachalam is covered in sandalwood paste all year; the true form is seen only on Chandanotsavam.', 'సింహాచలం వరాహ లక్ష్మీ నరసింహ స్వామి ఏడాదంతా చందనంతో కప్పబడి ఉంటారు; నిజరూపం చందనోత్సవం రోజే కనిపిస్తుంది.'],
+    quiz: [['The Simhachalam deity is covered with?', 'సింహాచలం స్వామి దేనితో కప్పబడి ఉంటారు?'], [['Sandalwood paste', 'చందనం'], ['Gold sheets', 'బంగారు రేకులు'], ['Flowers', 'పూలు']]] },
+  // Srisailam
+  mallikarjuna: { icon: 'htemple', type: 'gopuram', o: { c: 0xf0e0c0, tiers: 7 }, name: ['Mallikarjuna Temple', 'మల్లికార్జున ఆలయం'], y: ['Ancient', 'ప్రాచీనం'],
+    fact: ['Srisailam is rare: it is one of the 12 Jyotirlingas of Shiva and also a Shakti Peetha of Goddess Bhramaramba.', 'శ్రీశైలం అరుదైనది: ఇది శివుని 12 జ్యోతిర్లింగాలలో ఒకటి, భ్రమరాంబ అమ్మవారి శక్తిపీఠం కూడా.'],
+    quiz: [['Srisailam is a Jyotirlinga and also a?', 'శ్రీశైలం జ్యోతిర్లింగం మరియు ఒక?'], [['Shakti Peetha', 'శక్తిపీఠం'], ['Fort', 'కోట'], ['Palace', 'రాజభవనం']]] },
+  srisailamdam: { icon: 'bridge', type: 'barrage', name: ['Srisailam Dam', 'శ్రీశైలం డ్యామ్'], y: '1981',
+    fact: ['Srisailam Dam on the Krishna river makes electricity from water and supplies water to farms.', 'కృష్ణా నదిపై ఉన్న శ్రీశైలం డ్యామ్ నీటితో విద్యుత్ తయారు చేస్తుంది, పొలాలకు నీరు ఇస్తుంది.'],
+    quiz: [['Srisailam Dam is built on which river?', 'శ్రీశైలం డ్యామ్ ఏ నదిపై ఉంది?'], [['Krishna', 'కృష్ణా'], ['Godavari', 'గోదావరి'], ['Kaveri', 'కావేరి']]] },
+  // Bhadrachalam
+  bhadradri: { icon: 'htemple', type: 'gopuram', o: { c: 0xf4ead8, tiers: 6 }, name: ['Bhadrachalam Temple', 'భద్రాచలం ఆలయం'], y: ['17th century', '17వ శతాబ్దం'],
+    fact: ['Kancharla Gopanna, known as Bhakta Ramadasu, built this Sita Ramachandra Swamy temple. Its Sri Rama Navami wedding festival is famous.', 'కంచర్ల గోపన్న (భక్త రామదాసు) ఈ సీతారామచంద్ర స్వామి ఆలయాన్ని కట్టించారు. ఇక్కడి శ్రీరామనవమి కళ్యాణం ప్రసిద్ధి.'],
+    quiz: [['Who built the Bhadrachalam temple?', 'భద్రాచలం ఆలయాన్ని ఎవరు కట్టించారు?'], [['Bhakta Ramadasu', 'భక్త రామదాసు'], ['Akbar', 'అక్బర్'], ['Tipu Sultan', 'టిప్పు సుల్తాన్']]] },
+  godavarighat: { icon: 'canoe', type: 'ghat', name: ['Godavari Ghats', 'గోదావరి ఘాట్లు'], y: ['Ancient', 'ప్రాచీనం'],
+    fact: ['Bhadrachalam stands on the Godavari. Nearby Parnasala is believed to be where Rama and Sita lived during their exile.', 'భద్రాచలం గోదావరి ఒడ్డున ఉంది. దగ్గరలోని పర్ణశాలలో రాముడు, సీత వనవాసంలో ఉన్నారని నమ్మకం.'],
+    quiz: [['Bhadrachalam stands on which river?', 'భద్రాచలం ఏ నది ఒడ్డున ఉంది?'], [['Godavari', 'గోదావరి'], ['Ganga', 'గంగ'], ['Narmada', 'నర్మద']]] },
+  // Hampi
+  virupaksha: { icon: 'htemple', type: 'gopuram', o: { c: 0xd8c8a8, tiers: 9 }, name: ['Virupaksha Temple', 'విరూపాక్ష ఆలయం'], y: ['7th century', '7వ శతాబ్దం'],
+    fact: ['The Virupaksha Temple has been in worship since the 7th century, long before Hampi became the capital of the Vijayanagara Empire.', 'విరూపాక్ష ఆలయంలో 7వ శతాబ్దం నుంచి పూజలు జరుగుతున్నాయి—హంపి విజయనగర రాజధాని కాకముందు నుంచే.'],
+    quiz: [['Hampi was the capital of which empire?', 'హంపి ఏ సామ్రాజ్యానికి రాజధాని?'], [['Vijayanagara', 'విజయనగర'], ['Maurya', 'మౌర్య'], ['Mughal', 'మొఘల్']]] },
+  stonechariot: { icon: 'classical', type: 'konark', name: ['Stone Chariot', 'రాతి రథం'], y: ['16th century', '16వ శతాబ్దం'],
+    fact: ['The stone chariot at Hampi’s Vittala Temple is a shrine shaped like a temple car. It appears on the back of the ₹50 note.', 'హంపి విఠల ఆలయంలోని రాతి రథం రథం ఆకారంలో ఉన్న గుడి. ఇది ₹50 నోటు వెనుక కనిపిస్తుంది.'],
+    quiz: [['The Hampi stone chariot is on which note?', 'హంపి రాతి రథం ఏ నోటుపై ఉంది?'], [['₹50', '₹50'], ['₹10', '₹10'], ['₹2000', '₹2000']]] },
+  lotusmahal: { icon: 'crown', type: 'palace', o: { c: 0xe8dcc0, dc: 0xd8c8a8, trim: 0xc8b898 }, name: ['Lotus Mahal', 'కమల్ మహల్'], y: ['16th century', '16వ శతాబ్దం'],
+    fact: ['The Lotus Mahal mixes Hindu and Islamic styles, with arches shaped like lotus petals.', 'కమల్ మహల్‌లో హిందూ, ఇస్లామిక్ శైలులు కలిసి ఉంటాయి; దాని ఆర్చిలు కమలం రేకుల్లా ఉంటాయి.'],
+    quiz: [['Lotus Mahal mixes Hindu and which style?', 'కమల్ మహల్‌లో హిందూ శైలితో పాటు ఏ శైలి ఉంది?'], [['Islamic', 'ఇస్లామిక్'], ['Chinese', 'చైనీస్'], ['Greek', 'గ్రీకు']]] },
+  // Goa
+  bomjesus: { icon: 'church', type: 'church', name: ['Basilica of Bom Jesus', 'బోమ్ జీసస్ బాసిలికా'], y: '1605',
+    fact: ['The Basilica of Bom Jesus in Old Goa holds the remains of St. Francis Xavier and is a UNESCO World Heritage Site.', 'పాత గోవాలోని బోమ్ జీసస్ బాసిలికాలో సెయింట్ ఫ్రాన్సిస్ జేవియర్ అవశేషాలు ఉన్నాయి. ఇది యునెస్కో వారసత్వ ప్రదేశం.'],
+    quiz: [['Bom Jesus Basilica holds the remains of?', 'బోమ్ జీసస్ బాసిలికాలో ఎవరి అవశేషాలు ఉన్నాయి?'], [['St. Francis Xavier', 'సెయింట్ ఫ్రాన్సిస్ జేవియర్'], ['St. Thomas', 'సెయింట్ థామస్'], ['St. Peter', 'సెయింట్ పీటర్']]] },
+  aguada: { icon: 'castle', type: 'fort', o: { c: 0xa86a4a }, name: ['Fort Aguada', 'అగ్వాడా కోట'], y: '1612',
+    fact: ['The Portuguese built Fort Aguada to guard ships. Its name means "water", because ships filled fresh water from its spring.', 'పోర్చుగీసు వారు ఓడల రక్షణ కోసం అగ్వాడా కోట కట్టారు. "అగ్వాడా" అంటే నీరు—ఓడలు ఇక్కడి ఊట నుంచి మంచినీరు నింపుకునేవి.'],
+    quiz: [['Who built Fort Aguada?', 'అగ్వాడా కోటను ఎవరు కట్టారు?'], [['The Portuguese', 'పోర్చుగీసు వారు'], ['The British', 'బ్రిటిష్ వారు'], ['The French', 'ఫ్రెంచ్ వారు']]] },
+  // Kanyakumari
+  vivekananda: { icon: 'om', type: 'tomb', o: { c: 0xd8b890, dc: 0xb8805a, sea: true, small: true }, name: ['Vivekananda Rock', 'వివేకానంద శిల'], y: '1970',
+    fact: ['In 1892 Swami Vivekananda meditated on this rock in the sea. A memorial was built on it in 1970.', '1892లో స్వామి వివేకానంద సముద్రంలోని ఈ రాతిపై ధ్యానం చేశారు. 1970లో దానిపై స్మారకం కట్టారు.'],
+    quiz: [['Who meditated on the rock at Kanyakumari?', 'కన్యాకుమారి రాతిపై ఎవరు ధ్యానం చేశారు?'], [['Swami Vivekananda', 'స్వామి వివేకానంద'], ['Mahatma Gandhi', 'మహాత్మా గాంధీ'], ['Adi Shankara', 'ఆది శంకరాచార్యులు']]] },
+  thiruvalluvar: { icon: 'book', type: 'statue', name: ['Thiruvalluvar Statue', 'తిరువళ్ళువర్ విగ్రహం'], y: '2000',
+    fact: ['This statue of the poet Thiruvalluvar is 133 feet tall—one foot for each of the 133 chapters of his book, the Thirukkural.', 'కవి తిరువళ్ళువర్ ఈ విగ్రహం 133 అడుగుల ఎత్తు—ఆయన రాసిన తిరుక్కురళ్‌లోని 133 అధ్యాయాలకు ఒక్కో అడుగు.'],
+    quiz: [['The statue is 133 feet for the 133 chapters of?', '133 అడుగుల విగ్రహం ఏ గ్రంథంలోని 133 అధ్యాయాలకు గుర్తు?'], [['Thirukkural', 'తిరుక్కురళ్'], ['Ramayana', 'రామాయణం'], ['Panchatantra', 'పంచతంత్రం']]] },
+  // Ellora & Ajanta
+  kailasa: { icon: 'htemple', type: 'nagara', o: { c: 0x9a8a78, a: 0x7a6a5a }, name: ['Kailasa Temple, Ellora', 'కైలాస ఆలయం, ఎల్లోరా'], y: ['8th century', '8వ శతాబ్దం'],
+    fact: ['The Kailasa Temple was carved top-down out of one single rock—no bricks were added. It is Cave 16 at Ellora.', 'కైలాస ఆలయాన్ని ఒకే రాతిని పై నుంచి కిందకు చెక్కి తయారుచేశారు—ఒక్క ఇటుక కూడా పెట్టలేదు. ఇది ఎల్లోరా 16వ గుహ.'],
+    quiz: [['The Kailasa Temple was carved from?', 'కైలాస ఆలయం దేనితో చెక్కారు?'], [['One single rock', 'ఒకే రాయి'], ['Bricks', 'ఇటుకలు'], ['Marble blocks', 'పాలరాతి ముక్కలు']]] },
+  ajanta: { icon: 'lotus', type: 'stupa', o: { tall: true }, name: ['Ajanta Caves', 'అజంతా గుహలు'], y: ['200 BCE', 'క్రీ.పూ. 200'],
+    fact: ['Ajanta has about 30 Buddhist caves carved into a cliff, with beautiful wall paintings that are almost 2,000 years old.', 'అజంతాలో కొండలో చెక్కిన సుమారు 30 బౌద్ధ గుహలు ఉన్నాయి; వాటిలో దాదాపు 2,000 ఏళ్ళ పాత అందమైన చిత్రాలు ఉన్నాయి.'],
+    quiz: [['The Ajanta caves are famous for their?', 'అజంతా గుహలు దేనికి ప్రసిద్ధి?'], [['Paintings', 'చిత్రాలు'], ['Gold', 'బంగారం'], ['Clocks', 'గడియారాలు']]] },
+  bibi: { icon: 'mosque', type: 'tomb', o: { c: 0xf0ece4, dc: 0xf0ece4 }, name: ['Bibi Ka Maqbara', 'బీబీ కా మక్బరా'], y: '1660',
+    fact: ['Bibi Ka Maqbara looks like the Taj Mahal, so it is called the "Taj of the Deccan". Aurangzeb’s son built it for his mother.', 'బీబీ కా మక్బరా తాజ్ మహల్‌లా ఉంటుంది, అందుకే "దక్కన్ తాజ్" అంటారు. ఔరంగజేబు కొడుకు తన తల్లి కోసం కట్టించారు.'],
+    quiz: [['Bibi Ka Maqbara is called the Taj of the?', 'బీబీ కా మక్బరాను ఏ తాజ్ అంటారు?'], [['Deccan', 'దక్కన్'], ['Desert', 'ఎడారి'], ['Himalayas', 'హిమాలయాలు']]] },
+  // Sanchi & Bhopal
+  sanchistupa: { icon: 'lotus', type: 'stupa', name: ['Great Stupa, Sanchi', 'సాంచీ మహా స్తూపం'], y: ['3rd century BCE', 'క్రీ.పూ. 3వ శతాబ్దం'],
+    fact: ['Emperor Ashoka started the Great Stupa at Sanchi. Its four carved stone gateways (toranas) tell stories of the Buddha.', 'సాంచీ మహా స్తూపాన్ని అశోక చక్రవర్తి మొదలుపెట్టారు. దాని నాలుగు చెక్కిన రాతి తోరణాలు బుద్ధుని కథలు చెబుతాయి.'],
+    quiz: [['Who started the Great Stupa at Sanchi?', 'సాంచీ మహా స్తూపాన్ని ఎవరు మొదలుపెట్టారు?'], [['Emperor Ashoka', 'అశోక చక్రవర్తి'], ['Akbar', 'అక్బర్'], ['Shivaji', 'శివాజీ']]] },
+  tajulmasajid: { icon: 'mosque', type: 'tomb', o: { c: 0xe8b8c8, dc: 0xf4f0ea }, name: ['Taj-ul-Masajid', 'తాజ్-ఉల్-మసాజిద్'], y: ['19th century', '19వ శతాబ్దం'],
+    fact: ['Taj-ul-Masajid in Bhopal is one of the largest mosques in India. Its name means "Crown of Mosques".', 'భోపాల్‌లోని తాజ్-ఉల్-మసాజిద్ భారతదేశంలో అతిపెద్ద మసీదులలో ఒకటి. దాని పేరుకు అర్థం "మసీదుల కిరీటం".'],
+    quiz: [['Taj-ul-Masajid is in which city?', 'తాజ్-ఉల్-మసాజిద్ ఏ నగరంలో ఉంది?'], [['Bhopal', 'భోపాల్'], ['Agra', 'ఆగ్రా'], ['Delhi', 'ఢిల్లీ']]] },
+  // Ayodhya
+  rammandir: { icon: 'htemple', type: 'nagara', o: { c: 0xf0c8b0, a: 0xe0a888, h: 1.2, nine: true }, name: ['Ram Mandir', 'రామ మందిరం'], y: '2024',
+    fact: ['The Ram Mandir in Ayodhya is built in the Nagara style from pink sandstone, without using any steel. It opened in January 2024.', 'అయోధ్య రామ మందిరం నాగర శైలిలో గులాబీ ఇసుకరాయితో, ఇనుము వాడకుండా కట్టారు. 2024 జనవరిలో ప్రారంభమైంది.'],
+    quiz: [['Ayodhya stands on which river?', 'అయోధ్య ఏ నది ఒడ్డున ఉంది?'], [['Sarayu', 'సరయూ'], ['Yamuna', 'యమున'], ['Godavari', 'గోదావరి']]] },
+  ramkipaidi: { icon: 'diya', type: 'ghat', name: ['Ram ki Paidi', 'రామ్ కీ పైడీ'], y: ['Ancient', 'ప్రాచీనం'],
+    fact: ['On Diwali, Ayodhya’s Deepotsav lights lakhs of diyas along the Sarayu ghats and has set world records.', 'దీపావళికి అయోధ్య దీపోత్సవంలో సరయూ ఘాట్ల వెంట లక్షల దీపాలు వెలిగిస్తారు; ప్రపంచ రికార్డులు సృష్టించారు.'],
+    quiz: [['Ayodhya’s Deepotsav lights lakhs of?', 'అయోధ్య దీపోత్సవంలో లక్షల ఏమి వెలిగిస్తారు?'], [['Diyas', 'దీపాలు'], ['Fireworks', 'బాణసంచా'], ['Kites', 'గాలిపటాలు']]] },
+  // Darjeeling
+  toytrain: { icon: 'train', type: 'train', name: ['Darjeeling Toy Train', 'డార్జిలింగ్ టాయ్ ట్రైన్'], y: '1881',
+    fact: ['The Darjeeling Himalayan Railway, the "Toy Train", has climbed the mountains since 1881 and is a UNESCO World Heritage Site.', 'డార్జిలింగ్ హిమాలయన్ రైల్వే ("టాయ్ ట్రైన్") 1881 నుంచి కొండలు ఎక్కుతోంది. ఇది యునెస్కో వారసత్వ ప్రదేశం.'],
+    quiz: [['The Toy Train first ran in?', 'టాయ్ ట్రైన్ మొదట ఏ సంవత్సరం నడిచింది?'], [['1881', '1881'], ['1981', '1981'], ['1781', '1781']]] },
+  peacepagoda: { icon: 'lotus', type: 'stupa', name: ['Peace Pagoda', 'శాంతి స్తూపం'], y: '1992',
+    fact: ['The Japanese Peace Pagoda in Darjeeling was built in 1992 to spread the message of world peace.', 'డార్జిలింగ్‌లోని జపనీస్ శాంతి స్తూపాన్ని ప్రపంచ శాంతి సందేశం కోసం 1992లో కట్టారు.'],
+    quiz: [['Darjeeling is world famous for its?', 'డార్జిలింగ్ ప్రపంచవ్యాప్తంగా దేనికి ప్రసిద్ధి?'], [['Tea', 'టీ'], ['Coffee', 'కాఫీ'], ['Cotton', 'పత్తి']]] },
+});
+for (const k in LANDMARKS) LANDMARKS[k].id = k;
+CITIES.push(
+  { id: 'vizag', name: ['Visakhapatnam', 'విశాఖపట్నం'], ll: [17.69, 83.22], lms: ['kailasagiri', 'kursura', 'simhachalam'],
+    fact: ['Vizag, the "City of Destiny", is a port city on the Bay of Bengal and home of the Navy’s Eastern Command.', 'విశాఖ "సిటీ ఆఫ్ డెస్టినీ", బంగాళాఖాతం ఒడ్డున ఉన్న ఓడరేవు నగరం, నౌకాదళ తూర్పు కమాండ్ కేంద్రం.'] },
+  { id: 'srisailam', name: ['Srisailam', 'శ్రీశైలం'], ll: [16.07, 78.87], lms: ['mallikarjuna', 'srisailamdam'],
+    fact: ['A holy town in the Nallamala forest on the Krishna river.', 'కృష్ణా నది ఒడ్డున నల్లమల అడవిలో ఉన్న పుణ్యక్షేత్రం.'] },
+  { id: 'bhadrachalam', name: ['Bhadrachalam', 'భద్రాచలం'], ll: [17.67, 80.89], lms: ['bhadradri', 'godavarighat'],
+    fact: ['A temple town on the Godavari in Telangana, famous for its Sri Rama Navami celebrations.', 'తెలంగాణలో గోదావరి ఒడ్డున ఉన్న ఆలయ పట్టణం, శ్రీరామనవమి వేడుకలకు ప్రసిద్ధి.'] },
+  { id: 'hampi', name: ['Hampi', 'హంపి'], ll: [15.33, 76.46], lms: ['virupaksha', 'stonechariot', 'lotusmahal'],
+    fact: ['The ruins of Vijayanagara, a great empire’s capital in the 14th–16th centuries. A UNESCO World Heritage Site.', '14–16 శతాబ్దాల గొప్ప విజయనగర సామ్రాజ్య రాజధాని శిథిలాలు. యునెస్కో వారసత్వ ప్రదేశం.'] },
+  { id: 'goa', name: ['Goa', 'గోవా'], ll: [15.5, 73.83], lms: ['bomjesus', 'aguada'],
+    fact: ['India’s smallest state by area, famous for its beaches and its Portuguese history.', 'వైశాల్యంలో భారతదేశపు అతిచిన్న రాష్ట్రం, బీచ్‌లు, పోర్చుగీసు చరిత్రకు ప్రసిద్ధి.'] },
+  { id: 'kanyakumari', name: ['Kanyakumari', 'కన్యాకుమారి'], ll: [8.08, 77.54], lms: ['vivekananda', 'thiruvalluvar'],
+    fact: ['The southern tip of mainland India, where the Arabian Sea, the Bay of Bengal and the Indian Ocean meet.', 'భారత ప్రధాన భూభాగం దక్షిణ చివర—అరేబియా సముద్రం, బంగాళాఖాతం, హిందూ మహాసముద్రం కలిసే చోటు.'] },
+  { id: 'ellora', name: ['Ellora & Ajanta', 'ఎల్లోరా & అజంతా'], ll: [20.03, 75.18], lms: ['kailasa', 'ajanta', 'bibi'],
+    fact: ['Near Chhatrapati Sambhajinagar (Aurangabad) in Maharashtra. Both cave sites are UNESCO World Heritage Sites.', 'మహారాష్ట్రలో ఛత్రపతి శంభాజీనగర్ (ఔరంగాబాద్) దగ్గర. రెండు గుహల ప్రాంతాలూ యునెస్కో వారసత్వ ప్రదేశాలు.'] },
+  { id: 'sanchi', name: ['Sanchi & Bhopal', 'సాంచీ & భోపాల్'], ll: [23.48, 77.74], lms: ['sanchistupa', 'tajulmasajid'],
+    fact: ['Sanchi has some of the oldest stone buildings in India. Nearby Bhopal is called the "City of Lakes".', 'సాంచీలో భారతదేశంలోని అతి పురాతన రాతి కట్టడాలు ఉన్నాయి. దగ్గరలోని భోపాల్‌ను "సరస్సుల నగరం" అంటారు.'] },
+  { id: 'ayodhya', name: ['Ayodhya', 'అయోధ్య'], ll: [26.8, 82.2], lms: ['rammandir', 'ramkipaidi'],
+    fact: ['An ancient city on the Sarayu river, believed to be the birthplace of Lord Rama.', 'సరయూ నది ఒడ్డున ఉన్న పురాతన నగరం, శ్రీరాముని జన్మస్థలంగా నమ్మకం.'] },
+  { id: 'darjeeling', name: ['Darjeeling', 'డార్జిలింగ్'], ll: [27.04, 88.26], lms: ['toytrain', 'peacepagoda'],
+    fact: ['A Himalayan hill town famous for its tea and views of Kanchenjunga, the world’s third-highest mountain.', 'టీకి, ప్రపంచంలో మూడో ఎత్తైన శిఖరం కాంచనజంగ దృశ్యాలకు ప్రసిద్ధి చెందిన హిమాలయ కొండ పట్టణం.'] },
+);
+Object.assign(CITY_STATE, { vizag: 'AP', srisailam: 'AP', bhadrachalam: 'TG', hampi: 'KA', goa: 'GA', kanyakumari: 'TN', ellora: 'MH', sanchi: 'MP', ayodhya: 'UP', darjeeling: 'WB' });
 function openBuildMap() {
   const pts = CITIES.map(C => mapXY(...C.ll));
   const pins = CITIES.map((C, ci) => {
