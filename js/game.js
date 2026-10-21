@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '5.3';
+const GAME_VERSION = '5.4';
 const BIZ_OFF = true; // businesses, managers, upgrades, investors, stocks and worlds are switched off
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
@@ -866,6 +866,77 @@ function doSpin(paid) {
 }
 
 /* ---------------------------- MISSIONS ------------------------------ */
+// ---- Daily missions: five fresh goals every day; finish all five to open the daily chest ----
+const DM_COUNT = 5;
+function dstat() { if (!S.dstat || S.dstat.day !== dayKey()) S.dstat = { day: dayKey() }; return S.dstat; }
+function dcount(k, n = 1) { const d = dstat(); d[k] = (d[k] || 0) + n; }
+function currentLandmark() {
+  if (allCitiesDone()) return null;
+  const t = cityPlan(S.city.i).tasks.find(x => x.type === 'part' && !S.city.done[x.i]);
+  return t ? LANDMARKS[CITIES[S.city.i].lms[t.li]] : null;
+}
+function dmTemplates(all = false) {
+  const L = currentLandmark(), coins = niceNum(prizeOf('none') * 40), list = [
+    { type: 'spins', target: [15, 25, 40][Math.floor(Math.random() * 3)], icon: 'slot', text: n => tr(`Spin ${n} times`, `${n} సార్లు స్పిన్ చేయండి`) },
+    { type: 'jackpots', target: 2 + Math.floor(Math.random() * 2), icon: 'coin', text: n => tr(`Hit ${n} jackpots (three of a kind)`, `${n} జాక్‌పాట్లు కొట్టండి (మూడు ఒకేలా)`) },
+    { type: 'coins', target: coins, icon: 'moneybag', text: n => tr(`Win ${fmtInt(n)} coins from spins`, `స్పిన్‌లతో ${fmtInt(n)} కాయిన్లు గెలవండి`) },
+    { type: 'tiles', target: 3 + Math.floor(Math.random() * 3), icon: 'construction', text: n => tr(`Build ${n} tiles in ${CITIES[Math.min(S.city.i, CITIES.length - 1)].name[0]}`, `${CITIES[Math.min(S.city.i, CITIES.length - 1)].name[1]} లో ${n} టైల్స్ కట్టండి`) },
+    { type: 'hits', target: 5 + Math.floor(Math.random() * 6), icon: 'swords', text: n => tr(`Hit the boss ${n} times`, `బాస్‌ని ${n} సార్లు కొట్టండి`) },
+    { type: 'packs', target: 2, icon: 'pack', text: n => tr(`Open ${n} sticker packs`, `${n} స్టిక్కర్ ప్యాక్‌లు తెరవండి`) },
+    { type: 'bigbet', target: 5, icon: 'bolt', text: n => tr(`Spin ${n} times at bet ×3 or more`, `బెట్ ×3 లేదా ఎక్కువతో ${n} సార్లు స్పిన్ చేయండి`) },
+  ];
+  if (L || all) list.push({ type: 'parts', target: 2, icon: L ? L.icon : 'construction', text: n => L ? tr(`Build ${n} parts of ${L.name[0]}`, `${L.name[1]} లో ${n} భాగాలు కట్టండి`) : tr(`Build ${n} landmark parts`, `${n} కట్టడం భాగాలు కట్టండి`) });
+  if (all || S.raid.tokens > 0 || S.slot.energy > 30) list.push({ type: 'raids', target: 1, icon: 'hammer', text: n => tr(`Raid ${n} village`, `${n} ఊరిపై దాడి చేయండి`) });
+  if (all || (landmarksDone() > 0 && Object.keys(LANDMARKS).some(id => S.city.quiz[id] == null))) list.push({ type: 'quiz', target: 1, icon: 'question', text: n => tr('Answer a landmark quiz correctly', 'ఒక కట్టడం క్విజ్‌కి సరైన జవాబు చెప్పండి') });
+  if (all || activePet()) list.push({ type: 'feed', target: 1, icon: 'bone', text: n => tr('Feed your pets', 'మీ పెట్స్‌కి తినిపించండి') });
+  return list;
+}
+function dmNew(exclude = []) {
+  const pool = dmTemplates().filter(t => !exclude.includes(t.type));
+  const t = pool[Math.floor(Math.random() * pool.length)] || dmTemplates()[0];
+  return { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7), type: t.type, target: t.target, base: dstat()[t.type] || 0, gems: 3 + Math.floor(Math.random() * 3), energy: 5 };
+}
+function dmText(m) {
+  const t = dmTemplates(true).find(x => x.type === m.type);
+  return t ? { icon: t.icon, text: t.text(m.target) } : { icon: 'clipboard', text: tr('Mission', 'మిషన్') };
+}
+function missionReady(m) { return !m.claimed && missionValue(m) >= m.target; }
+function dmChest() { return { coins: Math.round(20000 * cityScale() / 100) * 100, gems: 25, energy: 20 }; }
+function claimDailyChest(el) {
+  if (S.mchest || !S.missions.every(m => m.claimed)) return;
+  const r = dmChest();
+  S.mchest = 1; earn(r.coins); S.gems += r.gems; S.slot.energy += r.energy; giveAlbumPack('gold', 1, true);
+  const from = el && visibleEl(el) ? el : null;
+  if (from) { flyTo('coins', from, 'coin', 8); flyTo('gems', from, 'gem', 5, 120); }
+  SlotFX.jackpot(); confetti(from, 200); save();
+  toast(tr(`🧰 Daily chest! +${fmtInt(r.coins)} coins, +${r.gems} 💎, +${r.energy} ⚡, +1 gold pack`, `🧰 డైలీ చెస్ట్! +${fmtInt(r.coins)} కాయిన్లు, +${r.gems} 💎, +${r.energy} ⚡, +1 గోల్డ్ ప్యాక్`), 'gem');
+}
+function renderDailyMissions() {
+  ensureMissions();
+  const done = S.missions.filter(m => m.claimed).length, all = done === S.missions.length, r = dmChest();
+  const rows = S.missions.map(m => {
+    const t = dmText(m), v = Math.min(missionValue(m), m.target), ready = missionReady(m);
+    return `<div class="row mission ${ready ? 'ready' : ''} ${m.claimed ? 'claimed' : ''}" data-mrow="${m.id}" data-done="${ready ? 1 : 0}">
+      <div class="ico">${ico(t.icon)}</div>
+      <div class="info"><div class="title">${t.text}</div>
+        <div class="mbar"><div style="width:${v / m.target * 100}%"></div></div>
+        <div class="desc"><span class="mval">${missionVal(m, v)}</span> · 💎${m.gems} ⚡${m.energy}</div></div>
+      ${m.claimed ? `<span class="badge">✓ ${tr('Done', 'పూర్తి')}</span>` : ready ? `<button class="btn gold" data-act="mclaim" data-id="${m.id}">${tr('Claim', 'తీసుకోండి')}</button>`
+        : `<button class="btn ghost" data-act="mskip" data-id="${m.id}" data-gems="2">${tr('Change', 'మార్చు')} 💎2</button>`}
+    </div>`;
+  }).join('');
+  const chest = `<div class="dm-chest ${all && !S.mchest ? 'ready' : ''} ${S.mchest ? 'open' : ''}">
+    ${ico(S.mchest ? 'sparkles' : 'gift', 'big-ico')}
+    <div class="info"><b>${tr('Daily chest', 'డైలీ చెస్ట్')}</b><div class="dm-steps">${S.missions.map(m => `<i class="${m.claimed ? 'on' : ''}"></i>`).join('')}</div>
+      <small>${S.mchest ? tr('Opened! New missions tomorrow.', 'తెరిచారు! రేపు కొత్త మిషన్లు.') : `${ico('coin')} ${fmtInt(r.coins)} · 💎 ${r.gems} · ⚡ ${r.energy} · ${ico('pack')} 1`}</small></div>
+    ${all && !S.mchest ? `<button class="btn gold" data-act="dm-chest">${tr('Open!', 'తెరువు!')}</button>` : `<span class="dm-count">${done}/${S.missions.length}</span>`}
+  </div>`;
+  return header('clipboard', tr('Daily missions', 'రోజువారీ మిషన్లు'),
+    tr(`Five new goals every day. Finish all of them to open the daily chest. New missions in <b>${fmtDur(secsToMidnight())}</b>.`, `ప్రతి రోజు ఐదు కొత్త లక్ష్యాలు. అన్నీ పూర్తి చేస్తే డైలీ చెస్ట్ తెరుచుకుంటుంది. కొత్త మిషన్లు <b>${fmtDur(secsToMidnight())}</b> లో.`)) +
+    chest + `<div class="list">${rows}</div>`;
+}
+function secsToMidnight() { const d = new Date(); d.setHours(24, 0, 0, 0); return (d - Date.now()) / 1000; }
+
 const MISSION_SLOTS = 3;
 function niceNum(x) { const p = Math.pow(10, Math.floor(Math.log10(x))); return Math.ceil(x / p) * p; }
 function missionValue(m) {
@@ -883,9 +954,11 @@ function missionValue(m) {
     case 'pack': return (S.stats.packs || 0) - m.base;
     case 'boss': return (S.stats.bosses || 0) - m.base;
   }
+  if (BIZ_OFF) return (dstat()[m.type] || 0) - (m.base || 0);
   return 0;
 }
 function missionText(m) {
+  if (BIZ_OFF) return dmText(m);
   const w = worldDef(m.world || 'earth');
   const d = w.biz[m.biz] || {};
   const where = w.id === 'earth' ? '' : tr(` on ${w.name}`, ` (${w.te})`);
@@ -944,13 +1017,28 @@ function newMission() {
   return pick;
 }
 function ensureMissions() {
-  if (BIZ_OFF) S.missions = S.missions.filter(m => ['earn', 'spin', 'slot', 'pack', 'boss'].includes(m.type)); while (S.missions.length < MISSION_SLOTS) S.missions.push(newMission()); }
-function replaceMission(k) { S.missions.splice(k, 1); S.missions.splice(k, 0, newMission()); }
+  if (BIZ_OFF) {
+    if (S.missionDay === dayKey() && S.missions.length === DM_COUNT) return;
+    S.missionDay = dayKey(); S.mchest = 0; S.missions = [];
+    while (S.missions.length < DM_COUNT) S.missions.push(dmNew(S.missions.map(m => m.type)));
+    return;
+  }
+  while (S.missions.length < MISSION_SLOTS) S.missions.push(newMission());
+}
+function replaceMission(k) { S.missions.splice(k, 1, BIZ_OFF ? dmNew(S.missions.map(m => m.type)) : newMission()); }
 function claimMission(id) {
   const k = S.missions.findIndex(m => m.id === id);
   if (k < 0) return;
   const m = S.missions[k];
-  if (missionValue(m) < m.target) { sfx('err'); return; }
+  if (m.claimed || missionValue(m) < m.target) { sfx('err'); return; }
+  if (BIZ_OFF) {
+    m.claimed = true; S.gems += m.gems; S.slot.energy += m.energy; S.stats.missionsDone++;
+    const row = document.querySelector(`[data-mrow="${m.id}"] .btn`);
+    if (row) { flyTo('gems', row, 'gem', 3); flyTo('energy', row, 'bolt', 2, 120); }
+    SlotFX.big(); save();
+    toast(tr(`📋 Mission complete! +${m.gems} 💎 +${m.energy} ⚡`, `📋 మిషన్ పూర్తి! +${m.gems} 💎 +${m.energy} ⚡`), 'gem');
+    return;
+  }
   const cash = bonusCash(120);
   S.gems += m.gems;
   earn(cash);
@@ -962,14 +1050,14 @@ function claimMission(id) {
 }
 function skipMission(id) {
   const k = S.missions.findIndex(m => m.id === id);
-  if (k < 0 || S.gems < 2) { sfx('err'); return; }
+  if (k < 0 || S.gems < 2 || S.missions[k].claimed) { sfx('err'); return; }
   S.gems -= 2;
   replaceMission(k);
   sfx('click');
 }
 function checkMissions() {
   for (const m of S.missions) {
-    if (!m.told && missionValue(m) >= m.target) {
+    if (!m.told && missionReady(m)) {
       m.told = true;
       toast(tr(`📋 Mission done: ${missionText(m).text}. Claim your reward!`, `📋 మిషన్ పూర్తి: ${missionText(m).text}. రివార్డ్ తీసుకోండి!`), 'good');
       sfx('cash');
@@ -985,7 +1073,7 @@ function updateMissionProgress() {
     const row = document.querySelector(`[data-mrow="${m.id}"]`);
     if (!row) continue;
     const v = Math.min(missionValue(m), m.target);
-    if ((v >= m.target) !== (row.dataset.done === '1')) { renderTab(); return; }
+    if (missionReady(m) !== (row.dataset.done === '1')) { renderTab(); return; }
     row.querySelector('.mbar div').style.width = (v / m.target * 100) + '%';
     row.querySelector('.mval').textContent = missionVal(m, v);
   }
@@ -2071,6 +2159,7 @@ async function raidGo(i) {
   }
   await raidScene($('raidStage'), !!res.blocked, raidLandmark(t));
   S.stats.raids = (S.stats.raids || 0) + 1;
+  dcount('raids');
   if (!res.blocked) addLeague(20);
   let html;
   if (res.blocked) {
@@ -2402,6 +2491,7 @@ function slotSpin() {
   if (Math.random() < petPower('free')) { sl.energy += bet; setTimeout(() => petPop(tr('Free spin!', 'ఫ్రీ స్పిన్!')), 300); }
   sl.piggy = Math.min(piggyCap(), sl.piggy + Math.round(60 * bet * cityScale()));
   S.stats.slotSpins = (S.stats.slotSpins || 0) + 1;
+  dcount('spins'); if (bet >= 3) dcount('bigbet');
   addVip(bet); addLeague(bet);
   const line = [slotPick(), slotPick(), slotPick()];
   if (Math.random() < 0.18) line[1] = line[0]; // two of a kind a little more often, so it feels lively
@@ -2500,7 +2590,7 @@ function outOfEnergyHtml() {
   if (canClaimDaily()) row('gem', tr('Daily reward', 'డైలీ రివార్డ్'), tr('Gems and coins for coming back', 'తిరిగి వచ్చినందుకు జెమ్స్, కాయిన్లు'), go('eo-open', tr('Open', 'తెరువు'), 'data-id="daily"'), true);
   if (spinReady()) row('wheel', tr('Lucky Wheel', 'లక్కీ వీల్'), tr('A free spin is waiting', 'ఫ్రీ స్పిన్ సిద్ధం'), go('eo-open', tr('Spin', 'తిప్పు'), 'data-id="spin"'), true);
   if (scratchFreeReady()) row('ticket', tr('Scratch card', 'స్క్రాచ్ కార్డ్'), tr('Your free card for today', 'ఈ రోజు ఫ్రీ కార్డ్'), go('eo-open', tr('Scratch', 'స్క్రాచ్'), 'data-id="scratch"'), true);
-  const doneMissions = S.missions.filter(m => missionValue(m) >= m.target).length;
+  const doneMissions = S.missions.filter(missionReady).length;
   row('clipboard', tr('Missions', 'మిషన్లు'), doneMissions ? tr(`${doneMissions} reward(s) ready`, `${doneMissions} బహుమతి(లు) సిద్ధం`) : tr('Finish missions for gems', 'మిషన్లు పూర్తి చేసి జెమ్స్'), go('go-tab', tr('Go', 'వెళ్ళు'), 'data-tab="missions"'), doneMissions > 0);
   if (helpLeft()) row('people', tr('Help other players', 'ఇతరులకు సాయం'), tr(`+${fmtInt(HELP_REWARD)} coins and a sticker pack`, `+${fmtInt(HELP_REWARD)} కాయిన్లు, స్టిక్కర్ ప్యాక్`), go('help-open', tr('Help', 'సాయం')), true);
   if (sl.piggy >= 1000) row('pig', tr('Piggy bank', 'పిగ్గీ బ్యాంక్'), tr(`${fmtInt(sl.piggy)} coins inside`, `లోపల ${fmtInt(sl.piggy)} కాయిన్లు`), go('piggy-break', `💎 ${PIGGY_GEMS}`, `data-gems="${PIGGY_GEMS}"`, S.gems < PIGGY_GEMS));
@@ -2546,13 +2636,16 @@ function showBigWin(text, jackpot) {
 function slotFinish(line, bet) {
   const sl = S.slot, p = slotPrize(line, bet), parts = [];
   let coinWin = 0;
+  if (p.big) dcount('jackpots');
   if (p.coins) { earn(p.coins); coinWin += p.coins; }
   if (p.cash) { earn(p.cash); coinWin += p.cash; }
   if (p.gems) { p.gems = Math.round(p.gems * (1 + themeBuff('gems'))); S.gems += p.gems; parts.push(`+${p.gems} 💎`); }
   if (p.energy) { sl.energy += p.energy; parts.push(`+${p.energy} ⚡`); }
   if (p.piggy) { const v = sl.piggy; earn(v); coinWin += v; sl.piggy = 0; parts.push(tr('🐷 Piggy bank!', '🐷 పిగ్గీ బ్యాంక్!')); }
   const swords = line.filter(k => k === 'swords').length, lvlBefore = sl.boss.lvl;
+  if (swords) dcount('hits');
   const hit = slotBattle(line, bet);
+  if (coinWin) dcount('coins', coinWin);
   if (hit) { parts.push(hit); SlotFX.hit(); }
   slotCollect(line, bet, p);
   const rs = slotRaidSymbols(line);
@@ -3603,7 +3696,7 @@ function answerQuiz(el, arg) {
     box.querySelectorAll('.quiz-opt').forEach(b => { b.disabled = true; const kk = +b.dataset.id.split(':')[1]; if (kk === 0) b.classList.add('right'); else if (kk === +k) b.classList.add('wrong'); });
     box.querySelector('.quiz-note').textContent = right ? tr('Correct! +10 gems', 'సరైన జవాబు! +10 జెమ్స్') : tr(`The answer is: ${L.quiz[1][0][0]}`, `సరైన జవాబు: ${L.quiz[1][0][1]}`);
   }
-  if (right) { S.gems += 10; flyTo('gems', el, 'gem', 4); SlotFX.big(); updateHeader(); }
+  if (right) { S.gems += 10; dcount('quiz'); flyTo('gems', el, 'gem', 4); SlotFX.big(); updateHeader(); }
   else SlotFX.land('hit');
   save();
 }
@@ -3633,6 +3726,7 @@ function buildPart() {
   const cost = taskCost(ci, t);
   if (S.cash < cost) { toast(tr('Not enough coins. Spin to win more!', 'కాయిన్లు సరిపోవు. స్పిన్ చేసి గెలవండి!'), 'bad'); return; }
   S.cash -= cost; S.city.done[t.i] = true; addLeague(t.type === 'part' ? 30 : 10);
+  dcount('tiles'); if (t.type === 'part') dcount('parts');
   const from = document.querySelector('.tc-build') || $('buildView');
   const rw = taskReward(ci, t);
   if (rw) { earn(rw.coins); S.slot.energy += rw.energy; flyTo('coins', from, 'coin', 6); toast(tr(`🎁 Gift! +${fmtInt(rw.coins)} coins, +${rw.energy} ⚡`, `🎁 బహుమతి! +${fmtInt(rw.coins)} కాయిన్లు, +${rw.energy} ⚡`), 'good'); SlotFX.big(); }
@@ -3650,7 +3744,7 @@ function buildPart() {
   if (lmDone) setTimeout(() => landmarkCelebration(lmDone, cityFinished), 1100);
   else if (cityFinished) setTimeout(cityCelebration, 900);
   // The first stone of a landmark: tell the player what they are building
-  else if (t.type === 'part' && t.k === 0) setTimeout(() => { if ($('modal').classList.contains('hidden')) lmInfo(lmId); }, 1000);
+  else if (t.type === 'part' && t.k === 0) setTimeout(() => { if (activeTab === 'build' && $('modal').classList.contains('hidden')) lmInfo(lmId); }, 1000);
 }
 function landmarkCelebration(id, thenCity) {
   const L = LANDMARKS[id], ci = CITIES.findIndex(C => C.lms.includes(id)), li = CITIES[ci].lms.indexOf(id);
@@ -3777,6 +3871,7 @@ function openPack(kind) {
   }).join('');
   const fresh = markFinishedSets();
   S.stats.packs = (S.stats.packs || 0) + 1;
+  dcount('packs');
   save();
   sfx('case');
   modal(`<h3>${ico('pack')} ${tr(...P.name)}</h3><div class="pk-row">${cards}</div>
@@ -4147,6 +4242,7 @@ function feedPets() {
   const ap = activePet(); if (ap && ap.kind === 'gems') gems += petLvl(ap.id);
   S.gems += gems;
   S.stats.feeds = (S.stats.feeds || 0) + 1;
+  dcount('feed');
   sfx('win');
   toast(tr(`🦴 Your pets are happy!${gems ? ` +${gems} 💎` : ''}`, `🦴 మీ పెట్స్ సంతోషంగా ఉన్నాయి!${gems ? ` +${gems} 💎` : ''}`), 'good');
   document.querySelectorAll('.pet-card.owned').forEach(el => heartBurst(el));
@@ -4586,6 +4682,7 @@ function rowHtml(icon, title, desc, action, cls = '') {
 }
 
 function renderMissions() {
+  if (BIZ_OFF) return renderDailyMissions() + challengeCardHtml();
   const rows = S.missions.map(m => {
     const t = missionText(m), v = Math.min(missionValue(m), m.target), done = v >= m.target;
     return `<div class="row mission ${done ? 'ready' : ''}" data-mrow="${m.id}" data-done="${done ? 1 : 0}">
@@ -4850,7 +4947,8 @@ function updateDots() {
     $('dot-investors').classList.toggle('on', investorsAvailable() >= Math.max(10, S.investors));
     $('dot-worlds').classList.toggle('on', WORLDS.some(w => !S.worldsUnlocked[w.id] && S.lifetime >= w.unlockAt));
   }
-  $('dot-missions').classList.toggle('on', S.missions.some(m => missionValue(m) >= m.target));
+  if (BIZ_OFF) ensureMissions();
+  $('dot-missions').classList.toggle('on', S.missions.some(missionReady) || (BIZ_OFF && !S.mchest && S.missions.every(m => m.claimed)));
   $('dot-daily').classList.toggle('on', canClaimDaily());
   $('dot-spin').classList.toggle('on', spinReady());
   $('dot-scratch').classList.toggle('on', scratchFreeReady());
@@ -4976,6 +5074,7 @@ document.addEventListener('click', e => {
     case 'lb-view': lbView = id === 'all' ? 'all' : 'week'; renderTab(); break;
     case 'lb-rename': S.player.name = ''; renderTab(); break;
     case 'mclaim': claimMission(id); renderTab(); break;
+    case 'dm-chest': claimDailyChest(el); renderTab(); break;
     case 'mskip': skipMission(id); renderTab(); break;
     case 'lang': setLang(id); break;
     case 'music': toggleMusic(); break;
