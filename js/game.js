@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '5.1';
+const GAME_VERSION = '5.2';
 const BIZ_OFF = true; // businesses, managers, upgrades, investors, stocks and worlds are switched off
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
@@ -3757,6 +3757,110 @@ function tradeStars() {
   S.album.stars -= STAR_TRADE; S.album.packs.basic++;
   openPack('basic');
 }
+// ---- Trading: send duplicates to friends with a 6-letter code, claim theirs, or swap duplicate stars for a missing sticker ----
+const TRADE_URL = '/api/trade', SWAP_STARS = 15; // a missing sticker costs 15 stars per star level
+async function tradePost(body) {
+  ensurePlayerId();
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 6000);
+  try {
+    const r = await fetch(TRADE_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: S.player.id, ...body }), signal: ctl.signal });
+    const data = await r.json();
+    if (!r.ok) throw Object.assign(new Error(data.error || 'server error'), { status: r.status });
+    return data;
+  } finally { clearTimeout(t); }
+}
+// Sticker ids carry their album: 'village-3' is album 1, 's1:faith-8' is album 2, and so on
+function stickerById(id) {
+  const m = /^s(\d+):/.exec(id), n = m ? +m[1] : 0, pre = n ? `s${n}:` : '';
+  for (const set of seasonInfo(n).sets) for (let k = 0; k < set.items.length; k++) {
+    if (id === `${pre}${set.id}-${k}`) { const [icon, en, te, stars] = set.items[k]; return { id, icon, name: [en, te], stars }; }
+  }
+  return null;
+}
+function tradeHtml(tab = 'swap') {
+  const A = S.album, all = allStickers();
+  const tabs = [['swap', tr('Swap shop', 'మార్పిడి'), 'star'], ['send', tr('Send', 'పంపు'), 'outbox'], ['get', tr('Receive', 'తీసుకో'), 'inbox']]
+    .map(([k, l, i]) => `<button class="tr-tab ${k === tab ? 'on' : ''}" data-act="trade-tab" data-id="${k}">${ico(i)}${l}</button>`).join('');
+  let body;
+  if (tab === 'swap') {
+    const missing = all.filter(s => !stickerHave(s.id));
+    body = `<p class="sub">${tr(`Duplicates turn into ⭐ stars. Spend them to pick any missing sticker: ${SWAP_STARS}⭐ per star level.`, `డూప్లికేట్లు ⭐ స్టార్లుగా మారతాయి. వాటితో కావలసిన స్టిక్కర్ తీసుకోండి: ప్రతి స్టార్ లెవెల్‌కి ${SWAP_STARS}⭐.`)}</p>
+      <div class="tr-stars">⭐ <b>${A.stars}</b> ${tr('stars', 'స్టార్లు')}</div>
+      <div class="tr-grid">${missing.length ? missing.map(s => { const cost = s.stars * SWAP_STARS; return `<button class="tr-card s${s.stars}" data-act="trade-swap" data-id="${s.id}" ${A.stars < cost ? 'disabled' : ''}>${ico(s.icon)}<b>${tr(...s.name)}</b><small>${starsHtml(s.stars)}</small><em>${cost}⭐</em></button>`; }).join('') : `<p>${tr('You have every sticker in this album!', 'ఈ ఆల్బమ్‌లో అన్ని స్టిక్కర్లూ ఉన్నాయి!')}</p>`}</div>`;
+  } else if (tab === 'send') {
+    const dups = all.filter(s => stickerHave(s.id) > 1);
+    body = `<p class="sub">${tr('Pick a duplicate. You get a code to share; your friend types it in Receive. Up to 10 a day.', 'ఒక డూప్లికేట్ ఎంచుకోండి. ఒక కోడ్ వస్తుంది, మీ ఫ్రెండ్ దాన్ని "తీసుకో" లో టైప్ చేయాలి. రోజుకి 10 వరకు.')}</p>
+      <div class="tr-grid">${dups.length ? dups.map(s => `<button class="tr-card s${s.stars}" data-act="trade-send" data-id="${s.id}">${ico(s.icon)}<b>${tr(...s.name)}</b><small>${starsHtml(s.stars)}</small><em>×${stickerHave(s.id) - 1}</em></button>`).join('') : `<p>${tr('No duplicates yet. Open more packs!', 'ఇంకా డూప్లికేట్లు లేవు. మరిన్ని ప్యాక్‌లు తెరవండి!')}</p>`}</div>`;
+  } else {
+    body = `<p class="sub">${tr('Got a code from a friend? Type it here.', 'ఫ్రెండ్ నుండి కోడ్ వచ్చిందా? ఇక్కడ టైప్ చేయండి.')}</p>
+      <div class="tr-claim"><input id="tradeCode" maxlength="6" placeholder="ABC123" autocomplete="off" value="${esc(pendingTradeCode || '')}"><button class="btn gold" data-act="trade-claim">${tr('Claim', 'తీసుకో')}</button></div>`;
+  }
+  return `<h3>${ico('people')} ${tr('Sticker trading', 'స్టిక్కర్ ట్రేడింగ్')}</h3><div class="tr-tabs">${tabs}</div><div id="tradeBody">${body}</div>
+    <div class="modal-actions"><button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button></div>`;
+}
+let pendingTradeCode = '';
+function openTrade(tab) { SlotFX.press(); modal(tradeHtml(tab)); }
+function gainSticker(id) {
+  const s = stickerById(id), all = allStickers();
+  if (!s) return null;
+  if (!all.some(x => x.id === id)) { S.album.stars += s.stars; return { s, stars: true }; } // from another album: becomes stars
+  const isNew = !stickerHave(id);
+  S.album.have[id] = stickerHave(id) + 1;
+  if (!isNew) S.album.stars += s.stars;
+  return { s, isNew, fresh: markFinishedSets() };
+}
+function swapSticker(id) {
+  const s = allStickers().find(x => x.id === id), cost = s ? s.stars * SWAP_STARS : Infinity;
+  if (!s || stickerHave(id) || S.album.stars < cost) { sfx('err'); return; }
+  S.album.stars -= cost;
+  const g = gainSticker(id);
+  save(); SlotFX.big();
+  modal(`<h3>${ico('star')} ${tr('Swapped!', 'మార్చుకున్నారు!')}</h3><div class="pk-row"><div class="pk-card s${s.stars} new">${ico(s.icon)}<b>${tr(...s.name)}</b><small>${starsHtml(s.stars)}</small></div></div>
+    ${(g.fresh || []).map(setClaimHtml).join('')}
+    <div class="modal-actions"><button class="btn gold" data-act="trade-tab" data-id="swap">${tr('Swap more', 'ఇంకా మార్చు')}</button><button class="btn ghost" data-act="close">${tr('Done', 'సరే')}</button></div>`);
+  if (activeTab === 'album') renderTab();
+}
+async function sendSticker(id) {
+  const s = allStickers().find(x => x.id === id);
+  if (!s || stickerHave(id) < 2) return;
+  $('tradeBody').innerHTML = `<div class="loader"></div>`;
+  try {
+    const { code } = await tradePost({ action: 'send', name: raidName(), sticker: id });
+    S.album.have[id]--; save(); SlotFX.whoosh();
+    const link = `${location.origin}${location.pathname}?trade=${code}`;
+    $('tradeBody').innerHTML = `<div class="tr-sent">${ico(s.icon, 'big-ico')}<p>${tr(`${s.name[0]} is ready for your friend!`, `${s.name[1]} మీ ఫ్రెండ్ కోసం సిద్ధం!`)}</p>
+      <div class="tr-code">${code}</div><small>${tr('Valid for 7 days. Only one person can claim it.', '7 రోజులు పనిచేస్తుంది. ఒక్కరే తీసుకోగలరు.')}</small>
+      <div class="modal-actions"><button class="btn gold" data-act="trade-share" data-id="${esc(link)}" data-code="${code}">${ico('outbox')} ${tr('Share', 'షేర్')}</button></div></div>`;
+    if (activeTab === 'album') renderTab();
+  } catch (e) {
+    $('tradeBody').innerHTML = `<p class="sub">${e.status === 429 ? tr('You sent 10 stickers today. Try again tomorrow!', 'ఈ రోజు 10 స్టిక్కర్లు పంపారు. రేపు మళ్ళీ!') : tr('Trading needs an internet connection. Try again in a moment.', 'ట్రేడింగ్‌కి ఇంటర్నెట్ కావాలి. కాసేపట్లో మళ్ళీ ప్రయత్నించండి.')}</p>`;
+  }
+}
+function shareTrade(link, code) {
+  const text = tr(`I sent you a sticker in Business Empire! Code: ${code}`, `బిజినెస్ ఎంపైర్‌లో మీకు ఒక స్టిక్కర్ పంపాను! కోడ్: ${code}`);
+  if (navigator.share) navigator.share({ title: 'Business Empire', text, url: link }).catch(() => {});
+  else { try { navigator.clipboard.writeText(`${text} ${link}`); toast(tr('Copied! Paste it to your friend.', 'కాపీ అయింది! ఫ్రెండ్‌కి పంపండి.'), 'good'); } catch (e) { /* no clipboard */ } }
+}
+async function claimTrade() {
+  const code = ($('tradeCode').value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (code.length !== 6) { shake($('tradeCode')); return; }
+  $('tradeBody').innerHTML = `<div class="loader"></div>`;
+  try {
+    const { sticker, from } = await tradePost({ action: 'claim', code });
+    pendingTradeCode = '';
+    const g = gainSticker(sticker);
+    if (!g) throw new Error('unknown sticker');
+    save(); SlotFX.big(); confetti($('modalBody'), 100);
+    $('tradeBody').innerHTML = `<div class="tr-sent"><p>${tr(`A gift from <b>${esc(from)}</b>!`, `<b>${esc(from)}</b> నుండి బహుమతి!`)}</p>
+      <div class="pk-row"><div class="pk-card s${g.s.stars} ${g.isNew ? 'new' : ''}">${g.isNew ? `<em>${tr('NEW!', 'కొత్తది!')}</em>` : ''}${ico(g.s.icon)}<b>${tr(...g.s.name)}</b><small>${starsHtml(g.s.stars)}</small></div></div>
+      ${g.stars ? `<p class="sub">${tr(`It is from another album, so it became +${g.s.stars}⭐.`, `ఇది వేరే ఆల్బమ్‌ది, అందుకే +${g.s.stars}⭐ అయింది.`)}</p>` : ''}${(g.fresh || []).map(setClaimHtml).join('')}</div>`;
+    if (activeTab === 'album') renderTab();
+  } catch (e) {
+    const msg = e.status === 404 ? tr('That code was not found or was already used.', 'ఆ కోడ్ లేదు లేదా ఇప్పటికే వాడేశారు.') : e.status === 409 ? tr('That is your own code—send it to a friend!', 'అది మీ సొంత కోడ్—ఫ్రెండ్‌కి పంపండి!') : tr('Trading needs an internet connection. Try again in a moment.', 'ట్రేడింగ్‌కి ఇంటర్నెట్ కావాలి. కాసేపట్లో మళ్ళీ ప్రయత్నించండి.');
+    pendingTradeCode = code;
+    modal(tradeHtml('get')); $('tradeBody').insertAdjacentHTML('afterbegin', `<p class="tr-err">${msg}</p>`);
+  }
+}
 function renderAlbum() {
   const A = S.album, all = allStickers(), owned = all.filter(s => stickerHave(s.id)).length;
   markFinishedSets();
@@ -3780,7 +3884,8 @@ function renderAlbum() {
     (done ? `<div class="season-banner">${ico('trophy')}<b>${tr('Album complete!', 'ఆల్బమ్ పూర్తి!')}</b><button class="btn gold" data-act="season-open">${tr('Claim & start new album', 'తీసుకుని కొత్త ఆల్బమ్')}</button></div>` : '') +
     `<div class="album-top"><div class="slot-stat">${ico('album')}<b>${owned}</b><small>/ ${all.length}</small></div>
       <div class="slot-stat stars">⭐<b>${A.stars}</b><small>${tr('stars from duplicates', 'డూప్లికేట్ల స్టార్లు')}</small>
-        <button class="btn ghost" data-act="star-trade" ${A.stars < STAR_TRADE ? 'disabled' : ''}>${STAR_TRADE}⭐ → ${ico('pack')}</button></div></div>
+        <button class="btn ghost" data-act="star-trade" ${A.stars < STAR_TRADE ? 'disabled' : ''}>${STAR_TRADE}⭐ → ${ico('pack')}</button></div>
+      <button class="btn gold trade-btn" data-act="trade-open">${ico('people')} ${tr('Trade', 'ట్రేడ్')}</button></div>
     <div class="pack-row">${packBtn('basic')}${packBtn('gold')}</div>
     <div class="album-sets">${sets}</div>`;
 }
@@ -4818,6 +4923,12 @@ document.addEventListener('click', e => {
     case 'help-go': helpGo(+id); break;
     case 'pack-open': openPack(id); break;
     case 'set-claim': claimSet(id, el); break;
+    case 'trade-open': openTrade('swap'); break;
+    case 'trade-tab': openTrade(id); break;
+    case 'trade-swap': swapSticker(id); break;
+    case 'trade-send': sendSticker(id); break;
+    case 'trade-claim': claimTrade(); break;
+    case 'trade-share': shareTrade(id, el.dataset.code); break;
     case 'season-open': showSeasonDone(); break;
     case 'season-claim': claimSeason(el); break;
     case 'pack-buy': buyPack(id); break;
@@ -5060,6 +5171,13 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
 
 const hadSave = load();
 migrateBuild();
+(() => {
+  const code = new URLSearchParams(location.search).get('trade');
+  if (!code) return;
+  history.replaceState(null, '', location.pathname);
+  pendingTradeCode = code.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+  setTimeout(() => { switchTab('album'); openTrade('get'); }, 1500);
+})();
 hydrateIcons();
 applyLowFx();
 applyStaticText();
