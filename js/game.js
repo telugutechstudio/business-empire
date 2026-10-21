@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '4.3';
+const GAME_VERSION = '4.4';
 const BIZ_OFF = true; // businesses, managers, upgrades, investors, stocks and worlds are switched off
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
@@ -165,6 +165,8 @@ const INVESTOR_UPGRADES = [
 function invText(u) { return isTe() ? [u.t[2], u.t[3]] : [u.t[0], u.t[1]]; }
 
 const GEM_SHOP = [
+  { id: 'energy30',  icon: 'battery',   cost: 10,            t: ['30 Energy', 'Instant energy for the Spin Game', '30 ఎనర్జీ', 'స్పిన్ గేమ్‌కి వెంటనే ఎనర్జీ'] },
+  { id: 'energy100', icon: 'battery',   cost: 30,            t: ['100 Energy', 'A big energy refill', '100 ఎనర్జీ', 'పెద్ద ఎనర్జీ రీఫిల్'] },
   { id: 'rush',    icon: 'bolt',      cost: 10,            t: ['Profit Rush', 'x2 all profits for 15 minutes (stacks time)', 'ప్రాఫిట్ రష్', '15 నిమిషాలు అన్ని లాభాలు x2'] },
   { id: 'warp1',   icon: 'hourglass', cost: 20,            t: ['Time Warp: 1 Hour', 'Instantly earn 1 hour of income', 'టైమ్ వార్ప్: 1 గంట', '1 గంట ఆదాయం వెంటనే పొందండి'] },
   { id: 'warp24',  icon: 'stopwatch', cost: 200,           t: ['Time Warp: 1 Day', 'Instantly earn 24 hours of income', 'టైమ్ వార్ప్: 1 రోజు', '24 గంటల ఆదాయం వెంటనే పొందండి'] },
@@ -644,6 +646,7 @@ function buyGem(id) {
   if (cost == null || S.gems < cost) { sfx('err'); return; }
   S.gems -= cost;
   switch (id) {
+    case 'energy30': case 'energy100': { const n = id === 'energy30' ? 30 : 100; S.slot.energy += n; toast(tr(`⚡ +${n} energy!`, `⚡ +${n} ఎనర్జీ!`), 'gem'); break; }
     case 'rush': S.boosts.rush += 900; toast(tr('⚡ Profit Rush! x2 for 15 minutes.', '⚡ ప్రాఫిట్ రష్! 15 నిమిషాలు x2.'), 'gem'); break;
     case 'warp1': case 'warp24': {
       const amt = bonusCash(id === 'warp1' ? 3600 : 86400);
@@ -2345,9 +2348,7 @@ function slotSpin() {
   slotRegen();
   const sl = S.slot, bet = sl.bet;
   if (sl.energy < bet) {
-    slotStopAuto();
-    toast(tr(`⚡ Not enough energy. +1 in ${fmtClock(slotNextIn())}`, `⚡ ఎనర్జీ సరిపోదు. ${fmtClock(slotNextIn())} లో +1`), 'bad');
-    shake($('slotSpinBtn')); sfx('err'); return;
+    shake($('slotSpinBtn')); showOutOfEnergy(); return;
   }
   slotBusy = true;
   if (sl.energy >= slotMax()) sl.at = Date.now(); // the refill clock starts when you drop below full
@@ -2438,6 +2439,44 @@ function flySpinRewards(line, p, extras) {
   flyTo('piggy', reelCenter(2), 'coin', 1, 350);
   if (extras.pack) flyTo('pack', res, 'pack', 2, 500);
 }
+// ---- Out of energy: one window that lists every place to get energy or coins, each with a Go button ----
+const ENERGY_PACKS = [{ id: 'energy30', n: 30, gems: 10 }, { id: 'energy100', n: 100, gems: 30 }];
+function outOfEnergyHtml() {
+  const sl = S.slot, rows = [];
+  const row = (icon, title, desc, btn, ready = false) => rows.push(`<div class="eo-row ${ready ? 'ready' : ''}">${ico(icon)}<div class="eo-info"><b>${title}</b><small>${desc}</small></div>${btn}</div>`);
+  const go = (act, label, extra = '', disabled = false) => `<button class="btn ${disabled ? 'ghost' : 'gold'} eo-go" data-act="${act}" ${extra} ${disabled ? 'disabled' : ''}>${label}</button>`;
+  if (sl.energy >= 1 && sl.bet > 1) row('bolt', tr('Lower your bet', 'బెట్ తగ్గించండి'), tr(`You still have ${sl.energy} energy. Spin at ×1.`, `ఇంకా ${sl.energy} ఎనర్జీ ఉంది. ×1 తో స్పిన్ చేయండి.`), go('eo-bet1', tr('Bet ×1', 'బెట్ ×1')), true);
+  row('gift', tr('Free gift', 'ఫ్రీ గిఫ్ట్'), giftReady() ? tr(`+${giftEnergy()} energy now`, `ఇప్పుడే +${giftEnergy()} ఎనర్జీ`) : tr(`Next gift in ${fmtClock(giftIn())}`, `తర్వాతి గిఫ్ట్ ${fmtClock(giftIn())} లో`),
+    go('gift-claim', giftReady() ? tr('Claim', 'తీసుకో') : tr('Wait', 'ఆగండి'), '', !giftReady()), giftReady());
+  row('calendar', tr('Spin calendar', 'స్పిన్ క్యాలెండర్'), calReady() ? tr(`Day ${calDay()}: +${calEnergy(calDay())} energy`, `రోజు ${calDay()}: +${calEnergy(calDay())} ఎనర్జీ`) : tr('Claimed today. Back tomorrow', 'ఈ రోజు తీసుకున్నారు. రేపు'),
+    go('cal-claim', calReady() ? tr('Claim', 'తీసుకో') : tr('Tomorrow', 'రేపు'), '', !calReady()), calReady());
+  if (canClaimDaily()) row('gem', tr('Daily reward', 'డైలీ రివార్డ్'), tr('Gems and coins for coming back', 'తిరిగి వచ్చినందుకు జెమ్స్, కాయిన్లు'), go('eo-open', tr('Open', 'తెరువు'), 'data-id="daily"'), true);
+  if (spinReady()) row('wheel', tr('Lucky Wheel', 'లక్కీ వీల్'), tr('A free spin is waiting', 'ఫ్రీ స్పిన్ సిద్ధం'), go('eo-open', tr('Spin', 'తిప్పు'), 'data-id="spin"'), true);
+  if (scratchFreeReady()) row('ticket', tr('Scratch card', 'స్క్రాచ్ కార్డ్'), tr('Your free card for today', 'ఈ రోజు ఫ్రీ కార్డ్'), go('eo-open', tr('Scratch', 'స్క్రాచ్'), 'data-id="scratch"'), true);
+  const doneMissions = S.missions.filter(m => missionValue(m) >= m.target).length;
+  row('clipboard', tr('Missions', 'మిషన్లు'), doneMissions ? tr(`${doneMissions} reward(s) ready`, `${doneMissions} బహుమతి(లు) సిద్ధం`) : tr('Finish missions for gems', 'మిషన్లు పూర్తి చేసి జెమ్స్'), go('go-tab', tr('Go', 'వెళ్ళు'), 'data-tab="missions"'), doneMissions > 0);
+  if (helpLeft()) row('people', tr('Help other players', 'ఇతరులకు సాయం'), tr(`+${fmtInt(HELP_REWARD)} coins and a sticker pack`, `+${fmtInt(HELP_REWARD)} కాయిన్లు, స్టిక్కర్ ప్యాక్`), go('help-open', tr('Help', 'సాయం')), true);
+  if (sl.piggy >= 1000) row('pig', tr('Piggy bank', 'పిగ్గీ బ్యాంక్'), tr(`${fmtInt(sl.piggy)} coins inside`, `లోపల ${fmtInt(sl.piggy)} కాయిన్లు`), go('piggy-break', `💎 ${PIGGY_GEMS}`, `data-gems="${PIGGY_GEMS}"`, S.gems < PIGGY_GEMS));
+  for (const p of ENERGY_PACKS) row('battery', tr(`${p.n} energy`, `${p.n} ఎనర్జీ`), tr('Instant refill with gems', 'జెమ్స్‌తో వెంటనే'), go('energy-buy', `💎 ${p.gems}`, `data-id="${p.id}" data-gems="${p.gems}"`, S.gems < p.gems));
+  return `<div class="eo-head">${ico('battery', 'big-ico')}<h3>${tr('Out of energy!', 'ఎనర్జీ అయిపోయింది!')}</h3>
+    <p class="sub">${tr(`+1 every 6 minutes · next in ${fmtClock(slotNextIn())}. Or get more here:`, `ప్రతి 6 నిమిషాలకు +1 · తర్వాతి ${fmtClock(slotNextIn())} లో. లేదా ఇక్కడ పొందండి:`)}</p></div>
+    <div class="eo-list">${rows.join('')}</div>
+    <div class="modal-actions"><button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button></div>`;
+}
+function showOutOfEnergy() {
+  slotStopAuto();
+  SlotFX.land('zap'); SlotFX.whoosh();
+  modal(outOfEnergyHtml());
+}
+function buyEnergy(id) {
+  const p = ENERGY_PACKS.find(x => x.id === id);
+  if (!p || S.gems < p.gems) { sfx('err'); return; }
+  S.gems -= p.gems; S.slot.energy += p.n;
+  SlotFX.land('zap'); toast(tr(`⚡ +${p.n} energy!`, `⚡ +${p.n} ఎనర్జీ!`), 'gem');
+  save(); closeModal();
+  if (activeTab === 'slots') renderTab();
+  updateHeader();
+}
 // Count a number up on screen with soft ticks
 function rollUp(el, to, html) {
   const t0 = performance.now(), dur = Math.min(1200, 400 + Math.log10(to + 1) * 150);
@@ -2492,7 +2531,8 @@ function slotFinish(line, bet) {
   if (sl.boss.lvl && $('bossCard')) updateBossHp();
   slotBusy = false;
   updateSlotLive(); updateHeader(); save();
-  if (slotAuto) setTimeout(() => { if (slotAuto && activeTab === 'slots') slotSpin(); else slotStopAuto(); }, p.big ? 2200 : 700);
+  if (sl.energy < sl.bet && !rs.includes('RAID') && !rs.includes('దాడి')) { slotStopAuto(); setTimeout(() => { if (activeTab !== 'slots') return; if ($('modal').classList.contains('hidden')) showOutOfEnergy(); else queueModal(outOfEnergyHtml); }, p.big ? 2400 : 1300); }
+  else if (slotAuto) setTimeout(() => { if (slotAuto && activeTab === 'slots') slotSpin(); else slotStopAuto(); }, p.big ? 2200 : 700);
 }
 
 function breakPiggy() {
@@ -3846,6 +3886,10 @@ document.addEventListener('click', e => {
     case 'slot-bet': slotSetBet(); break;
     case 'piggy-break': breakPiggy(); break;
     case 'gift-claim': claimGift(); break;
+    case 'energy-buy': buyEnergy(id); break;
+    case 'eo-bet1': S.slot.bet = 1; closeModal(); renderTab(); break;
+    case 'eo-open': closeModal(); setTimeout(() => { if (id === 'daily') modal(dailyHtml()); if (id === 'spin') modal(spinHtml()); if (id === 'scratch') openScratch(); }, 50); break;
+    case 'go-tab': closeModal(); switchTab(el.dataset.tab); break;
     case 'raid-open': openRaid(); break;
     case 'raid-go': raidGo(+id); break;
     case 'help-open': openHelp(); break;

@@ -1181,3 +1181,14 @@ body.biz-off .ips { color: #7dff9a; }
 /* Rewards flying into their counters */
 .reward-fly { position: fixed; left: 0; top: 0; width: 38px; height: 38px; margin: -19px 0 0 -19px; pointer-events: none; z-index: 70; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .45)); }
 .rail-btn.bump, .sg-energy.bump, .pill.gem.bump, .tab-btn.bump { animation: bump .25s ease-out; }
+
+/* Out-of-energy window */
+.eo-head { text-align: center; }
+.eo-head h3 { margin: 4px 0; }
+.eo-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; max-height: 52vh; overflow-y: auto; text-align: left; }
+.eo-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 14px; background: var(--card2); border: 1px solid var(--border); }
+.eo-row > .i3d { width: 38px; height: 38px; flex: none; }
+.eo-row.ready { border-color: var(--gold); box-shadow: 0 0 12px rgba(255, 200, 61, .3); }
+.eo-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.eo-info small { color: var(--muted); font-size: 12px; }
+.eo-go { flex: none; padding: 8px 14px; min-width: 76px; }
