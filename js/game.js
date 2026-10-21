@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '4.6';
+const GAME_VERSION = '4.7';
 const BIZ_OFF = true; // businesses, managers, upgrades, investors, stocks and worlds are switched off
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
@@ -64,7 +64,7 @@ const ICONS = {
   dizzy: ['Dizzy', '💫'], alienm: ['Alien monster', '👾'], crystal: ['Crystal ball', '🔮'], atom: ['Atom symbol', '⚛️'], magnet: ['Magnet', '🧲'],
   starplain: ['Star', '⭐'], hole: ['Hole', '🕳️'], dna: ['Dna', '🧬'], wand: ['Magic wand', '🪄'], shooting: ['Shooting star', '🌠'],
   sunface: ['Sun with face', '🌞'], nightstars: ['Night with stars', '🌃'],
-  ticket: ['Ticket', '🎫'], slot: ['Slot machine', '🎰'], mosque: ['Mosque', '🕌'], castle: ['Castle', '🏰'], htemple: ['Hindu temple', '🛕'], classical: ['Classical building', '🏛️'], construction: ['Building construction', '🏗️'], worldmap: ['World map', '🗺️'], island: ['Desert island', '🏝️'], cow: ['Cow', '🐄'], rooster: ['Rooster', '🐓'], sheaf: ['Sheaf of rice', '🌾'], ox: ['Ox', '🐂'], goat: ['Goat', '🐐'], coconut: ['Coconut', '🥥'], curry: ['Curry rice', '🍛'], ricebowl: ['Cooked rice', '🍚'], flatbread: ['Flatbread', '🫓'], pancakes: ['Pancakes', '🥞'], riceball: ['Rice ball', '🍙'], doughnut: ['Doughnut', '🍩'], custard: ['Custard', '🍮'], candy: ['Candy', '🍬'], pepper: ['Hot pepper', '🌶️'], firecracker: ['Firecracker', '🧨'], monkey: ['Monkey', '🐒'], parrot: ['Parrot', '🦜'], snake: ['Snake', '🐍'], deer: ['Deer', '🦌'], mountain: ['Snow-capped mountain', '🏔️'], beach: ['Beach with umbrella', '🏖️'], train: ['Locomotive', '🚂'], stadium: ['Stadium', '🏟️'], album: ['Notebook with decorative cover', '📔'], pack: ['Package', '📦'], battery: ['Battery', '🔋'], pig: ['Pig face', '🐷'], moneybag: ['Money bag', '💰'], hammer: ['Hammer', '🔨'], cherry: ['Cherries', '🍒'], chartdown: ['Chart decreasing', '📉'], tv: ['Television', '📺'], shield: ['Shield', '🛡️'], page: ['Page with curl', '📃'],
+  ticket: ['Ticket', '🎫'], slot: ['Slot machine', '🎰'], mosque: ['Mosque', '🕌'], castle: ['Castle', '🏰'], htemple: ['Hindu temple', '🛕'], classical: ['Classical building', '🏛️'], construction: ['Building construction', '🏗️'], worldmap: ['World map', '🗺️'], island: ['Desert island', '🏝️'], cow: ['Cow', '🐄'], rooster: ['Rooster', '🐓'], sheaf: ['Sheaf of rice', '🌾'], ox: ['Ox', '🐂'], goat: ['Goat', '🐐'], coconut: ['Coconut', '🥥'], curry: ['Curry rice', '🍛'], ricebowl: ['Cooked rice', '🍚'], flatbread: ['Flatbread', '🫓'], pancakes: ['Pancakes', '🥞'], riceball: ['Rice ball', '🍙'], doughnut: ['Doughnut', '🍩'], custard: ['Custard', '🍮'], candy: ['Candy', '🍬'], pepper: ['Hot pepper', '🌶️'], firecracker: ['Firecracker', '🧨'], monkey: ['Monkey', '🐒'], parrot: ['Parrot', '🦜'], snake: ['Snake', '🐍'], deer: ['Deer', '🦌'], mountain: ['Snow-capped mountain', '🏔️'], beach: ['Beach with umbrella', '🏖️'], train: ['Locomotive', '🚂'], stadium: ['Stadium', '🏟️'], album: ['Notebook with decorative cover', '📔'], pack: ['Package', '📦'], battery: ['Battery', '🔋'], pig: ['Pig face', '🐷'], moneybag: ['Money bag', '💰'], hammer: ['Hammer', '🔨'], cherry: ['Cherries', '🍒'], chartdown: ['Chart decreasing', '📉'], tv: ['Television', '📺'], shield: ['Shield', '🛡️'], page: ['Page with curl', '📃'], church: ['Church', '⛪'], bridge: ['Bridge at night', '🌉'], sunrise: ['Sunrise', '🌅'], fountain: ['Fountain', '⛲'], lighttower: ['Tokyo tower', '🗼'], book: ['Open book', '📖'], question: ['Red question mark', '❓'], om: ['Om', '🕉️'], canoe: ['Canoe', '🛶'], camel: ['Camel', '🐫'], worship: ['Place of worship', '🛐'], khanda: ['Khanda', '🪯'],
 };
 function iconUrl(key) { return ICONS[key] ? `icons/3d/${key}.webp` : ''; }
 function emo(key) { return (ICONS[key] || [])[1] || '❔'; }
@@ -301,7 +301,7 @@ function defaultState() {
     scratch: { day: '', card: null },
     slot: { energy: 30, at: 0, bet: 1, coins: 0, piggy: 0, vip: 0, gift: { at: 0, chest: 0 }, cal: { last: '', streak: 0 }, boss: { lvl: 1, hp: 300 }, col: { week: '', n: 0, got: 0, item: 0 } },
     build: { done: 0, stage: 0, view: null },
-    city: { i: 0, done: {}, view: null, migrated: false },
+    city: { i: 0, done: {}, view: null, migrated: false, quiz: {}, intro: -1, pv: 2 },
     album: { have: {}, packs: { basic: 2, gold: 0 }, stars: 0, sets: {} },
     league: { week: '', tier: 0, pts: 0, lastRank: 0 },
     raid: { shields: 1, tokens: 0, helpDay: '', log: [], online: false },
@@ -352,7 +352,7 @@ function mergeState(saved) {
   out.album = Object.assign({ have: {}, stars: 0, sets: {} }, saved.album || {});
   out.album.packs = Object.assign({ basic: saved.album ? 0 : 2, gold: 0 }, out.album.packs || {});
   out.build = Object.assign({ done: 0, stage: 0, view: null }, saved.build || {});
-  out.city = Object.assign({ i: 0, done: {}, view: null, migrated: !saved.build }, saved.city || {});
+  out.city = Object.assign({ i: 0, done: {}, view: null, migrated: !saved.build, quiz: {}, intro: -1, pv: saved.city ? 1 : 2 }, saved.city || {});
   out.slot = Object.assign({ energy: 30, at: 0, bet: 1, coins: 0, piggy: 0, vip: 0 }, saved.slot || {});
   out.league = Object.assign({ week: '', tier: 0, pts: 0, lastRank: 0 }, saved.league || {});
   out.slot.gift = Object.assign({ at: 0, chest: 0 }, out.slot.gift || {});
@@ -2563,24 +2563,225 @@ function breakPiggy() {
 // An India map of cities. Each city is a hexagon island: tap a glowing + tile to build it with coins.
 // Tiles are houses, trees and the five parts of each landmark; some tiles carry a gift of coins and energy.
 // Finish every tile of a city to open the next one.
-const LANDMARKS = {
-  charminar: { icon: 'mosque', name: ['Charminar', 'చార్మినార్'], parts: [['Base and arches', 'పునాది, ఆర్చిలు'], ['Upper floor', 'పై అంతస్తు'], ['Four minarets', 'నాలుగు మినార్లు'], ['Minaret balconies', 'మినార్ బాల్కనీలు'], ['Domes', 'గుమ్మటాలు']] },
-  golconda: { icon: 'castle', name: ['Golconda Fort', 'గోల్కొండ కోట'], parts: [['Rocky hill', 'రాతి కొండ'], ['Fort walls', 'కోట గోడలు'], ['Watch towers', 'బురుజులు'], ['Bala Hissar', 'బాలా హిస్సార్'], ['Royal flag', 'రాజ జెండా']] },
-  buddha: { icon: 'lotus', name: ['Buddha Statue', 'బుద్ధ విగ్రహం'], parts: [['Rock in the lake', 'సరస్సులో రాయి'], ['Lotus base', 'కమల పీఠం'], ['Robe', 'వస్త్రం'], ['Head and shoulders', 'తల, భుజాలు'], ['Blessing hand and halo', 'అభయ హస్తం, ప్రభ']] },
-  indiagate: { icon: 'classical', name: ['India Gate', 'ఇండియా గేట్'], parts: [['Stone base', 'రాతి పునాది'], ['Two pillars', 'రెండు స్తంభాలు'], ['Great arch', 'పెద్ద ఆర్చి'], ['Cornice', 'పై అంచు'], ['Eternal flame', 'అమర జ్యోతి']] },
-  qutub: { icon: 'tower', name: ['Qutub Minar', 'కుతుబ్ మినార్'], parts: [['First storey', 'మొదటి అంతస్తు'], ['Second storey', 'రెండో అంతస్తు'], ['Third storey', 'మూడో అంతస్తు'], ['Marble storeys', 'పాలరాతి అంతస్తులు'], ['Top cupola', 'పై గుమ్మటం']] },
-  lotus: { icon: 'lotus', name: ['Lotus Temple', 'లోటస్ టెంపుల్'], parts: [['Base and pools', 'పునాది, కొలనులు'], ['Outer petals', 'బయటి రేకులు'], ['Middle petals', 'మధ్య రేకులు'], ['Inner petals', 'లోపలి రేకులు'], ['Crown and steps', 'పైభాగం, మెట్లు']] },
-  redfort: { icon: 'castle', name: ['Red Fort', 'ఎర్రకోట'], parts: [['Red walls', 'ఎర్ర గోడలు'], ['Lahori Gate', 'లాహోరీ గేట్'], ['Corner towers', 'మూల బురుజులు'], ['Chhatris', 'ఛత్రీలు'], ['National flag', 'జాతీయ జెండా']] },
-  taj: { icon: 'mosque', name: ['Taj Mahal', 'తాజ్ మహల్'], parts: [['Marble platform', 'పాలరాతి వేదిక'], ['Main hall', 'ప్రధాన భవనం'], ['Great dome', 'పెద్ద గుమ్మటం'], ['Four minarets', 'నాలుగు మినార్లు'], ['Gardens and pool', 'తోటలు, కొలను']] },
-  agrafort: { icon: 'castle', name: ['Agra Fort', 'ఆగ్రా కోట'], parts: [['Sandstone walls', 'రాతి గోడలు'], ['Amar Singh Gate', 'అమర్ సింగ్ గేట్'], ['Bastions', 'బురుజులు'], ['Marble pavilions', 'పాలరాతి మండపాలు'], ['Flag', 'జెండా']] },
-  tirupati: { icon: 'htemple', name: ['Temple Gopuram', 'ఆలయ గోపురం'], parts: [['Temple base', 'ఆలయ పునాది'], ['Lower tiers', 'కింది అంతస్తులు'], ['Upper tiers', 'పై అంతస్తులు'], ['Vimana roof', 'విమాన గోపురం'], ['Golden kalasams', 'బంగారు కలశాలు']] },
+// Every landmark teaches something: a short fact, when it was built, and a three-choice quiz (the first answer is the right one).
+// `type` picks a ready-made 3D building and its part names; landmarks with their own model list their own parts.
+const BTYPE_PARTS = {
+  nagara: [['Platform', 'వేదిక'], ['Prayer hall', 'మండపం'], ['Sanctum', 'గర్భగుడి'], ['Shikhara tower', 'శిఖరం'], ['Kalasham and flag', 'కలశం, జెండా']],
+  gopuram: [['Stone base', 'రాతి పునాది'], ['Lower tiers', 'కింది అంతస్తులు'], ['Middle tiers', 'మధ్య అంతస్తులు'], ['Upper tiers', 'పై అంతస్తులు'], ['Roof and kalasams', 'పైకప్పు, కలశాలు']],
+  tomb: [['Platform', 'వేదిక'], ['Main hall', 'ప్రధాన భవనం'], ['Great dome', 'పెద్ద గుమ్మటం'], ['Corner towers', 'మూల బురుజులు'], ['Garden', 'తోట']],
+  gateway: [['Stone base', 'రాతి పునాది'], ['Side towers', 'పక్క బురుజులు'], ['Great arch', 'పెద్ద ఆర్చి'], ['Top and turrets', 'పైభాగం, బురుజులు'], ['Domes and flags', 'గుమ్మటాలు, జెండాలు']],
+  palace: [['Ground floor', 'కింది అంతస్తు'], ['Upper floor', 'పై అంతస్తు'], ['Central tower', 'మధ్య గోపురం'], ['Side towers', 'పక్క బురుజులు'], ['Main dome', 'ప్రధాన గుమ్మటం']],
+  hawa: [['Ground floor', 'కింది అంతస్తు'], ['Second floor', 'రెండో అంతస్తు'], ['Third floor', 'మూడో అంతస్తు'], ['Fourth floor', 'నాలుగో అంతస్తు'], ['Top floor', 'పై అంతస్తు']],
+  jantar: [['Platform', 'వేదిక'], ['Giant sundial', 'పెద్ద సూర్య గడియారం'], ['Shadow arcs', 'నీడ వంపులు'], ['Top pavilion', 'పై మండపం'], ['Small instruments', 'చిన్న యంత్రాలు']],
+  golden: [['Holy pool', 'పవిత్ర సరోవరం'], ['Causeway', 'వంతెన దారి'], ['Golden sanctum', 'బంగారు గర్భగుడి'], ['Golden dome', 'బంగారు గుమ్మటం'], ['Kalash and flag', 'కలశం, జెండా']],
+  memorial: [['Garden', 'తోట'], ['Stone base', 'రాతి పునాది'], ['Memorial pillar', 'స్మారక స్తంభం'], ['Wall and well', 'గోడ, బావి'], ['Flame', 'జ్యోతి']],
+  ghat: [['River steps', 'నది మెట్లు'], ['Riverside houses', 'ఒడ్డున ఇళ్లు'], ['Small temples', 'చిన్న గుడులు'], ['Umbrellas', 'గొడుగులు'], ['Boats and lamps', 'పడవలు, దీపాలు']],
+  stupa: [['Round base', 'గుండ్రని పునాది'], ['Railing', 'కంచె'], ['Dome', 'గుమ్మటం'], ['Harmika', 'హర్మిక'], ['Umbrella top', 'ఛత్రం']],
+  bridge: [['Pillars in the river', 'నదిలో స్తంభాలు'], ['Tall towers', 'ఎత్తైన టవర్లు'], ['Steel frame', 'ఇనుప చట్రం'], ['Road deck', 'రోడ్డు'], ['Traffic', 'వాహనాలు']],
+  barrage: [['River', 'నది'], ['Piers', 'స్తంభాలు'], ['Gates', 'గేట్లు'], ['Road', 'రోడ్డు'], ['Lamps', 'దీపాలు']],
+  konark: [['Platform', 'వేదిక'], ['Stone wheels', 'రాతి చక్రాలు'], ['Hall', 'మండపం'], ['Seven horses', 'ఏడు గుర్రాలు'], ['Top', 'శిఖరం']],
+  lighthouse: [['Base', 'పునాది'], ['Lower tower', 'కింది భాగం'], ['Middle tower', 'మధ్య భాగం'], ['Upper tower', 'పై భాగం'], ['Lamp room', 'దీపపు గది']],
+  church: [['Steps', 'మెట్లు'], ['Main hall', 'ప్రధాన భవనం'], ['Bell tower', 'గంట గోపురం'], ['Spire', 'శిఖరం'], ['Cross and windows', 'శిలువ, కిటికీలు']],
+  garden: [['Terraces', 'మెట్ల తోటలు'], ['Dam wall', 'ఆనకట్ట గోడ'], ['Water channels', 'నీటి కాలువలు'], ['Fountains', 'ఫౌంటెన్లు'], ['Lights', 'దీపాలు']],
+  thoranam: [['Stone base', 'రాతి పునాది'], ['Pillars', 'స్తంభాలు'], ['Stone beam', 'రాతి దూలం'], ['Carved top', 'చెక్కిన పైభాగం'], ['Swans', 'హంసలు']],
+  mandapa: [['Star platform', 'నక్షత్ర వేదిక'], ['Pillars', 'స్తంభాలు'], ['Roof', 'పైకప్పు'], ['Shrines', 'గుడులు'], ['Nandi', 'నంది']],
 };
+const LANDMARKS = {
+  // Hyderabad
+  charminar: { icon: 'mosque', name: ['Charminar', 'చార్మినార్'], y: '1591', parts: [['Base and arches', 'పునాది, ఆర్చిలు'], ['Upper floor', 'పై అంతస్తు'], ['Four minarets', 'నాలుగు మినార్లు'], ['Minaret balconies', 'మినార్ బాల్కనీలు'], ['Domes', 'గుమ్మటాలు']],
+    fact: ['Built in 1591 by Sultan Muhammad Quli Qutb Shah, the founder of Hyderabad. Its four minarets are about 56 metres tall.', '1591లో హైదరాబాద్ స్థాపకుడు సుల్తాన్ మహమ్మద్ కులీ కుతుబ్ షా కట్టించారు. దీని నాలుగు మినార్లు సుమారు 56 మీటర్ల ఎత్తు.'],
+    quiz: [['Who built the Charminar?', 'చార్మినార్‌ను ఎవరు కట్టించారు?'], [['Muhammad Quli Qutb Shah', 'మహమ్మద్ కులీ కుతుబ్ షా'], ['Shah Jahan', 'షాజహాన్'], ['Tipu Sultan', 'టిప్పు సుల్తాన్']]] },
+  golconda: { icon: 'castle', name: ['Golconda Fort', 'గోల్కొండ కోట'], y: ['16th century', '16వ శతాబ్దం'], parts: [['Rocky hill', 'రాతి కొండ'], ['Fort walls', 'కోట గోడలు'], ['Watch towers', 'బురుజులు'], ['Bala Hissar', 'బాలా హిస్సార్'], ['Royal flag', 'రాజ జెండా']],
+    fact: ['Golconda was famous for its diamond trade. A hand clap at the Fateh Darwaza gate can be heard at the Bala Hissar on the hilltop!', 'గోల్కొండ వజ్రాల వ్యాపారానికి ప్రసిద్ధి. ఫతే దర్వాజా దగ్గర చప్పట్లు కొడితే కొండ పైన బాలా హిస్సార్ వరకు వినిపిస్తుంది!'],
+    quiz: [['Golconda was famous for trading in?', 'గోల్కొండ దేని వ్యాపారానికి ప్రసిద్ధి?'], [['Diamonds', 'వజ్రాలు'], ['Silk', 'పట్టు'], ['Tea', 'టీ']]] },
+  buddha: { icon: 'lotus', name: ['Buddha Statue', 'బుద్ధ విగ్రహం'], y: '1992', parts: [['Rock in the lake', 'సరస్సులో రాయి'], ['Lotus base', 'కమల పీఠం'], ['Robe', 'వస్త్రం'], ['Head and shoulders', 'తల, భుజాలు'], ['Blessing hand and halo', 'అభయ హస్తం, ప్రభ']],
+    fact: ['This 18 metre Buddha is carved from a single block of granite and stands on the Gibraltar Rock in Hussain Sagar lake.', 'ఈ 18 మీటర్ల బుద్ధ విగ్రహం ఒకే గ్రానైట్ రాతితో చెక్కబడింది. ఇది హుస్సేన్ సాగర్ సరస్సులోని జిబ్రాల్టర్ రాక్ మీద ఉంది.'],
+    quiz: [['In which lake does the Buddha statue stand?', 'బుద్ధ విగ్రహం ఏ సరస్సులో ఉంది?'], [['Hussain Sagar', 'హుస్సేన్ సాగర్'], ['Dal Lake', 'దాల్ సరస్సు'], ['Chilika', 'చిలికా']]] },
+  birla: { icon: 'htemple', type: 'nagara', o: { c: 0xf6f4ee, a: 0xe8e2d4 }, name: ['Birla Mandir', 'బిర్లా మందిర్'], y: '1976',
+    fact: ['Birla Mandir is built from 2,000 tonnes of white Rajasthani marble on Naubath Pahad hill. It is dedicated to Lord Venkateswara.', 'బిర్లా మందిర్ 2,000 టన్నుల తెల్లని రాజస్థానీ పాలరాతితో నౌబత్ పహాడ్ కొండ మీద కట్టారు. ఇది శ్రీ వేంకటేశ్వర స్వామి ఆలయం.'],
+    quiz: [['Birla Mandir in Hyderabad is made of?', 'హైదరాబాద్ బిర్లా మందిర్ దేనితో కట్టారు?'], [['White marble', 'తెల్ల పాలరాయి'], ['Red sandstone', 'ఎర్ర ఇసుకరాయి'], ['Bricks', 'ఇటుకలు']]] },
+  // New Delhi
+  indiagate: { icon: 'classical', name: ['India Gate', 'ఇండియా గేట్'], y: '1931', parts: [['Stone base', 'రాతి పునాది'], ['Two pillars', 'రెండు స్తంభాలు'], ['Great arch', 'పెద్ద ఆర్చి'], ['Cornice', 'పై అంచు'], ['Eternal flame', 'అమర జ్యోతి']],
+    fact: ['India Gate is a 42 metre war memorial for Indian soldiers who died in the First World War. Their names are carved on its walls.', 'ఇండియా గేట్ మొదటి ప్రపంచ యుద్ధంలో చనిపోయిన భారత సైనికుల 42 మీటర్ల స్మారకం. వారి పేర్లు దీని గోడల మీద చెక్కారు.'],
+    quiz: [['India Gate remembers?', 'ఇండియా గేట్ ఎవరి స్మారకం?'], [['Soldiers', 'సైనికులు'], ['Kings', 'రాజులు'], ['Poets', 'కవులు']]] },
+  qutub: { icon: 'lighttower', name: ['Qutub Minar', 'కుతుబ్ మినార్'], y: '1199', parts: [['First storey', 'మొదటి అంతస్తు'], ['Second storey', 'రెండో అంతస్తు'], ['Third storey', 'మూడో అంతస్తు'], ['Marble storeys', 'పాలరాతి అంతస్తులు'], ['Top cupola', 'పై గుమ్మటం']],
+    fact: ['At 72.5 metres, Qutub Minar is the tallest brick minaret in the world. Qutb-ud-din Aibak started it in 1199.', '72.5 మీటర్ల కుతుబ్ మినార్ ప్రపంచంలోనే ఎత్తైన ఇటుక మినార్. 1199లో కుతుబుద్దీన్ ఐబక్ దీన్ని మొదలుపెట్టారు.'],
+    quiz: [['Who started building Qutub Minar?', 'కుతుబ్ మినార్ కట్టడం ఎవరు మొదలుపెట్టారు?'], [['Qutb-ud-din Aibak', 'కుతుబుద్దీన్ ఐబక్'], ['Akbar', 'అక్బర్'], ['Ashoka', 'అశోకుడు']]] },
+  lotus: { icon: 'lotus', name: ['Lotus Temple', 'లోటస్ టెంపుల్'], y: '1986', parts: [['Base and pools', 'పునాది, కొలనులు'], ['Outer petals', 'బయటి రేకులు'], ['Middle petals', 'మధ్య రేకులు'], ['Inner petals', 'లోపలి రేకులు'], ['Crown and steps', 'పైభాగం, మెట్లు']],
+    fact: ['The Lotus Temple has 27 marble petals and nine doors. People of every religion can come inside to pray quietly.', 'లోటస్ టెంపుల్‌కు 27 పాలరాతి రేకులు, తొమ్మిది తలుపులు ఉన్నాయి. ఏ మతం వారైనా లోపలికి వెళ్ళి ప్రశాంతంగా ప్రార్థించవచ్చు.'],
+    quiz: [['How many petals does the Lotus Temple have?', 'లోటస్ టెంపుల్‌కు ఎన్ని రేకులు?'], [['27', '27'], ['9', '9'], ['100', '100']]] },
+  redfort: { icon: 'castle', name: ['Red Fort', 'ఎర్రకోట'], y: '1648', parts: [['Red walls', 'ఎర్ర గోడలు'], ['Lahori Gate', 'లాహోరీ గేట్'], ['Corner towers', 'మూల బురుజులు'], ['Chhatris', 'ఛత్రీలు'], ['National flag', 'జాతీయ జెండా']],
+    fact: ['Shah Jahan built the Red Fort from red sandstone. Every Independence Day, the Prime Minister hoists the national flag here.', 'షాజహాన్ ఎర్రకోటను ఎర్ర ఇసుకరాయితో కట్టించారు. ప్రతి స్వాతంత్ర్య దినోత్సవం రోజు ప్రధానమంత్రి ఇక్కడ జాతీయ జెండా ఎగురవేస్తారు.'],
+    quiz: [['On which day is the flag hoisted at the Red Fort?', 'ఎర్రకోటపై జెండా ఏ రోజు ఎగురవేస్తారు?'], [['Independence Day', 'స్వాతంత్ర్య దినోత్సవం'], ['Children’s Day', 'బాలల దినోత్సవం'], ['Teachers’ Day', 'ఉపాధ్యాయ దినోత్సవం']]] },
+  // Agra
+  taj: { icon: 'mosque', name: ['Taj Mahal', 'తాజ్ మహల్'], y: '1653', parts: [['Marble platform', 'పాలరాతి వేదిక'], ['Main hall', 'ప్రధాన భవనం'], ['Great dome', 'పెద్ద గుమ్మటం'], ['Four minarets', 'నాలుగు మినార్లు'], ['Gardens and pool', 'తోటలు, కొలను']],
+    fact: ['Shah Jahan built the Taj Mahal in memory of his wife Mumtaz Mahal. About 20,000 workers took over 20 years. It is one of the New Seven Wonders of the World.', 'షాజహాన్ తన భార్య ముంతాజ్ మహల్ జ్ఞాపకార్థం తాజ్ మహల్ కట్టించారు. సుమారు 20,000 మంది 20 ఏళ్ళకు పైగా పనిచేశారు. ఇది ప్రపంచ ఏడు కొత్త అద్భుతాలలో ఒకటి.'],
+    quiz: [['The Taj Mahal stands on the bank of which river?', 'తాజ్ మహల్ ఏ నది ఒడ్డున ఉంది?'], [['Yamuna', 'యమున'], ['Ganga', 'గంగ'], ['Godavari', 'గోదావరి']]] },
+  agrafort: { icon: 'castle', name: ['Agra Fort', 'ఆగ్రా కోట'], y: '1573', parts: [['Sandstone walls', 'రాతి గోడలు'], ['Amar Singh Gate', 'అమర్ సింగ్ గేట్'], ['Bastions', 'బురుజులు'], ['Marble pavilions', 'పాలరాతి మండపాలు'], ['Flag', 'జెండా']],
+    fact: ['Akbar rebuilt Agra Fort. Later Aurangzeb kept his father Shah Jahan here, and he spent his last years looking at the Taj Mahal.', 'అక్బర్ ఆగ్రా కోటను మళ్ళీ కట్టించారు. తర్వాత ఔరంగజేబు తన తండ్రి షాజహాన్‌ను ఇక్కడ బంధించారు. ఆయన చివరి రోజులు తాజ్ మహల్‌ను చూస్తూ గడిపారు.'],
+    quiz: [['Who was kept in Agra Fort by his own son?', 'కొడుకు చేత ఆగ్రా కోటలో బంధించబడింది ఎవరు?'], [['Shah Jahan', 'షాజహాన్'], ['Babur', 'బాబర్'], ['Humayun', 'హుమాయూన్']]] },
+  buland: { icon: 'classical', type: 'gateway', o: { c: 0xb8603a, dc: 0xf2ece0, chhatri: true }, name: ['Buland Darwaza', 'బులంద్ దర్వాజా'], y: '1575',
+    fact: ['Buland Darwaza at Fatehpur Sikri is 54 metres high, one of the tallest gateways in the world. Akbar built it to celebrate a victory in Gujarat.', 'ఫతేపూర్ సిక్రీలోని బులంద్ దర్వాజా 54 మీటర్ల ఎత్తు, ప్రపంచంలోనే ఎత్తైన ద్వారాలలో ఒకటి. గుజరాత్ విజయానికి గుర్తుగా అక్బర్ కట్టించారు.'],
+    quiz: [['Who built the Buland Darwaza?', 'బులంద్ దర్వాజాను ఎవరు కట్టించారు?'], [['Akbar', 'అక్బర్'], ['Aurangzeb', 'ఔరంగజేబు'], ['Babur', 'బాబర్']]] },
+  itimad: { icon: 'mosque', type: 'tomb', o: { c: 0xf2e6d0, dc: 0xf2e6d0, small: true }, name: ['Baby Taj', 'బేబీ తాజ్'], y: '1628',
+    fact: ['The tomb of Itimad-ud-Daulah is called the "Baby Taj". Empress Nur Jahan built it for her father, and its inlay work inspired the Taj Mahal.', 'ఇతిమాద్-ఉద్-దౌలా సమాధిని "బేబీ తాజ్" అంటారు. మహారాణి నూర్జహాన్ తన తండ్రి కోసం కట్టించారు. దీని పొదుగు పనితనం తాజ్ మహల్‌కు స్ఫూర్తి.'],
+    quiz: [['Who built the Baby Taj?', 'బేబీ తాజ్ ఎవరు కట్టించారు?'], [['Nur Jahan', 'నూర్జహాన్'], ['Mumtaz Mahal', 'ముంతాజ్ మహల్'], ['Razia Sultan', 'రజియా సుల్తాన్']]] },
+  // Jaipur
+  hawa: { icon: 'classical', type: 'hawa', name: ['Hawa Mahal', 'హవా మహల్'], y: '1799',
+    fact: ['Hawa Mahal, the "Palace of Winds", has 953 small windows. Royal ladies watched street festivals through them without being seen.', 'హవా మహల్ అంటే "గాలి మహల్". దీనికి 953 చిన్న కిటికీలు ఉన్నాయి. రాణులు బయటకు కనిపించకుండా వీధి ఉత్సవాలను వీటి నుంచి చూసేవారు.'],
+    quiz: [['About how many windows does Hawa Mahal have?', 'హవా మహల్‌కు సుమారు ఎన్ని కిటికీలు?'], [['953', '953'], ['53', '53'], ['9', '9']]] },
+  amber: { icon: 'castle', type: 'fort', o: { c: 0xd8b070 }, name: ['Amber Fort', 'ఆమెర్ కోట'], y: '1592',
+    fact: ['Raja Man Singh started Amber Fort in 1592. Its Sheesh Mahal is covered in tiny mirrors, so one candle can light up the whole hall.', '1592లో రాజా మాన్ సింగ్ ఆమెర్ కోట మొదలుపెట్టారు. దీని శీష్ మహల్ నిండా చిన్న అద్దాలు, ఒక్క దీపం పెడితే హాలంతా వెలుగుతుంది.'],
+    quiz: [['The mirror palace inside Amber Fort is called?', 'ఆమెర్ కోటలోని అద్దాల మహల్ పేరు?'], [['Sheesh Mahal', 'శీష్ మహల్'], ['Rang Mahal', 'రంగ్ మహల్'], ['Moti Mahal', 'మోతీ మహల్']]] },
+  jantar: { icon: 'sun', type: 'jantar', name: ['Jantar Mantar', 'జంతర్ మంతర్'], y: '1734',
+    fact: ['Maharaja Sawai Jai Singh II built Jantar Mantar to study the sky. Its Samrat Yantra is the largest stone sundial in the world and tells time to about 2 seconds.', 'ఆకాశాన్ని అధ్యయనం చేయడానికి మహారాజా సవాయ్ జై సింగ్ II జంతర్ మంతర్ కట్టించారు. దీని సమ్రాట్ యంత్రం ప్రపంచంలోనే పెద్ద రాతి సూర్య గడియారం, 2 సెకన్ల తేడాతో సమయం చెబుతుంది.'],
+    quiz: [['The Samrat Yantra at Jantar Mantar is a giant?', 'జంతర్ మంతర్‌లోని సమ్రాట్ యంత్రం ఒక పెద్ద?'], [['Sundial', 'సూర్య గడియారం'], ['Telescope', 'టెలిస్కోప్'], ['Bell', 'గంట']]] },
+  // Amritsar
+  golden: { icon: 'khanda', type: 'golden', name: ['Golden Temple', 'స్వర్ణ దేవాలయం'], y: '1604',
+    fact: ['Sri Harmandir Sahib stands in a holy pool. Its free kitchen, the langar, serves meals to about 1 lakh people every day.', 'శ్రీ హర్మందిర్ సాహిబ్ పవిత్ర సరోవరం మధ్యలో ఉంది. దీని ఉచిత వంటశాల "లంగర్" రోజూ సుమారు లక్ష మందికి భోజనం పెడుతుంది.'],
+    quiz: [['The free kitchen at the Golden Temple is called?', 'స్వర్ణ దేవాలయంలోని ఉచిత వంటశాల పేరు?'], [['Langar', 'లంగర్'], ['Dhaba', 'ధాబా'], ['Canteen', 'క్యాంటీన్']]] },
+  jallianwala: { icon: 'diya', type: 'memorial', name: ['Jallianwala Bagh', 'జలియన్‌వాలా బాగ్'], y: '1919',
+    fact: ['On 13 April 1919, British troops fired on a peaceful crowd here. The bullet marks are still on the walls. It made the freedom struggle much stronger.', '1919 ఏప్రిల్ 13న ఇక్కడ శాంతియుత జనంపై బ్రిటిష్ సైన్యం కాల్పులు జరిపింది. బుల్లెట్ గుర్తులు ఇప్పటికీ గోడలపై ఉన్నాయి. ఇది స్వాతంత్ర్య పోరాటాన్ని మరింత బలపరిచింది.'],
+    quiz: [['In which year did the Jallianwala Bagh tragedy happen?', 'జలియన్‌వాలా బాగ్ దుర్ఘటన ఏ సంవత్సరం?'], [['1919', '1919'], ['1947', '1947'], ['1857', '1857']]] },
+  wagah: { icon: 'flag', type: 'gateway', o: { c: 0xf0ece4, dc: 0xf0ece4, flag: true }, name: ['Attari–Wagah Border', 'అటారీ–వాఘా సరిహద్దు'], y: '1959',
+    fact: ['Every evening soldiers hold the Beating Retreat ceremony at the Attari–Wagah border, lowering the flags with loud marching.', 'ప్రతి సాయంత్రం అటారీ–వాఘా సరిహద్దులో సైనికులు "బీటింగ్ రిట్రీట్" వేడుక చేసి జెండాలు దించుతారు.'],
+    quiz: [['The Attari–Wagah border is between India and?', 'అటారీ–వాఘా సరిహద్దు భారత్ మరియు ఏ దేశం మధ్య?'], [['Pakistan', 'పాకిస్తాన్'], ['Nepal', 'నేపాల్'], ['China', 'చైనా']]] },
+  // Varanasi
+  kashi: { icon: 'om', type: 'nagara', o: { c: 0xf2e6d0, sc: 0xe0b030, a: 0xd8a040 }, name: ['Kashi Vishwanath', 'కాశీ విశ్వనాథ్'], y: '1780',
+    fact: ['Kashi Vishwanath is one of the 12 Jyotirlingas of Lord Shiva. Its spires are covered with gold given by Maharaja Ranjit Singh.', 'కాశీ విశ్వనాథ ఆలయం శివుని 12 జ్యోతిర్లింగాలలో ఒకటి. దీని శిఖరాలకు మహారాజా రంజిత్ సింగ్ ఇచ్చిన బంగారం తొడిగారు.'],
+    quiz: [['Kashi Vishwanath is one of the 12?', 'కాశీ విశ్వనాథ్ 12 ___ లో ఒకటి?'], [['Jyotirlingas', 'జ్యోతిర్లింగాలు'], ['Forts', 'కోటలు'], ['Rivers', 'నదులు']]] },
+  ghats: { icon: 'diya', type: 'ghat', name: ['Ganga Ghats', 'గంగా ఘాట్లు'], y: ['Ancient', 'ప్రాచీనం'],
+    fact: ['Varanasi has over 80 ghats, steps that lead down to the Ganga. Every evening a grand Ganga Aarti with lamps is held at Dashashwamedh Ghat.', 'వారణాసిలో 80కి పైగా ఘాట్లు (గంగలోకి దిగే మెట్లు) ఉన్నాయి. ప్రతి సాయంత్రం దశాశ్వమేధ ఘాట్‌లో దీపాలతో గంగా హారతి జరుగుతుంది.'],
+    quiz: [['The famous evening Ganga Aarti happens at?', 'ప్రసిద్ధ సాయంత్రపు గంగా హారతి ఎక్కడ?'], [['Dashashwamedh Ghat', 'దశాశ్వమేధ ఘాట్'], ['Marina Beach', 'మెరీనా బీచ్'], ['Hussain Sagar', 'హుస్సేన్ సాగర్']]] },
+  sarnath: { icon: 'lotus', type: 'stupa', o: { tall: true }, name: ['Sarnath Stupa', 'సారనాథ్ స్తూపం'], y: ['500 CE', 'క్రీ.శ. 500'],
+    fact: ['At Sarnath the Buddha gave his first teaching. The Lion Capital of Ashoka found here is now the National Emblem of India.', 'సారనాథ్‌లో బుద్ధుడు తన మొదటి బోధన చేశారు. ఇక్కడ దొరికిన అశోకుని సింహ స్తంభ శీర్షమే ఇప్పుడు భారత జాతీయ చిహ్నం.'],
+    quiz: [['India’s National Emblem comes from the Lion Capital found at?', 'భారత జాతీయ చిహ్నం ఎక్కడ దొరికిన సింహ శీర్షం నుంచి వచ్చింది?'], [['Sarnath', 'సారనాథ్'], ['Hampi', 'హంపి'], ['Agra', 'ఆగ్రా']]] },
+  // Kolkata
+  victoria: { icon: 'classical', type: 'tomb', o: { c: 0xf6f4ee, dc: 0xf6f4ee, angel: true }, name: ['Victoria Memorial', 'విక్టోరియా మెమోరియల్'], y: '1921',
+    fact: ['The Victoria Memorial is built of white Makrana marble, the same marble as the Taj Mahal. Today it is a big museum of history and art.', 'విక్టోరియా మెమోరియల్ తాజ్ మహల్ లాగే తెల్లని మక్రానా పాలరాతితో కట్టారు. ఇప్పుడు ఇది చరిత్ర, కళల పెద్ద మ్యూజియం.'],
+    quiz: [['What is the Victoria Memorial today?', 'ఇప్పుడు విక్టోరియా మెమోరియల్ ఏమిటి?'], [['A museum', 'మ్యూజియం'], ['A railway station', 'రైల్వే స్టేషన్'], ['A school', 'బడి']]] },
+  howrah: { icon: 'bridge', type: 'bridge', name: ['Howrah Bridge', 'హౌరా బ్రిడ్జ్'], y: '1943',
+    fact: ['Howrah Bridge over the Hooghly river was built without a single nut or bolt; it is held together by rivets. Lakhs of people cross it every day.', 'హుగ్లీ నదిపై ఉన్న హౌరా బ్రిడ్జ్‌ను ఒక్క నట్టు, బోల్టు లేకుండా రివెట్లతో కట్టారు. రోజూ లక్షల మంది దీనిపై ప్రయాణిస్తారు.'],
+    quiz: [['Howrah Bridge crosses which river?', 'హౌరా బ్రిడ్జ్ ఏ నదిపై ఉంది?'], [['Hooghly', 'హుగ్లీ'], ['Krishna', 'కృష్ణా'], ['Narmada', 'నర్మద']]] },
+  dakshineswar: { icon: 'htemple', type: 'nagara', o: { c: 0xf6f0e6, a: 0xc84a3a, nine: true }, name: ['Dakshineswar Kali Temple', 'దక్షిణేశ్వర్ కాళీ ఆలయం'], y: '1855',
+    fact: ['Rani Rashmoni built this Kali temple with nine spires on the Hooghly. The saint Sri Ramakrishna Paramahamsa served here as a priest.', 'రాణీ రాష్మోని హుగ్లీ ఒడ్డున తొమ్మిది శిఖరాల ఈ కాళీ ఆలయం కట్టించారు. శ్రీ రామకృష్ణ పరమహంస ఇక్కడ పూజారిగా ఉండేవారు.'],
+    quiz: [['Which saint was a priest at Dakshineswar?', 'దక్షిణేశ్వర్‌లో పూజారిగా ఉన్న మహాత్ముడు ఎవరు?'], [['Sri Ramakrishna', 'శ్రీ రామకృష్ణ'], ['Kabir', 'కబీర్'], ['Tulsidas', 'తులసీదాస్']]] },
+  // Puri
+  jagannath: { icon: 'htemple', type: 'nagara', o: { c: 0xf4f0e8, a: 0xd85a3a, h: 1.35 }, name: ['Jagannath Temple', 'జగన్నాథ ఆలయం'], y: ['12th century', '12వ శతాబ్దం'],
+    fact: ['Every year Lord Jagannath, Balabhadra and Subhadra ride huge wooden chariots in the Rath Yatra. The flag on top of the temple is changed every single day.', 'ప్రతి ఏటా రథయాత్రలో జగన్నాథుడు, బలభద్రుడు, సుభద్ర పెద్ద చెక్క రథాలపై ఊరేగుతారు. ఆలయ శిఖరంపై జెండాను ప్రతి రోజూ మారుస్తారు.'],
+    quiz: [['Puri’s famous chariot festival is called?', 'పూరీలో జరిగే ప్రసిద్ధ రథోత్సవం పేరు?'], [['Rath Yatra', 'రథయాత్ర'], ['Kumbh Mela', 'కుంభమేళా'], ['Onam', 'ఓనం']]] },
+  konark: { icon: 'sunrise', type: 'konark', name: ['Konark Sun Temple', 'కోణార్క్ సూర్య దేవాలయం'], y: '1250',
+    fact: ['The Konark Sun Temple is shaped like the Sun God’s chariot with 24 stone wheels and 7 horses. The wheels work as sundials! It is on the back of the ₹10 note.', 'కోణార్క్ సూర్య దేవాలయం 24 రాతి చక్రాలు, 7 గుర్రాలతో సూర్యుని రథం ఆకారంలో ఉంటుంది. ఆ చక్రాలు సూర్య గడియారాలుగా పనిచేస్తాయి! ఇది ₹10 నోటు వెనుక ఉంటుంది.'],
+    quiz: [['The Konark Sun Temple is shaped like a?', 'కోణార్క్ సూర్య దేవాలయం ఏ ఆకారంలో ఉంటుంది?'], [['Chariot', 'రథం'], ['Boat', 'పడవ'], ['Lotus', 'కమలం']]] },
+  // Mumbai
+  gatewayindia: { icon: 'classical', type: 'gateway', o: { c: 0xd8b880, dc: 0xd8b880, dome: true }, name: ['Gateway of India', 'గేట్‌వే ఆఫ్ ఇండియా'], y: '1924',
+    fact: ['The Gateway of India faces the Arabian Sea. It was built for a royal visit in 1911, and in 1948 the last British troops left India through it.', 'గేట్‌వే ఆఫ్ ఇండియా అరేబియా సముద్రం వైపు ఉంటుంది. 1911 రాజ సందర్శన కోసం కట్టారు. 1948లో చివరి బ్రిటిష్ సైన్యం దీని గుండా భారతదేశం విడిచింది.'],
+    quiz: [['The Gateway of India faces which sea?', 'గేట్‌వే ఆఫ్ ఇండియా ఏ సముద్రం వైపు ఉంటుంది?'], [['Arabian Sea', 'అరేబియా సముద్రం'], ['Bay of Bengal', 'బంగాళాఖాతం'], ['Red Sea', 'ఎర్ర సముద్రం']]] },
+  cst: { icon: 'train', type: 'palace', o: { c: 0xc89a6a, dc: 0x8a6a4a, trim: 0xf2ece0, spires: true }, name: ['CST Station', 'సీఎస్‌టీ స్టేషన్'], y: '1888',
+    fact: ['Chhatrapati Shivaji Maharaj Terminus is a railway station that looks like a palace. It is a UNESCO World Heritage Site and millions of passengers use it.', 'ఛత్రపతి శివాజీ మహారాజ్ టెర్మినస్ రాజభవనంలా కనిపించే రైల్వే స్టేషన్. ఇది యునెస్కో ప్రపంచ వారసత్వ ప్రదేశం.'],
+    quiz: [['What is CST in Mumbai?', 'ముంబైలోని సీఎస్‌టీ ఏమిటి?'], [['A railway station', 'రైల్వే స్టేషన్'], ['A fort', 'కోట'], ['A beach', 'బీచ్']]] },
+  hajiali: { icon: 'mosque', type: 'tomb', o: { c: 0xf6f4ee, dc: 0xf6f4ee, sea: true, small: true }, name: ['Haji Ali Dargah', 'హాజీ అలీ దర్గా'], y: '1431',
+    fact: ['Haji Ali Dargah stands on a small island in the sea. You can walk to it on a narrow path only at low tide.', 'హాజీ అలీ దర్గా సముద్రంలో ఒక చిన్న దీవిపై ఉంది. ఆటుపోట్లలో నీరు తగ్గినప్పుడే సన్నని దారిలో నడిచి వెళ్ళగలం.'],
+    quiz: [['When can you walk to Haji Ali Dargah?', 'హాజీ అలీ దర్గాకు ఎప్పుడు నడిచి వెళ్ళవచ్చు?'], [['At low tide', 'నీరు తగ్గినప్పుడు (ఆటు)'], ['Only at night', 'రాత్రి మాత్రమే'], ['Only when it rains', 'వర్షం వచ్చినప్పుడే']]] },
+  // Mysuru
+  mysorepalace: { icon: 'crown', type: 'palace', o: { c: 0xe8dcc0, dc: 0xd8606a, trim: 0xc8a46a }, name: ['Mysore Palace', 'మైసూరు ప్యాలెస్'], y: '1912',
+    fact: ['Mysore Palace was the home of the Wadiyar kings. During Dasara it is lit with nearly one lakh bulbs and glows like gold.', 'మైసూరు ప్యాలెస్ వడయార్ రాజుల నివాసం. దసరా సమయంలో దాదాపు లక్ష బల్బులతో బంగారంలా మెరుస్తుంది.'],
+    quiz: [['Mysore Palace glows with lights during which festival?', 'ఏ పండుగలో మైసూరు ప్యాలెస్ దీపాలతో వెలుగుతుంది?'], [['Dasara', 'దసరా'], ['Holi', 'హోలీ'], ['Pongal', 'పొంగల్']]] },
+  chamundi: { icon: 'htemple', type: 'gopuram', o: { c: 0xe8dcc8, tiers: 7 }, name: ['Chamundeshwari Temple', 'చాముండేశ్వరి ఆలయం'], y: ['12th century', '12వ శతాబ్దం'],
+    fact: ['This temple of Goddess Chamundeshwari sits on Chamundi Hills. On the way up there is a huge Nandi statue carved from one rock.', 'చాముండేశ్వరి దేవి ఆలయం చాముండి కొండలపై ఉంది. పైకి వెళ్ళే దారిలో ఒకే రాతితో చెక్కిన పెద్ద నంది విగ్రహం ఉంది.'],
+    quiz: [['Chamundi Hills has a giant stone statue of?', 'చాముండి కొండలపై ఏ పెద్ద రాతి విగ్రహం ఉంది?'], [['Nandi', 'నంది'], ['Hanuman', 'హనుమాన్'], ['Elephant', 'ఏనుగు']]] },
+  brindavan: { icon: 'fountain', type: 'garden', name: ['Brindavan Gardens', 'బృందావన్ గార్డెన్స్'], y: '1932',
+    fact: ['Brindavan Gardens lie below the KRS dam on the Kaveri river. Its musical fountain dances to songs every evening.', 'బృందావన్ గార్డెన్స్ కావేరి నదిపై ఉన్న కేఆర్‌ఎస్ ఆనకట్ట కింద ఉన్నాయి. ప్రతి సాయంత్రం సంగీత ఫౌంటెన్ పాటలకు నాట్యం చేస్తుంది.'],
+    quiz: [['Brindavan Gardens are next to a dam on which river?', 'బృందావన్ గార్డెన్స్ ఏ నదిపై ఆనకట్ట దగ్గర ఉన్నాయి?'], [['Kaveri', 'కావేరి'], ['Ganga', 'గంగ'], ['Yamuna', 'యమున']]] },
+  // Chennai
+  kapaleeshwarar: { icon: 'htemple', type: 'gopuram', o: { colorful: true, tiers: 8 }, name: ['Kapaleeshwarar Temple', 'కపాలీశ్వర ఆలయం'], y: ['16th century', '16వ శతాబ్దం'],
+    fact: ['This Shiva temple in Mylapore has a colourful 37 metre gopuram covered with hundreds of painted figures from stories.', 'మైలాపూర్‌లోని ఈ శివాలయానికి 37 మీటర్ల రంగుల గోపురం ఉంది. దానిపై కథల నుండి వందల రంగు బొమ్మలు ఉన్నాయి.'],
+    quiz: [['Kapaleeshwarar Temple is dedicated to?', 'కపాలీశ్వర ఆలయం ఏ దేవునిది?'], [['Lord Shiva', 'శివుడు'], ['Lord Rama', 'శ్రీరాముడు'], ['Lord Ganesha', 'వినాయకుడు']]] },
+  lighthouse: { icon: 'lighttower', type: 'lighthouse', name: ['Chennai Lighthouse', 'చెన్నై లైట్‌హౌస్'], y: '1977',
+    fact: ['Marina Beach is one of the longest city beaches in the world. Its lighthouse is one of the few in the world that stands inside a city.', 'మెరీనా బీచ్ ప్రపంచంలోనే పొడవైన నగర బీచ్‌లలో ఒకటి. దీని లైట్‌హౌస్ నగరం లోపల ఉన్న అరుదైన లైట్‌హౌస్‌లలో ఒకటి.'],
+    quiz: [['Chennai Lighthouse stands on which beach?', 'చెన్నై లైట్‌హౌస్ ఏ బీచ్‌లో ఉంది?'], [['Marina Beach', 'మెరీనా బీచ్'], ['Juhu Beach', 'జుహూ బీచ్'], ['RK Beach', 'ఆర్కే బీచ్']]] },
+  santhome: { icon: 'church', type: 'church', name: ['San Thome Basilica', 'శాంథోమ్ బాసిలికా'], y: '1896',
+    fact: ['San Thome Basilica is built over the tomb of St. Thomas, one of Jesus’ twelve apostles. It is one of only three such churches in the world.', 'శాంథోమ్ బాసిలికా యేసు పన్నెండు మంది శిష్యులలో ఒకరైన సెయింట్ థామస్ సమాధిపై కట్టారు. ప్రపంచంలో ఇలాంటి చర్చిలు మూడే ఉన్నాయి.'],
+    quiz: [['San Thome Basilica is built over the tomb of?', 'శాంథోమ్ బాసిలికా ఎవరి సమాధిపై కట్టారు?'], [['St. Thomas', 'సెయింట్ థామస్'], ['St. Peter', 'సెయింట్ పీటర్'], ['St. Francis', 'సెయింట్ ఫ్రాన్సిస్']]] },
+  // Madurai
+  meenakshi: { icon: 'htemple', type: 'gopuram', o: { colorful: true, tiers: 10 }, name: ['Meenakshi Temple', 'మీనాక్షి ఆలయం'], y: ['17th century', '17వ శతాబ్దం'],
+    fact: ['Meenakshi Amman Temple has 14 gopurams. The tallest is about 52 metres and is covered with thousands of colourful sculptures.', 'మీనాక్షి అమ్మన్ ఆలయానికి 14 గోపురాలు. అత్యంత ఎత్తైనది సుమారు 52 మీటర్లు, దానిపై వేల రంగుల శిల్పాలు ఉన్నాయి.'],
+    quiz: [['How many gopurams does the Meenakshi Temple have?', 'మీనాక్షి ఆలయానికి ఎన్ని గోపురాలు?'], [['14', '14'], ['4', '4'], ['40', '40']]] },
+  nayak: { icon: 'crown', type: 'palace', o: { c: 0xf4eee2, dc: 0xf4eee2, trim: 0xd8c8a8 }, name: ['Thirumalai Nayak Palace', 'తిరుమలై నాయక్ ప్యాలెస్'], y: '1636',
+    fact: ['King Thirumalai Nayak built this palace in 1636. Its giant pillars are about 20 metres tall—so wide that two people cannot hug one!', '1636లో రాజు తిరుమలై నాయక్ ఈ ప్యాలెస్ కట్టించారు. దీని స్తంభాలు సుమారు 20 మీటర్ల ఎత్తు, ఇద్దరు కలిసి కూడా చుట్టలేనంత లావు!'],
+    quiz: [['Thirumalai Nayak Palace is famous for its giant?', 'తిరుమలై నాయక్ ప్యాలెస్ దేనికి ప్రసిద్ధి?'], [['Pillars', 'స్తంభాలు'], ['Gardens', 'తోటలు'], ['Lakes', 'సరస్సులు']]] },
+  // Tirupati
+  tirumala: { icon: 'htemple', model: 'tirupati', name: ['Tirumala Temple', 'తిరుమల ఆలయం'], y: ['300 CE', 'క్రీ.శ. 300'], parts: [['Temple base', 'ఆలయ పునాది'], ['Lower tiers', 'కింది అంతస్తులు'], ['Upper tiers', 'పై అంతస్తులు'], ['Ananda Nilayam', 'ఆనంద నిలయం'], ['Golden kalasams', 'బంగారు కలశాలు']],
+    fact: ['Sri Venkateswara Temple stands on the seven hills of Tirumala. Its gold-covered tower is called Ananda Nilayam, and its laddu prasadam has a GI tag.', 'శ్రీ వేంకటేశ్వర ఆలయం తిరుమల ఏడు కొండలపై ఉంది. బంగారు గోపురాన్ని "ఆనంద నిలయం" అంటారు. ఇక్కడి లడ్డూ ప్రసాదానికి జీఐ ట్యాగ్ ఉంది.'],
+    quiz: [['The golden tower of Tirumala temple is called?', 'తిరుమల ఆలయ బంగారు గోపురం పేరు?'], [['Ananda Nilayam', 'ఆనంద నిలయం'], ['Raj Bhavan', 'రాజ్ భవన్'], ['Hawa Mahal', 'హవా మహల్']]] },
+  govindaraja: { icon: 'htemple', type: 'gopuram', o: { c: 0xf2ead8, tiers: 8 }, name: ['Govindaraja Temple', 'గోవిందరాజ స్వామి ఆలయం'], y: '1130',
+    fact: ['Sri Ramanujacharya consecrated the Govindaraja Swamy Temple in Tirupati town in 1130. Its tall gopuram can be seen from far away.', '1130లో శ్రీ రామానుజాచార్యులు తిరుపతి పట్టణంలో గోవిందరాజ స్వామి ఆలయాన్ని ప్రతిష్ఠించారు. దీని ఎత్తైన గోపురం దూరం నుంచే కనిపిస్తుంది.'],
+    quiz: [['Who consecrated the Govindaraja Temple?', 'గోవిందరాజ ఆలయాన్ని ఎవరు ప్రతిష్ఠించారు?'], [['Ramanujacharya', 'రామానుజాచార్యులు'], ['Adi Shankara', 'ఆది శంకరాచార్యులు'], ['Kabir', 'కబీర్']]] },
+  kalahasti: { icon: 'htemple', type: 'gopuram', o: { c: 0xd8d0c0, tiers: 7 }, name: ['Srikalahasti Temple', 'శ్రీకాళహస్తి ఆలయం'], y: ['12th century', '12వ శతాబ్దం'],
+    fact: ['Srikalahasti is the Vayu (air) temple among the five Pancha Bhoota Sthalas of Lord Shiva. The lamp near the lingam keeps flickering even with no wind inside.', 'శ్రీకాళహస్తి శివుని పంచభూత స్థలాలలో వాయు (గాలి) క్షేత్రం. లోపల గాలి లేకపోయినా లింగం దగ్గర దీపం కదులుతూ ఉంటుంది.'],
+    quiz: [['Srikalahasti stands for which element?', 'శ్రీకాళహస్తి ఏ భూతానికి ప్రతీక?'], [['Air (Vayu)', 'వాయువు'], ['Fire (Agni)', 'అగ్ని'], ['Water (Jala)', 'జలం']]] },
+  // Vijayawada
+  kanakadurga: { icon: 'htemple', type: 'gopuram', o: { c: 0xf4e0b0, roof: 0xe0b030, tiers: 6 }, name: ['Kanaka Durga Temple', 'కనకదుర్గ ఆలయం'], y: ['Ancient', 'ప్రాచీనం'],
+    fact: ['Goddess Kanaka Durga’s temple stands on Indrakeeladri hill beside the Krishna river. Lakhs of devotees come during the Dasara festival.', 'కనకదుర్గ అమ్మవారి ఆలయం కృష్ణా నది ఒడ్డున ఇంద్రకీలాద్రి కొండపై ఉంది. దసరా సమయంలో లక్షల మంది భక్తులు వస్తారు.'],
+    quiz: [['Kanaka Durga Temple stands on which hill?', 'కనకదుర్గ ఆలయం ఏ కొండపై ఉంది?'], [['Indrakeeladri', 'ఇంద్రకీలాద్రి'], ['Tirumala', 'తిరుమల'], ['Chamundi', 'చాముండి']]] },
+  prakasam: { icon: 'bridge', type: 'barrage', name: ['Prakasam Barrage', 'ప్రకాశం బ్యారేజ్'], y: '1957',
+    fact: ['Prakasam Barrage stretches about 1.2 km across the Krishna river. Its water reaches farms through three big canals.', 'ప్రకాశం బ్యారేజ్ కృష్ణా నదిపై సుమారు 1.2 కి.మీ. పొడవు ఉంది. దీని నీరు మూడు పెద్ద కాలువల ద్వారా పొలాలకు చేరుతుంది.'],
+    quiz: [['Prakasam Barrage is built across which river?', 'ప్రకాశం బ్యారేజ్ ఏ నదిపై ఉంది?'], [['Krishna', 'కృష్ణా'], ['Godavari', 'గోదావరి'], ['Kaveri', 'కావేరి']]] },
+  amaravati: { icon: 'lotus', type: 'stupa', name: ['Amaravati Stupa', 'అమరావతి స్తూపం'], y: ['200 BCE', 'క్రీ.పూ. 200'],
+    fact: ['The Amaravati Mahachaitya was a great Buddhist stupa built over 2,000 years ago. Its carved marble panels are kept in museums around the world.', 'అమరావతి మహాచైత్యం 2,000 ఏళ్ళ క్రితం కట్టిన గొప్ప బౌద్ధ స్తూపం. దీని చెక్కిన పాలరాతి ఫలకాలు ప్రపంచంలోని మ్యూజియాలలో ఉన్నాయి.'],
+    quiz: [['The Amaravati Stupa belongs to which religion?', 'అమరావతి స్తూపం ఏ మతానికి చెందినది?'], [['Buddhism', 'బౌద్ధం'], ['Sikhism', 'సిక్కు మతం'], ['Christianity', 'క్రైస్తవం']]] },
+  // Warangal
+  thoranam: { icon: 'classical', type: 'thoranam', name: ['Kakatiya Kala Thoranam', 'కాకతీయ కళా తోరణం'], y: ['13th century', '13వ శతాబ్దం'],
+    fact: ['This carved stone gateway of Warangal Fort was built by the Kakatiya kings. It is part of the official emblem of Telangana.', 'వరంగల్ కోటలోని ఈ చెక్కిన రాతి తోరణాన్ని కాకతీయ రాజులు కట్టించారు. ఇది తెలంగాణ రాష్ట్ర అధికారిక చిహ్నంలో ఉంది.'],
+    quiz: [['The Kakatiya Kala Thoranam is on the emblem of?', 'కాకతీయ కళా తోరణం ఏ రాష్ట్ర చిహ్నంలో ఉంది?'], [['Telangana', 'తెలంగాణ'], ['Kerala', 'కేరళ'], ['Punjab', 'పంజాబ్']]] },
+  thousandpillar: { icon: 'htemple', type: 'mandapa', name: ['Thousand Pillar Temple', 'వేయి స్తంభాల గుడి'], y: '1163',
+    fact: ['Kakatiya king Rudra Deva built this star-shaped temple in 1163 for Shiva, Vishnu and Surya. A big Nandi carved from black stone sits in front.', '1163లో కాకతీయ రాజు రుద్రదేవుడు శివ, విష్ణు, సూర్యుల కోసం ఈ నక్షత్ర ఆకార ఆలయం కట్టించారు. ముందు నల్లరాతి పెద్ద నంది ఉంది.'],
+    quiz: [['Who built the Thousand Pillar Temple?', 'వేయి స్తంభాల గుడి ఎవరు కట్టించారు?'], [['The Kakatiyas', 'కాకతీయులు'], ['The Mughals', 'మొఘలులు'], ['The British', 'బ్రిటిష్ వారు']]] },
+  ramappa: { icon: 'htemple', type: 'nagara', o: { c: 0xb8806a, a: 0x9a6a58, band: true }, name: ['Ramappa Temple', 'రామప్ప ఆలయం'], y: '1213',
+    fact: ['Ramappa Temple is named after its sculptor, Ramappa. Its tower is made of bricks so light they float on water! It became a UNESCO World Heritage Site in 2021.', 'రామప్ప ఆలయానికి దాని శిల్పి రామప్ప పేరు పెట్టారు. దీని గోపురం నీటిలో తేలే తేలికపాటి ఇటుకలతో కట్టారు! 2021లో యునెస్కో ప్రపంచ వారసత్వ ప్రదేశం అయ్యింది.'],
+    quiz: [['Ramappa Temple is named after its?', 'రామప్ప ఆలయానికి ఎవరి పేరు పెట్టారు?'], [['Sculptor', 'శిల్పి'], ['King', 'రాజు'], ['River', 'నది']]] },
+};
+// ll = [latitude, longitude]; the India map places each pin from these
 const CITIES = [
-  { id: 'hyd', name: ['Hyderabad', 'హైదరాబాద్'], pin: [125, 226], lms: ['charminar', 'golconda', 'buddha'] },
-  { id: 'delhi', name: ['New Delhi', 'న్యూఢిల్లీ'], pin: [114, 102], lms: ['indiagate', 'qutub', 'lotus', 'redfort'] },
-  { id: 'agra', name: ['Agra', 'ఆగ్రా'], pin: [128, 120], left: true, lms: ['taj', 'agrafort'] },
-  { id: 'tirupati', name: ['Tirupati', 'తిరుపతి'], pin: [134, 268], lms: ['tirupati'] },
+  { id: 'hyd', name: ['Hyderabad', 'హైదరాబాద్'], ll: [17.38, 78.48], lms: ['charminar', 'golconda', 'buddha', 'birla'],
+    fact: ['Capital of Telangana, founded in 1591 by the Qutb Shahi kings. Famous for biryani, pearls and IT companies.', 'తెలంగాణ రాజధాని, 1591లో కుతుబ్ షాహీ రాజులు స్థాపించారు. బిర్యానీ, ముత్యాలు, ఐటీ కంపెనీలకు ప్రసిద్ధి.'] },
+  { id: 'delhi', name: ['New Delhi', 'న్యూఢిల్లీ'], ll: [28.61, 77.21], lms: ['indiagate', 'qutub', 'lotus', 'redfort'],
+    fact: ['The capital of India. Parliament, the President’s house (Rashtrapati Bhavan) and the Supreme Court are here.', 'భారతదేశ రాజధాని. పార్లమెంట్, రాష్ట్రపతి భవన్, సుప్రీం కోర్టు ఇక్కడే ఉన్నాయి.'] },
+  { id: 'agra', name: ['Agra', 'ఆగ్రా'], ll: [27.18, 78.01], lms: ['taj', 'agrafort', 'buland', 'itimad'],
+    fact: ['A Mughal capital on the Yamuna river in Uttar Pradesh, home to three UNESCO World Heritage Sites.', 'ఉత్తరప్రదేశ్‌లో యమునా నది ఒడ్డున ఉన్న మొఘల్ రాజధాని. ఇక్కడ మూడు యునెస్కో వారసత్వ ప్రదేశాలు ఉన్నాయి.'] },
+  { id: 'jaipur', name: ['Jaipur', 'జైపూర్'], ll: [26.91, 75.79], lms: ['hawa', 'amber', 'jantar'],
+    fact: ['The "Pink City", capital of Rajasthan. Its old town was painted pink in 1876 to welcome a royal guest.', '"పింక్ సిటీ", రాజస్థాన్ రాజధాని. 1876లో ఒక రాజ అతిథిని స్వాగతించడానికి పాత నగరానికి గులాబీ రంగు వేశారు.'] },
+  { id: 'amritsar', name: ['Amritsar', 'అమృత్‌సర్'], ll: [31.63, 74.87], lms: ['golden', 'jallianwala', 'wagah'],
+    fact: ['A holy city of the Sikhs in Punjab, founded by Guru Ram Das in 1577.', 'పంజాబ్‌లో సిక్కుల పవిత్ర నగరం, 1577లో గురు రామ్ దాస్ స్థాపించారు.'] },
+  { id: 'varanasi', name: ['Varanasi', 'వారణాసి'], ll: [25.32, 82.97], lms: ['kashi', 'ghats', 'sarnath'],
+    fact: ['Also called Kashi, it is one of the oldest living cities in the world, on the banks of the Ganga.', 'కాశీ అని కూడా పిలుస్తారు. గంగా తీరంలో ఉన్న ప్రపంచంలోని అతి పురాతన నగరాలలో ఒకటి.'] },
+  { id: 'kolkata', name: ['Kolkata', 'కోల్‌కతా'], ll: [22.57, 88.36], lms: ['victoria', 'howrah', 'dakshineswar'],
+    fact: ['Capital of West Bengal and of British India until 1911. Known as the City of Joy and home of Rabindranath Tagore.', 'పశ్చిమ బెంగాల్ రాజధాని, 1911 వరకు బ్రిటిష్ ఇండియా రాజధాని. "సిటీ ఆఫ్ జాయ్", రవీంద్రనాథ్ ఠాగూర్ పుట్టిన ఊరు.'] },
+  { id: 'puri', name: ['Puri', 'పూరీ'], ll: [19.81, 85.83], lms: ['jagannath', 'konark'],
+    fact: ['A holy beach town in Odisha and one of the four Char Dham pilgrimage places.', 'ఒడిశాలోని పవిత్ర సముద్రతీర పట్టణం, చార్ ధామ్ యాత్రా స్థలాలలో ఒకటి.'] },
+  { id: 'mumbai', name: ['Mumbai', 'ముంబై'], ll: [19.08, 72.88], lms: ['gatewayindia', 'cst', 'hajiali'],
+    fact: ['Capital of Maharashtra and the money capital of India. It was once seven islands, and Bollywood films are made here.', 'మహారాష్ట్ర రాజధాని, భారతదేశ ఆర్థిక రాజధాని. ఒకప్పుడు ఏడు దీవులు. బాలీవుడ్ సినిమాలు ఇక్కడే తయారవుతాయి.'] },
+  { id: 'mysuru', name: ['Mysuru', 'మైసూరు'], ll: [12.3, 76.64], lms: ['mysorepalace', 'chamundi', 'brindavan'],
+    fact: ['The City of Palaces in Karnataka, famous for its grand Dasara festival, silk and sandalwood.', 'కర్ణాటకలోని "ప్యాలెస్‌ల నగరం". గొప్ప దసరా ఉత్సవం, పట్టు, గంధానికి ప్రసిద్ధి.'] },
+  { id: 'chennai', name: ['Chennai', 'చెన్నై'], ll: [13.08, 80.27], lms: ['kapaleeshwarar', 'lighthouse', 'santhome'],
+    fact: ['Capital of Tamil Nadu on the Bay of Bengal, a big centre for cars, films and Carnatic music.', 'బంగాళాఖాతం ఒడ్డున తమిళనాడు రాజధాని. కార్లు, సినిమాలు, కర్ణాటక సంగీతానికి పెద్ద కేంద్రం.'] },
+  { id: 'madurai', name: ['Madurai', 'మదురై'], ll: [9.93, 78.12], lms: ['meenakshi', 'nayak'],
+    fact: ['One of the oldest cities in India, on the Vaigai river, called the "Temple City" of Tamil Nadu.', 'వైగై నది ఒడ్డున ఉన్న భారతదేశపు పురాతన నగరాలలో ఒకటి, తమిళనాడు "దేవాలయాల నగరం".'] },
+  { id: 'tirupati', name: ['Tirupati', 'తిరుపతి'], ll: [13.63, 79.42], lms: ['tirumala', 'govindaraja', 'kalahasti'],
+    fact: ['At the foot of the Tirumala hills in Andhra Pradesh. Tirumala is one of the most visited holy places in the world.', 'ఆంధ్రప్రదేశ్‌లో తిరుమల కొండల దిగువన ఉంది. ప్రపంచంలో అత్యధిక భక్తులు వచ్చే పుణ్యక్షేత్రాలలో తిరుమల ఒకటి.'] },
+  { id: 'vijayawada', name: ['Vijayawada', 'విజయవాడ'], ll: [16.51, 80.65], lms: ['kanakadurga', 'prakasam', 'amaravati'],
+    fact: ['A busy city on the Krishna river in Andhra Pradesh, near Amaravati, an ancient Buddhist centre.', 'ఆంధ్రప్రదేశ్‌లో కృష్ణా నది ఒడ్డున ఉన్న నగరం. ప్రాచీన బౌద్ధ కేంద్రం అమరావతి దగ్గరలో ఉంది.'] },
+  { id: 'warangal', name: ['Warangal', 'వరంగల్'], ll: [17.97, 79.59], lms: ['thoranam', 'thousandpillar', 'ramappa'],
+    fact: ['The capital of the great Kakatiya kings in Telangana, famous for its fort, temples and lakes.', 'తెలంగాణలో గొప్ప కాకతీయ రాజుల రాజధాని. కోట, ఆలయాలు, చెరువులకు ప్రసిద్ధి.'] },
 ];
+// India's outline as [longitude, latitude] points, drawn on the map with the same projection as the pins
+const INDIA_LL = [[74.4, 34.8], [75.5, 35.8], [77.5, 35.6], [78.6, 34.3], [79.0, 32.5], [78.8, 31.0], [80.2, 30.2], [81.1, 30.0], [82.5, 28.9], [84.1, 27.5], [85.9, 26.6], [88.1, 26.4],
+  [88.2, 27.6], [88.9, 27.3], [89.0, 26.5], [89.8, 26.7], [92.0, 26.9], [92.6, 27.8], [94.5, 28.9], [96.1, 29.4], [97.4, 28.2], [96.5, 27.3], [95.2, 26.6], [94.6, 25.3], [94.2, 23.9], [93.3, 23.0],
+  [93.2, 22.1], [92.6, 22.0], [92.2, 23.7], [91.6, 22.9], [91.2, 23.8], [91.9, 24.2], [92.4, 25.0], [90.0, 25.3], [89.8, 25.9], [88.6, 25.4], [88.0, 24.6], [88.7, 23.2], [89.0, 22.0],
+  [88.2, 21.6], [87.0, 21.5], [86.8, 20.6], [85.2, 19.6], [84.2, 18.4], [82.3, 17.0], [81.3, 16.3], [80.2, 15.5], [80.1, 13.8], [80.3, 13.0], [79.9, 11.0], [79.3, 10.3], [78.2, 8.9], [77.5, 8.1],
+  [76.6, 8.9], [76.0, 10.5], [75.3, 12.3], [74.6, 14.5], [73.7, 16.0], [73.0, 18.5], [72.8, 19.5], [72.7, 21.1], [72.2, 21.7], [72.5, 22.3], [70.9, 20.8], [69.0, 22.3], [70.0, 23.0], [68.4, 23.6],
+  [68.8, 24.3], [71.0, 24.4], [70.6, 25.7], [70.0, 26.6], [70.5, 27.9], [72.5, 29.9], [73.9, 30.4], [74.5, 31.0], [74.6, 32.0], [75.0, 32.5], [74.2, 33.0], [73.7, 34.3]];
+for (const k in LANDMARKS) LANDMARKS[k].id = k;
 const LANDMARK_BONUS = 0.1, HEX_R = 1.15;
 const LM_CENTERS = [[0, 0], [3, -1], [-2, 3], [-3, 0]];
 const NB = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, -1], [-1, 1]];
@@ -2612,11 +2813,11 @@ function cityPlan(ci) {
   return (PLAN[ci] = { tasks, centers });
 }
 function hashKind([q, r], ci) { const h = Math.abs((q * 73856093) ^ (r * 19349663) ^ (ci * 83492791)) % 10; return h < 4 ? 'tree' : h < 7 ? 'house' : h < 8 ? 'rock' : h < 9 ? 'palm' : 'bush'; }
-function cityBase(ci) { return 15000 * Math.pow(3, ci); }
+function cityBase(ci) { return 15000 * Math.pow(2.2, ci); }
 function taskCost(ci, t) { const b = cityBase(ci) * Math.pow(1.6, t.li); return Math.round((t.type === 'part' ? b * (1 + 0.35 * t.k) : b * 0.2) / 100) * 100; }
 function taskReward(ci, t) { return t.gift ? { coins: Math.round(taskCost(ci, t) * 1.5 / 100) * 100, energy: 8 } : null; }
 function taskName(ci, t) {
-  if (t.type === 'part') { const L = LANDMARKS[CITIES[ci].lms[t.li]]; return `${tr(...L.name)}: ${tr(...L.parts[t.k])}`; }
+  if (t.type === 'part') { const L = LANDMARKS[CITIES[ci].lms[t.li]]; return `${tr(...L.name)}: ${tr(...lmParts(L)[t.k])}`; }
   return { tree: tr('Trees', 'చెట్లు'), house: tr('House', 'ఇల్లు'), rock: tr('Rock garden', 'రాతి తోట'), palm: tr('Palm trees', 'కొబ్బరి చెట్లు'), bush: tr('Garden', 'తోట') }[t.kind];
 }
 function taskIcon(ci, t) { return t.type === 'part' ? LANDMARKS[CITIES[ci].lms[t.li]].icon : { tree: 'tree', house: 'hut', rock: 'rock', palm: 'tree', bush: 'seedling' }[t.kind]; }
@@ -2631,7 +2832,12 @@ function cityProgress(ci) { const T = cityPlan(ci).tasks; return { done: T.filte
 function selTask() { const a = availableTasks(); return a.find(t => t.i === B3.sel) || a[0] || null; }
 function nextTaskCost() { const a = availableTasks(); return a.length ? Math.min(...a.map(t => taskCost(S.city.i, t))) : Infinity; }
 // Old saves built single landmarks: carry Charminar, Golconda and the Buddha statue over to Hyderabad
+const PLAN_V = 2; // bump when city layouts change; saves then keep the same number of built tiles
 function migrateBuild() {
+  if (S.city.pv !== PLAN_V) {
+    const n = Object.keys(S.city.done).length; S.city.done = {}; S.city.pv = PLAN_V;
+    if (!allCitiesDone()) cityPlan(S.city.i).tasks.slice(0, n).forEach(t => { S.city.done[t.i] = true; });
+  }
   if (S.city.migrated) return;
   S.city.migrated = true;
   const old = S.build && S.build.done || 0;
@@ -2757,6 +2963,285 @@ function fortModel(red) {
   [[0xff9933, 2.6], [0xffffff, 2.48], [0x138808, 2.36]].forEach(([c, y]) => { const f = bx(0.55, 0.12, 0.02, c, 0.3, y, 0.1, P[4]); f.castShadow = false; });
   return P;
 }
+// Ready-made buildings shared by many landmarks; each takes colour options and returns five part groups
+const G5 = () => [0, 1, 2, 3, 4].map(() => new B3.T.Group());
+const GOLD = 0xe0b030;
+const glow = c => new B3.T.MeshBasicMaterial({ color: c });
+function noShadow(m) { m.castShadow = false; return m; }
+function halfDome(r, c, x, y, z, p) { return b3Mesh(new B3.T.SphereGeometry(r, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), c, x, y, z, p); }
+// A thin bar from (x1, y1) to (x2, y2) at depth z
+function beam(x1, y1, x2, y2, z, t, c, p) {
+  const L = Math.hypot(x2 - x1, y2 - y1), m = bx(L, t, t, c, (x1 + x2) / 2, (y1 + y2) / 2, z, p);
+  m.rotation.z = Math.atan2(y2 - y1, x2 - x1); return m;
+}
+const BTYPES = {
+  fort: o => fortModel(o.c),
+  // North Indian temple with a curved shikhara
+  nagara(o) {
+    const P = G5(), c = o.c || 0xf4f0e8, a = o.a || 0xd85a3a, sc = o.sc || c, h = o.h || 1, zS = -0.6;
+    bx(3.8, 0.4, 3.4, 0xd8ccb8, 0, 0.2, 0, P[0]); bx(1.2, 0.2, 0.5, 0xd8ccb8, 0, 0.1, 1.95, P[0]);
+    bx(2.2, 0.9, 1.4, c, 0, 0.85, 0.85, P[1]);
+    for (const x of [-0.9, -0.3, 0.3, 0.9]) cy(0.08, 0.08, 0.9, c, x, 0.85, 1.6, P[1], 8);
+    const rf = co(1.4, 0.75, a, 0, 1.68, 0.85, P[1], 4); rf.rotation.y = Math.PI / 4;
+    bx(1.7, 1.3, 1.7, c, 0, 1.05, zS, P[2]); bx(0.45, 0.7, 0.05, 0x4a3020, 0, 0.95, zS + 0.86, P[2]);
+    const n = 7, sh = 0.42 * h, y0 = 1.7;
+    for (let i = 0; i < n; i++) {
+      const r0 = 0.88 * (1 - Math.pow(i / n, 1.7) * 0.8), r1 = 0.88 * (1 - Math.pow((i + 1) / n, 1.7) * 0.8);
+      const s = cy(r1, r0, sh, o.band && i % 2 ? a : sc, 0, y0 + sh * (i + 0.5), zS, P[3], 8); s.rotation.y = Math.PI / 8;
+    }
+    for (const x of [-0.78, 0.78]) co(0.3, 1.3 * h, sc, x, y0 + 0.65 * h, zS, P[3], 8);
+    if (o.nine) for (const [x, z] of [[-0.9, 0.3], [0.9, 0.3], [-0.9, 1.4], [0.9, 1.4], [-0.9, -1.3], [0.9, -1.3], [0, 1.5], [0, -1.4]]) co(0.22, 0.9, sc, x, 1.75, z, P[3], 8);
+    const top = y0 + sh * n;
+    cy(0.3, 0.3, 0.14, o.top || 0xe8dcc0, 0, top + 0.07, zS, P[4], 16); sp(0.14, GOLD, 0, top + 0.26, zS, P[4], 1.3); co(0.05, 0.32, GOLD, 0, top + 0.48, zS, P[4]);
+    cy(0.015, 0.015, 0.9, 0x5a3418, 0.18, top + 0.55, zS, P[4], 6); noShadow(bx(0.42, 0.24, 0.02, 0xff8a1a, 0.4, top + 0.88, zS, P[4]));
+    return P;
+  },
+  // South Indian temple tower
+  gopuram(o) {
+    const P = G5(), n = o.tiers || 7, c = o.c || 0xf0d8a8, cols = o.colorful ? [0xd84a3a, 0x3a7ad8, 0x3ccf6e, 0xffc83d, 0xff7ab8, 0x8a5ad8] : null;
+    const tierH = Math.min(0.5, 4.2 / n), step = (3.0 - 0.7) / n;
+    bx(3.2, 1.1, 1.8, 0x9a8a78, 0, 0.55, 0, P[0]); bx(0.7, 0.85, 0.05, 0x3a2818, 0, 0.45, 0.92, P[0]); bx(3.35, 0.12, 1.95, 0x8a7a68, 0, 1.16, 0, P[0]);
+    const per = Math.ceil(n / 3);
+    for (let i = 0; i < n; i++) {
+      const p = P[1 + Math.min(2, Math.floor(i / per))], w = 3.0 - i * step, d = 1.6 - i * (0.9 / n), y = 1.22 + tierH * (i + 0.5);
+      bx(w, tierH * 0.86, d, c, 0, y, 0, p); bx(w + 0.1, tierH * 0.14, d + 0.1, o.trim || 0xd8b070, 0, y + tierH * 0.43, 0, p);
+      bx(0.2, tierH * 0.6, 0.06, 0x3a2818, 0, y, d / 2 + 0.02, p);
+      const k = Math.max(1, Math.floor(w / 0.55));
+      for (let j = -k; j <= k; j++) if (j) for (const sz of [1, -1]) bx(0.12, tierH * 0.55, 0.05, cols ? cols[(i * 3 + j + 9) % cols.length] : 0xe8dcc8, j * (w / (2 * k + 1)), y, sz * (d / 2 + 0.03), p);
+    }
+    const top = 1.22 + tierH * n, rc = o.roof || (o.colorful ? 0xd85a3a : 0xd8b070);
+    bx(1.0, 0.2, 0.62, rc, 0, top + 0.1, 0, P[4]);
+    const v = cy(0.3, 0.3, 1.0, rc, 0, top + 0.35, 0, P[4], 16); v.rotation.z = Math.PI / 2;
+    for (const x of [-0.6, 0.6]) sp(0.16, rc, x, top + 0.35, 0, P[4]);
+    for (const x of [-0.36, -0.18, 0, 0.18, 0.36]) { sp(0.07, GOLD, x, top + 0.7, 0, P[4]); co(0.04, 0.18, GOLD, x, top + 0.83, 0, P[4]); }
+    return P;
+  },
+  // Mughal-style tomb or memorial with a big dome
+  tomb(o) {
+    const P = G5(), c = o.c || 0xf6f2ea, dc = o.dc || c, s = o.small ? 0.8 : 1;
+    if (o.sea) { noShadow(cy(2.7, 2.7, 0.08, 0x3a8ad8, 0, 0.04, 0, P[0], 32)); bx(2.6, 0.35, 2.6, 0x9a958c, 0, 0.175, -0.3, P[0]); bx(0.5, 0.18, 1.8, 0x9a958c, 0, 0.12, 1.9, P[0]); }
+    else bx(4.2, 0.35, 4.2, 0xece6da, 0, 0.175, 0, P[0]);
+    bx(2.6 * s, 1.5 * s, 2.6 * s, c, 0, 0.35 + 0.75 * s, o.sea ? -0.3 : 0, P[1]);
+    for (const [fx, fz, r] of FACES) { const a = bx(0.8 * s, 1.1 * s, 0.06, 0x7a7066, fx * 1.31 * s, 0.35 + 0.6 * s, fz * 1.31 * s + (o.sea ? -0.3 : 0), P[1]); a.rotation.y = r; }
+    const z0 = o.sea ? -0.3 : 0, yR = 0.35 + 1.5 * s;
+    cy(0.8 * s, 0.85 * s, 0.4, c, 0, yR + 0.2, z0, P[2], 24); sp(1.0 * s, dc, 0, yR + 0.75 * s, z0, P[2], 1.1); co(0.06, 0.55, GOLD, 0, yR + 1.95 * s, z0, P[2]);
+    if (o.angel) { sp(0.14, GOLD, 0, yR + 2.3 * s, z0, P[2]); noShadow(bx(0.5, 0.06, 0.1, GOLD, 0, yR + 2.3 * s, z0, P[2])); }
+    for (const [sx, sz] of CORNERS) {
+      if (o.sea || o.small) { cy(0.17, 0.2, 0.6, c, sx * 1.15 * s, yR + 0.3, sz * 1.15 * s + z0, P[3]); sp(0.2, dc, sx * 1.15 * s, yR + 0.7, sz * 1.15 * s + z0, P[3], 1.2); }
+      else { cy(0.15, 0.18, 2.6, c, sx * 1.85, 1.65, sz * 1.85, P[3]); sp(0.2, dc, sx * 1.85, 3.05, sz * 1.85, P[3]); }
+    }
+    if (o.sea) { for (const x of [-0.25, 0.25]) for (const z of [1.3, 1.9, 2.5]) cy(0.03, 0.03, 0.6, 0x5a3418, x, 0.5, z, P[4], 6); noShadow(bx(0.6, 0.04, 1.4, 0xf0e0a0, 0, 0.8, 1.9, P[4])); }
+    else for (const x of [-0.65, 0.65]) for (const z of [2.4, 3.0, 3.6]) co(0.18, 0.7, 0x2f6a24, x, 0.7, z * 0.95, P[4], 7);
+    if (!o.sea) { const pool = bx(0.45, 0.05, 1.6, 0x3a8ad8, 0, 0.37, 3.0, P[4]); pool.castShadow = false; }
+    return P;
+  },
+  gateway(o) {
+    const P = G5(), c = o.c, dc = o.dc || c;
+    bx(4.2, 0.35, 1.8, 0xb8a88a, 0, 0.175, 0, P[0]);
+    for (const x of [-1.45, 1.45]) { bx(1.2, 2.8, 1.5, c, x, 1.75, 0, P[1]); bx(0.4, 0.9, 0.05, 0x4a3020, x, 1.6, 0.76, P[1]); }
+    bx(1.7, 0.9, 1.5, c, 0, 2.7, 0, P[2]); const ar = cy(0.85, 0.85, 1.5, c, 0, 2.25, 0, P[2], 20); ar.rotation.x = Math.PI / 2;
+    bx(4.3, 0.25, 1.7, c, 0, 3.27, 0, P[3]);
+    for (const [sx, sz] of CORNERS) cy(0.22, 0.22, 0.8, c, sx * 1.9, 3.8, sz * 0.6, P[3], 10);
+    if (o.chhatri) for (const x of [-1.2, -0.6, 0, 0.6, 1.2]) for (const dx of [-0.12, 0.12]) cy(0.03, 0.03, 0.4, c, x + dx, 3.6, 0, P[3], 6);
+    for (const [sx, sz] of CORNERS) sp(0.26, dc, sx * 1.9, 4.3, sz * 0.6, P[4], 1.1);
+    if (o.dome) sp(0.75, dc, 0, 3.4, 0, P[4], 0.9);
+    if (o.chhatri) for (const x of [-1.2, -0.6, 0, 0.6, 1.2]) sp(0.2, dc, x, 3.85, 0, P[4], 0.9);
+    if (o.flag) { cy(0.03, 0.03, 2.4, 0xdddddd, 0, 4.6, 0, P[4], 6); [[0xff9933, 5.6], [0xffffff, 5.4], [0x138808, 5.2]].forEach(([fc, y]) => noShadow(bx(0.9, 0.2, 0.02, fc, 0.47, y, 0, P[4]))); }
+    return P;
+  },
+  palace(o) {
+    const P = G5(), c = o.c, dc = o.dc, trim = o.trim || 0xf2ece0;
+    bx(4.4, 1.1, 1.6, c, 0, 0.55, 0, P[0]); for (let x = -1.8; x <= 1.81; x += 0.6) bx(0.32, 0.6, 0.05, 0x4a3020, x, 0.5, 0.81, P[0]);
+    bx(4.6, 0.1, 1.75, trim, 0, 1.12, 0, P[1]); bx(4.0, 0.9, 1.4, c, 0, 1.6, 0, P[1]);
+    for (let x = -1.6; x <= 1.61; x += 0.4) bx(0.18, 0.4, 0.05, 0x5a6a8a, x, 1.6, 0.71, P[1]); bx(4.1, 0.1, 1.5, trim, 0, 2.08, 0, P[1]);
+    bx(1.2, 1.5, 1.2, c, 0, 2.85, 0.1, P[2]); for (const y of [2.6, 3.2]) bx(0.3, 0.35, 0.05, 0x5a6a8a, 0, y, 0.71, P[2]);
+    for (const x of [-2.0, 2.0]) { bx(0.7, 1.1, 0.7, c, x, 2.6, 0, P[3]); sp(0.36, dc, x, 3.2, 0, P[3], 0.9); if (o.spires) co(0.05, 0.4, dc, x, 3.6, 0, P[3], 6); }
+    for (const x of [-1.0, 1.0]) sp(0.25, dc, x, 2.2, 0.3, P[3], 1.0);
+    sp(0.62, dc, 0, 3.75, 0.1, P[4], 1.25); co(0.05, 0.5, GOLD, 0, 4.7, 0.1, P[4]);
+    if (o.spires) for (const [sx, sz] of CORNERS) co(0.06, 0.6, dc, sx * 0.55, 3.9, 0.1 + sz * 0.55, P[4], 6);
+    cy(0.015, 0.015, 0.7, 0x5a3418, 0, 5.1, 0.1, P[4], 6); noShadow(bx(0.35, 0.2, 0.02, 0xff8a1a, 0.18, 5.35, 0.1, P[4]));
+    return P;
+  },
+  // Hawa Mahal: five stepped pink storeys of little bay windows
+  hawa() {
+    const P = G5(), pink = 0xe8866a, cream = 0xf6e2c4;
+    for (let i = 0; i < 5; i++) {
+      const w = 4.2 - i * 0.65, y = 0.42 + 0.8 * i;
+      bx(w, 0.8, 0.9, pink, 0, y, -i * 0.05, P[i]); bx(w + 0.08, 0.06, 1.0, cream, 0, y + 0.4, -i * 0.05, P[i]);
+      const k = Math.max(1, Math.floor(w / 0.42));
+      for (let j = 0; j < k; j++) {
+        const x = -w / 2 + (j + 0.5) * (w / k);
+        cy(0.15, 0.15, 0.5, pink, x, y - 0.05, 0.45 - i * 0.05, P[i], 8); bx(0.12, 0.22, 0.05, cream, x, y - 0.05, 0.6 - i * 0.05, P[i]);
+        sp(0.15, i === 4 ? 0xd8605a : pink, x, y + 0.26, 0.45 - i * 0.05, P[i], 0.8);
+      }
+    }
+    for (const x of [-0.45, 0, 0.45]) co(0.04, 0.3, GOLD, x, 4.55, -0.2, P[4]);
+    return P;
+  },
+  // Jantar Mantar: a stepped sundial with arcs either side
+  jantar() {
+    const P = G5(), c = 0xe8c8a0, red = 0xc86a4a;
+    bx(4.2, 0.25, 3.6, 0xe8d8b8, 0, 0.125, 0, P[0]);
+    for (let k = 0; k < 8; k++) { const h = 0.35 * (k + 1); bx(0.6, h, 0.42, c, 0, 0.25 + h / 2, 1.5 - k * 0.42, P[1]); }
+    for (const x of [-1.0, 1.0]) {
+      const arc = b3Mesh(new B3.T.TorusGeometry(1.25, 0.12, 6, 20, Math.PI / 2), red, x, 0.25, -0.2, P[2]); arc.rotation.y = Math.PI / 2;
+      bx(0.3, 0.12, 2.6, c, x, 0.31, -0.2, P[2]);
+    }
+    const ty = 0.25 + 0.35 * 8;
+    for (const [sx, sz] of CORNERS) cy(0.04, 0.04, 0.5, c, sx * 0.24, ty + 0.25, -1.44 + sz * 0.16, P[3], 6);
+    sp(0.36, red, 0, ty + 0.55, -1.44, P[3], 0.6);
+    for (const x of [-1.5, 1.5]) { const b = halfDome(0.5, c, x, 0.75, 1.3, P[4]); b.rotation.x = Math.PI; cy(0.5, 0.5, 0.1, red, x, 0.75, 1.3, P[4], 20); }
+    cy(0.3, 0.3, 0.6, c, 0, 0.55, 2.05, P[4], 12);
+    return P;
+  },
+  // Golden Temple in its holy pool
+  golden() {
+    const P = G5(), marble = 0xf2ece0;
+    bx(4.4, 0.2, 4.4, marble, 0, 0.1, 0, P[0]); noShadow(bx(3.8, 0.06, 3.8, 0x3a8ad8, 0, 0.22, 0, P[0]));
+    bx(0.5, 0.2, 1.9, marble, 0, 0.3, 1.45, P[1]); bx(1.7, 0.25, 1.7, marble, 0, 0.33, 0, P[1]);
+    bx(1.3, 0.6, 1.3, marble, 0, 0.75, 0, P[2]); bx(1.3, 0.6, 1.3, GOLD, 0, 1.35, 0, P[2]);
+    for (const [fx, fz, r] of FACES) { const w = bx(0.3, 0.35, 0.05, 0x9a6a10, fx * 0.66, 1.35, fz * 0.66, P[2]); w.rotation.y = r; }
+    cy(0.5, 0.55, 0.14, GOLD, 0, 1.72, 0, P[3], 16); sp(0.45, GOLD, 0, 1.95, 0, P[3], 0.95);
+    for (const [sx, sz] of CORNERS) sp(0.13, GOLD, sx * 0.55, 1.78, sz * 0.55, P[3], 1.2);
+    co(0.06, 0.35, GOLD, 0, 2.55, 0, P[4]);
+    cy(0.03, 0.03, 3.2, 0xe8e8e8, 1.8, 1.8, 1.8, P[4], 6); noShadow(bx(0.5, 0.32, 0.02, 0xff8a1a, 2.06, 3.2, 1.8, P[4]));
+    return P;
+  },
+  memorial() {
+    const P = G5(), red = 0xb8452a;
+    bx(3.8, 0.15, 3.4, 0x6fbf4a, 0, 0.075, 0, P[0]); bx(0.6, 0.16, 3.4, 0xd8c8a0, 0, 0.08, 0, P[0]);
+    bx(1.6, 0.35, 1.6, 0xa85a3a, 0, 0.32, 0, P[1]); bx(1.2, 0.3, 1.2, 0xa85a3a, 0, 0.62, 0, P[1]);
+    const pil = cy(0.22, 0.65, 2.8, red, 0, 2.17, 0, P[2], 4); pil.rotation.y = Math.PI / 4;
+    bx(3.4, 1.0, 0.25, 0xa08060, 0, 0.65, -1.5, P[3]); for (let i = 0; i < 9; i++) bx(0.06, 0.06, 0.03, 0x3a2a1a, -1.2 + i * 0.3, 0.5 + (i % 3) * 0.2, -1.36, P[3]);
+    cy(0.35, 0.35, 0.3, 0xf0f0f0, 1.3, 0.3, 0.9, P[3], 16); noShadow(cy(0.28, 0.28, 0.02, 0x2a4a6a, 1.3, 0.46, 0.9, P[3], 16));
+    const fl = co(0.16, 0.45, glow(0xff8a1a), 0, 3.8, 0, P[4], 8); fl.castShadow = false; P[4].userData.flame = fl;
+    for (const [x, z] of [[-1.4, 1.1], [-1.5, -0.6], [1.5, -0.7]]) { cy(0.06, 0.08, 0.5, 0x7a5232, x, 0.4, z, P[4], 6); b3Mesh(new B3.T.IcosahedronGeometry(0.35, 0), 0x3f9a3a, x, 0.85, z, P[4]); }
+    return P;
+  },
+  // River ghats: steps down into the water, houses and temples behind
+  ghat() {
+    const P = G5(), stone = 0xd8b890, top = 0.22 * 6;
+    noShadow(bx(4.6, 0.05, 1.2, 0x4a8ab8, 0, 0.03, 2.3, P[0]));
+    for (let k = 0; k < 6; k++) bx(4.4, 0.22 * (k + 1), 0.45, stone, 0, 0.11 * (k + 1), 1.5 - k * 0.45, P[0]);
+    [[0xf2e0c0, 1.4], [0xe8a060, 1.9], [0xf4f0e8, 1.2], [0xd8c0ff, 1.7], [0xf0c870, 1.5]].forEach(([c, h], i) => { bx(0.8, h, 0.9, c, -1.8 + i * 0.9, top + h / 2, -1.3, P[1]); bx(0.2, 0.3, 0.05, 0x4a3020, -1.8 + i * 0.9, top + 0.4, -0.84, P[1]); });
+    for (const x of [-1.35, 0.45]) { bx(0.5, 0.5, 0.5, 0xf4e0c0, x, top + 0.25, -0.5, P[2]); const s = co(0.3, 1.1, 0xf0d0a0, x, top + 1.05, -0.5, P[2], 8); s.rotation.y = Math.PI / 8; sp(0.06, GOLD, x, top + 1.65, -0.5, P[2]); }
+    for (const [x, z, y] of [[-1.2, 0.6, 0.66], [0.2, 0.15, 0.88], [1.3, 0.6, 0.66]]) { cy(0.02, 0.02, 0.6, 0x5a3418, x, y + 0.3, z, P[3], 6); co(0.42, 0.22, 0xd8b060, x, y + 0.65, z, P[3], 10); }
+    for (const x of [-1.2, 0.9]) { bx(0.9, 0.15, 0.3, 0x8a5a2a, x, 0.1, 2.4, P[4]); bx(0.06, 0.4, 0.06, 0x8a5a2a, x, 0.35, 2.4, P[4]); }
+    for (let i = 0; i < 6; i++) { const f = sp(0.05, glow(0xffb030), -1.6 + i * 0.65, 0.5, 1.3, P[4]); f.castShadow = false; }
+    return P;
+  },
+  stupa(o) {
+    const P = G5(), c = 0xe0d0b0, brick = 0xb06a4a;
+    if (o.tall) {
+      cy(1.6, 1.7, 0.5, 0xc8b898, 0, 0.25, 0, P[0], 24);
+      cy(1.35, 1.4, 1.6, c, 0, 1.3, 0, P[1], 24); for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2, n = bx(0.35, 0.5, 0.05, 0x8a7a68, Math.sin(a) * 1.38, 1.4, Math.cos(a) * 1.38, P[1]); n.rotation.y = a; }
+      cy(1.25, 1.33, 1.6, brick, 0, 2.9, 0, P[2], 24);
+      sp(1.25, brick, 0, 3.7, 0, P[3], 0.45);
+      cy(0.02, 0.02, 1.0, 0x5a3418, 0, 4.6, 0, P[4], 6); for (const [x, col] of [[-0.6, 0xff4a3a], [0.6, 0x3a8ad8]]) noShadow(beam(0, 4.9, x * 2.2, 0.8, 0, 0.02, col, P[4]));
+      return P;
+    }
+    cy(2.0, 2.1, 0.6, c, 0, 0.3, 0, P[0], 32);
+    for (let i = 0; i < 24; i++) { const a = i / 24 * Math.PI * 2; if (i % 6 === 0) continue; bx(0.1, 0.5, 0.1, 0xc8b898, Math.sin(a) * 2.35, 0.25, Math.cos(a) * 2.35, P[1]); }
+    const rail = b3Mesh(new B3.T.TorusGeometry(2.35, 0.05, 6, 40), 0xc8b898, 0, 0.48, 0, P[1]); rail.rotation.x = Math.PI / 2;
+    for (let i = 0; i < 4; i++) { const g = new B3.T.Group(); g.rotation.y = i * Math.PI / 2; P[1].add(g); for (const x of [-0.35, 0.35]) bx(0.12, 1.1, 0.12, 0xc8b898, x, 0.55, 2.4, g); for (const y of [0.95, 1.15]) bx(1.0, 0.08, 0.1, 0xc8b898, 0, y, 2.4, g); }
+    halfDome(1.7, c, 0, 0.6, 0, P[2]);
+    bx(0.6, 0.35, 0.6, 0xc8b898, 0, 2.45, 0, P[3]);
+    cy(0.03, 0.03, 0.9, 0xc8b898, 0, 2.95, 0, P[4], 6); for (const [y, r] of [[2.85, 0.45], [3.1, 0.35], [3.35, 0.25]]) cy(r, r, 0.05, 0xc8b898, 0, y, 0, P[4], 16);
+    return P;
+  },
+  // Howrah Bridge: two steel towers and a cantilever frame
+  bridge() {
+    const P = G5(), steel = 0x7a8a9a;
+    noShadow(bx(5.2, 0.06, 1.8, 0x4a8ab8, 0, 0.03, 0, P[0])); for (const x of [-1.5, 1.5]) bx(0.7, 0.5, 1.4, 0x8a8a8a, x, 0.25, 0, P[0]);
+    for (const x of [-1.5, 1.5]) { for (const dx of [-0.25, 0.25]) for (const z of [-0.55, 0.55]) bx(0.12, 3.4, 0.12, steel, x + dx, 2.2, z, P[1]); for (const y of [1.6, 2.6, 3.6]) for (const z of [-0.55, 0.55]) bx(0.62, 0.08, 0.08, steel, x, y, z, P[1]); bx(0.62, 0.1, 1.22, steel, x, 3.9, 0, P[1]); }
+    for (const z of [-0.55, 0.55]) { beam(-1.5, 3.9, 0, 2.2, z, 0.1, steel, P[2]); beam(1.5, 3.9, 0, 2.2, z, 0.1, steel, P[2]); beam(-1.5, 3.9, -2.55, 1.6, z, 0.1, steel, P[2]); beam(1.5, 3.9, 2.55, 1.6, z, 0.1, steel, P[2]); beam(-2.55, 1.1, 2.55, 1.1, z, 0.1, steel, P[2]); for (const x of [-2.0, -0.75, 0.75, 2.0]) beam(x, 1.1, x, x < 0 ? 1.6 + (x + 2.55) * 0.9 : 1.6 + (2.55 - x) * 0.9, z, 0.07, steel, P[2]); }
+    bx(5.2, 0.12, 1.0, 0x5a5a5a, 0, 1.0, 0, P[3]); noShadow(bx(5.2, 0.01, 0.06, 0xffffff, 0, 1.07, 0, P[3]));
+    [[-1.8, 0.25, 0xffd23d], [-0.6, -0.25, 0xd84a3a], [0.7, 0.25, 0xffd23d], [1.9, -0.25, 0x3a7ad8]].forEach(([x, z, c]) => { bx(0.45, 0.2, 0.25, c, x, 1.16, z, P[4]); bx(0.25, 0.12, 0.22, 0x2a3a4a, x, 1.3, z, P[4]); });
+    return P;
+  },
+  barrage() {
+    const P = G5(), pier = 0xa8a29a;
+    noShadow(bx(5.0, 0.06, 2.2, 0x4a8ab8, 0, 0.03, 0, P[0])); bx(5.0, 0.12, 0.3, 0x8a8478, 0, 0.06, 1.0, P[0]);
+    for (let i = 0; i < 10; i++) bx(0.18, 0.9, 1.3, pier, -2.25 + i * 0.5, 0.45, 0, P[1]);
+    for (let i = 0; i < 9; i++) bx(0.32, 0.55, 0.06, 0x3a6a8a, -2.0 + i * 0.5, 0.35, 0.25, P[2]);
+    bx(5.0, 0.15, 1.4, 0x8a8a8a, 0, 0.98, 0, P[3]); for (const z of [-0.66, 0.66]) bx(5.0, 0.12, 0.04, 0xf0f0f0, 0, 1.12, z, P[3]);
+    for (let i = 0; i < 5; i++) { const x = -2.0 + i; cy(0.02, 0.02, 0.6, 0x4a4a4a, x, 1.35, 0.6, P[4], 6); const l = sp(0.07, glow(0xffe08a), x, 1.67, 0.6, P[4]); l.castShadow = false; }
+    return P;
+  },
+  // Konark: the Sun God's stone chariot
+  konark() {
+    const P = G5(), st = 0x9a7a62;
+    bx(3.4, 0.6, 2.2, st, -0.2, 0.3, 0, P[0]); bx(3.6, 0.08, 2.4, 0x8a6a52, -0.2, 0.62, 0, P[0]);
+    for (let k = 0; k < 6; k++) for (const z of [-1.13, 1.13]) {
+      const x = -1.7 + k * 0.6; b3Mesh(new B3.T.TorusGeometry(0.25, 0.05, 6, 16), 0x7a5a42, x, 0.32, z, P[1]);
+      for (const r of [0, Math.PI / 2]) { const s = bx(0.48, 0.04, 0.04, 0x7a5a42, x, 0.32, z, P[1]); s.rotation.z = r + Math.PI / 4; }
+    }
+    for (let i = 0; i < 6; i++) bx(2.2 - i * 0.32, 0.32, 1.9 - i * 0.28, st, -0.2, 0.82 + i * 0.34, 0, P[2]);
+    for (let i = 0; i < 7; i++) { const z = -0.9 + i * 0.3; bx(0.5, 0.22, 0.14, st, 1.85, 0.75, z, P[3]); const nk = bx(0.12, 0.3, 0.12, st, 2.1, 0.95, z, P[3]); nk.rotation.z = -0.4; for (const dx of [1.68, 2.02]) bx(0.06, 0.35, 0.06, st, dx, 0.47, z, P[3]); }
+    const ty = 0.82 + 6 * 0.34;
+    cy(0.35, 0.35, 0.14, 0xb8987a, -0.2, ty, 0, P[4], 16); sp(0.14, GOLD, -0.2, ty + 0.2, 0, P[4], 1.2);
+    return P;
+  },
+  lighthouse() {
+    const P = G5(), w = 0xf0ece4, red = 0xd84a3a;
+    bx(1.9, 0.6, 1.9, 0xd8d0c0, 0, 0.3, 0, P[0]); bx(0.4, 0.5, 0.05, 0x4a3020, 0, 0.3, 0.96, P[0]);
+    cy(0.62, 0.72, 1.8, w, 0, 1.5, 0, P[1], 10);
+    cy(0.53, 0.62, 1.8, red, 0, 3.3, 0, P[2], 10);
+    cy(0.45, 0.53, 1.6, w, 0, 5.0, 0, P[3], 10);
+    cy(0.65, 0.65, 0.1, 0x3a3a3a, 0, 5.85, 0, P[4], 16); const lamp = cy(0.32, 0.32, 0.5, glow(0xfff2a0), 0, 6.15, 0, P[4], 12); lamp.castShadow = false; co(0.4, 0.4, red, 0, 6.6, 0, P[4], 12);
+    return P;
+  },
+  church() {
+    const P = G5(), w = 0xf6f4ee, roof = 0x8a9aaa;
+    bx(3.0, 0.25, 4.2, 0xe0dcd4, 0, 0.125, -0.1, P[0]);
+    bx(1.8, 1.6, 3.0, w, 0, 1.05, -0.6, P[1]); const r = cy(1.1, 1.1, 3.0, roof, 0, 2.4, -0.6, P[1], 3); r.rotation.x = -Math.PI / 2;
+    bx(1.0, 2.6, 1.0, w, 0, 1.55, 1.4, P[2]); bx(0.4, 0.8, 0.05, 0x4a3020, 0, 0.65, 1.91, P[2]);
+    co(0.62, 2.3, w, 0, 4.0, 1.4, P[3], 8); for (const [sx, sz] of CORNERS) co(0.08, 0.5, w, sx * 0.45, 3.1, 1.4 + sz * 0.45, P[3], 6);
+    bx(0.07, 0.55, 0.07, GOLD, 0, 5.4, 1.4, P[4]); bx(0.32, 0.07, 0.07, GOLD, 0, 5.5, 1.4, P[4]);
+    noShadow(cy(0.25, 0.25, 0.04, 0x3a6ad8, 0, 2.3, 1.91, P[4], 16)).rotation.x = Math.PI / 2;
+    for (const sx of [-0.91, 0.91]) for (const z of [-1.6, -0.6, 0.4]) bx(0.05, 0.6, 0.25, 0x3a6ad8, sx, 1.15, z, P[4]);
+    return P;
+  },
+  // Brindavan Gardens below the KRS dam
+  garden() {
+    const P = G5(), green = 0x5fae3a, blue = 0x4ab0e8;
+    for (let k = 0; k < 3; k++) bx(4.2, 0.2 * (k + 1), 1.0, green, 0, 0.1 * (k + 1), 1.4 - k * 1.0, P[0]);
+    bx(4.4, 1.6, 0.5, 0xa8a090, 0, 0.8, -1.75, P[1]); for (let i = 0; i < 7; i++) bx(0.25, 0.3, 0.05, 0x5a6a7a, -1.8 + i * 0.6, 1.3, -1.49, P[1]);
+    for (let k = 0; k < 3; k++) noShadow(bx(0.4, 0.04, 1.0, blue, 0, 0.2 * (k + 1) + 0.02, 1.4 - k * 1.0, P[2]));
+    for (const [x, z, y] of [[0, 1.4, 0.2], [0, 0.4, 0.4], [0, -0.6, 0.6], [-1.3, 0.9, 0.3], [1.3, 0.9, 0.3]]) { const f = co(0.14, 0.9, glow(0xcfefff), x, y + 0.45, z, P[3], 8); f.castShadow = false; }
+    [0xff6aa8, 0xffd23d, 0x7aff8a, 0x6ac8ff, 0xff8a3d].forEach((c, i) => { for (const x of [-1.9, 1.9]) { const l = sp(0.09, glow(c), x, 0.3 + (i % 3) * 0.2, 1.6 - i * 0.7, P[4]); l.castShadow = false; } });
+    for (const x of [-1.3, 1.3]) for (const z of [0.4, -0.6]) b3Mesh(new B3.T.IcosahedronGeometry(0.22, 0), 0xff7ab8, x, z > 0 ? 0.55 : 0.75, z, P[4]);
+    return P;
+  },
+  // Kakatiya Kala Thoranam: the carved stone gate of Warangal
+  thoranam() {
+    const P = G5(), c = 0xb0aaa0;
+    bx(3.4, 0.3, 1.4, 0x9a958c, 0, 0.15, 0, P[0]);
+    for (const x of [-1.1, 1.1]) { bx(0.45, 2.6, 0.45, c, x, 1.6, 0, P[1]); for (const y of [0.8, 1.6, 2.4]) bx(0.55, 0.12, 0.55, 0x9a958c, x, y, 0, P[1]); }
+    bx(3.0, 0.35, 0.55, c, 0, 3.05, 0, P[2]); for (const x of [-0.75, 0.75]) beam(x * 1.25, 2.6, x, 2.88, 0, 0.12, c, P[2]);
+    bx(2.4, 0.55, 0.35, c, 0, 3.5, 0, P[3]); const orn = cy(0.45, 0.45, 0.35, c, 0, 3.85, 0, P[3], 16); orn.rotation.x = Math.PI / 2;
+    for (const x of [-0.6, 0.6]) sp(0.16, c, x, 3.85, 0, P[3]);
+    for (const x of [-1.25, 1.25]) { sp(0.2, c, x, 3.42, 0, P[4], 0.8); const nk = cy(0.05, 0.07, 0.35, c, x * 0.92, 3.6, 0, P[4], 6); nk.rotation.z = x > 0 ? 0.4 : -0.4; sp(0.08, c, x * 0.85, 3.78, 0, P[4]); }
+    sp(0.12, c, 0, 4.15, 0, P[4], 1.3);
+    return P;
+  },
+  // Thousand Pillar Temple: a star-shaped hall of black stone pillars
+  mandapa() {
+    const P = G5(), basalt = 0x6a6660, st = 0x8a8478;
+    bx(3.0, 0.45, 3.0, st, 0, 0.225, -0.3, P[0]); const b2 = bx(3.0, 0.45, 3.0, st, 0, 0.225, -0.3, P[0]); b2.rotation.y = Math.PI / 4;
+    for (let i = 0; i < 16; i++) { const a = i / 16 * Math.PI * 2; cy(0.09, 0.1, 1.3, basalt, Math.sin(a) * 1.3, 1.1, -0.3 + Math.cos(a) * 1.3, P[1], 8); }
+    for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + 0.2; cy(0.09, 0.1, 1.3, basalt, Math.sin(a) * 0.65, 1.1, -0.3 + Math.cos(a) * 0.65, P[1], 8); }
+    cy(1.6, 1.6, 0.2, 0x7a756c, 0, 1.85, -0.3, P[2], 8); cy(1.75, 1.75, 0.08, st, 0, 1.98, -0.3, P[2], 8);
+    for (const a of [Math.PI / 2, Math.PI, -Math.PI / 2]) { const x = Math.sin(a) * 1.0, z = -0.3 + Math.cos(a) * 1.0; bx(0.7, 0.55, 0.7, 0x7a756c, x, 2.3, z, P[3]); const t = co(0.45, 0.7, 0x7a756c, x, 2.92, z, P[3], 4); t.rotation.y = Math.PI / 4; }
+    bx(1.0, 0.3, 0.6, st, 0, 0.15, 2.1, P[4]);
+    const body = sp(0.35, 0x2e2e2e, 0, 0.6, 2.1, P[4]); body.scale.set(1.5, 0.8, 0.9);
+    sp(0.17, 0x2e2e2e, 0.48, 0.78, 2.1, P[4]); for (const z of [2.0, 2.2]) co(0.03, 0.12, 0x2e2e2e, 0.5, 0.97, z, P[4], 6);
+    return P;
+  },
+};
+BTYPE_PARTS.fort = [['Fort walls', 'కోట గోడలు'], ['Main gate', 'ప్రధాన ద్వారం'], ['Towers', 'బురుజులు'], ['Pavilions', 'మండపాలు'], ['Flag', 'జెండా']];
+function lmModel(id) { const L = LANDMARKS[id]; return MODELS[L.model || id] ? MODELS[L.model || id]() : BTYPES[L.type](L.o || {}); }
+function lmParts(L) { return L.parts || BTYPE_PARTS[L.type]; }
 function initBuild3D() {
   if (B3.T || B3.loading || B3.failed) return;
   B3.loading = true;
@@ -2828,7 +3313,7 @@ function drawCity(ci, anim = -1) {
     const built = lmPartsBuilt(ci, li), p0 = hexPos(...c);
     [c, ...NB.map(([a, b]) => [c[0] + a, c[1] + b])].forEach(h => hexTile(hexPos(...h), built ? 0xe8dcc0 : 0xd8c8a0, 0xc8a46a, B3.holder));
     const holder = new T.Group(); holder.position.set(p0.x, 0.12, p0.z); holder.scale.setScalar(0.8); B3.holder.add(holder);
-    const P = MODELS[CITIES[ci].lms[li]]();
+    const P = lmModel(CITIES[ci].lms[li]);
     const box = built < 5 ? new T.Box3().setFromObject(P[built]) : null; // measured before the parts join the scaled holder
     const partTask = plan.tasks.find(t => t.type === 'part' && t.li === li && t.k === built);
     P.forEach((g, k) => { g.visible = k < built; holder.add(g); if (g.userData.flame) B3.flames.push(g.userData.flame); });
@@ -2879,6 +3364,7 @@ function mountBuildView() {
   const w = host.clientWidth || 600, h = Math.round(Math.min(640, Math.max(400, Math.min(w * (w < 640 ? 1.3 : 0.85), innerHeight - 220))));
   B3.renderer.setSize(w, h); B3.camera.aspect = w / h; B3.camera.updateProjectionMatrix();
   drawCity(viewCity());
+  if (S.city.intro !== S.city.i && !allCitiesDone() && $('modal').classList.contains('hidden')) { S.city.intro = S.city.i; save(); setTimeout(() => cityIntro(S.city.i), 700); }
   if (!B3.raf) { B3.lastT = performance.now(); B3.raf = requestAnimationFrame(b3Loop); }
 }
 function viewCity() { return S.city.view != null && S.city.view < S.city.i ? S.city.view : Math.min(S.city.i, CITIES.length - 1); }
@@ -2916,9 +3402,9 @@ function renderBuild() {
     const t = selTask();
     if (!t) bottom = `<button class="btn gold bv-main" data-act="city-next">${CITIES[ci + 1] ? tr(`Travel to ${CITIES[ci + 1].name[0]} ✈️`, `${CITIES[ci + 1].name[1]} కి వెళ్ళు ✈️`) : tr('City complete!', 'నగరం పూర్తి!')}</button>`;
     else {
-      const cost = taskCost(ci, t), ok = S.cash >= cost, rw = taskReward(ci, t);
+      const cost = taskCost(ci, t), ok = S.cash >= cost, rw = taskReward(ci, t), lmId = C.lms[t.li];
       bottom = `<div class="task-card">
-        <div class="tc-ico">${ico(taskIcon(ci, t))}</div>
+        <button class="tc-ico" data-act="lm-info" data-id="${lmId}" title="${esc(tr('About this place', 'ఈ ప్రదేశం గురించి'))}">${ico(taskIcon(ci, t))}<span class="tc-learn">${ico('book')}</span></button>
         <div class="tc-info"><small>${tr('Next task', 'తర్వాతి పని')}</small><b>${taskName(ci, t)}</b>
           ${rw ? `<span class="tc-gift">${ico('gift')} +${fmtInt(rw.coins)} ${ico('coin')} +${rw.energy} ⚡</span>` : t.type === 'part' ? `<span class="tc-gift">+5 ⚡ +1 ${ico('pack')}</span>` : ''}</div>
         <button class="btn ${ok ? 'gold' : 'ghost'} tc-build" data-act="build-part" ${ok ? '' : 'disabled'}><b>${tr('Build', 'కట్టు')}</b><small>${ico('coin')} ${fmtInt(cost)}</small></button>
@@ -2931,43 +3417,101 @@ function renderBuild() {
   return `<div class="build-view big" id="buildView">${fallback}
     <div class="bv-top">
       <button class="bv-btn map" data-act="build-map">${ico('worldmap')}<span>${tr('MAP', 'మ్యాప్')}</span></button>
-      <div class="bv-title"><b>${tr(...C.name)}</b><div class="city-bar"><div style="width:${prog.done / prog.total * 100}%"></div><span>${prog.done} / ${prog.total}</span></div>
-        <small>${tr('Landmarks', 'కట్టడాలు')}: ${C.lms.filter((_, li) => lmPartsBuilt(ci, li) >= 5).length}/${C.lms.length}</small></div>
-      <button class="bv-btn" data-act="build-parts">${ico('construction')}<span>${tr('Landmarks', 'కట్టడాలు')}</span></button>
+      <button class="bv-title" data-act="city-intro" data-id="${ci}"><b>${tr(...C.name)} <span class="bv-num">${ci + 1}/${CITIES.length}</span></b><div class="city-bar"><div style="width:${prog.done / prog.total * 100}%"></div><span>${prog.done} / ${prog.total}</span></div>
+        <small>${tr('Landmarks', 'కట్టడాలు')}: ${C.lms.filter((_, li) => lmPartsBuilt(ci, li) >= 5).length}/${C.lms.length}</small></button>
+      <button class="bv-btn learn" data-act="build-parts">${ico('book')}<span>${tr('Learn', 'నేర్చుకో')}</span></button>
     </div>
     <div class="bv-bonus">${ico('chart')} +${Math.round((landmarkBonus() - 1) * 100)}%</div>
     <div class="bv-bottom">${bottom}</div>
   </div>`;
 }
-const INDIA_PATH = 'M105,10 L130,8 L150,25 L140,45 L160,60 L175,70 L200,78 L215,95 L240,100 L262,92 L285,98 L295,115 L275,125 L262,140 L255,150 L240,150 L235,165 L220,170 L212,185 L200,190 L195,205 L185,215 L178,230 L170,245 L162,262 L155,280 L148,300 L140,318 L132,330 L124,318 L118,300 L110,282 L104,262 L98,240 L94,222 L88,205 L80,195 L65,192 L52,185 L40,172 L48,160 L38,150 L30,140 L45,130 L60,128 L70,115 L80,100 L85,85 L78,70 L90,55 L95,35 Z';
+// India map: real latitude/longitude placed on a simple flat projection
+const mapXY = (lat, lon) => [Math.round((14 + (lon - 68) * 9.6) * 10) / 10, Math.round((10 + (37 - lat) * 10.6) * 10) / 10];
+const INDIA_PATH = 'M' + INDIA_LL.map(([lon, lat]) => mapXY(lat, lon).join(',')).join(' L') + ' Z';
+function cityState(ci) { return ci < S.city.i ? 'done' : ci === S.city.i ? 'now' : 'locked'; }
 function openBuildMap() {
+  const pts = CITIES.map(C => mapXY(...C.ll));
   const pins = CITIES.map((C, ci) => {
-    const st = ci < S.city.i ? 'done' : ci === S.city.i ? 'now' : 'locked', [x, y] = C.pin, p = cityProgress(ci);
-    return `<g class="pin ${st}" ${st !== 'locked' ? `data-act="build-view" data-id="${ci === S.city.i ? -1 : ci}"` : ''}>
-      <circle cx="${x}" cy="${y}" r="13" class="pin-ring"/><circle cx="${x}" cy="${y}" r="8" class="pin-dot"/>
-      <text x="${C.left ? x - 16 : x + 16}" y="${y + 4}" class="pin-label" text-anchor="${C.left ? 'end' : 'start'}">${esc(tr(...C.name))}</text>
-      <text x="${C.left ? x - 16 : x + 16}" y="${y + 17}" class="pin-sub" text-anchor="${C.left ? 'end' : 'start'}">${st === 'done' ? '✓' : st === 'now' ? `${p.done}/${p.total}` : '🔒'}</text></g>`;
+    const st = cityState(ci), [x, y] = pts[ci];
+    return `<g class="pin ${st}" ${st !== 'locked' ? `data-act="build-view" data-id="${st === 'now' ? -1 : ci}"` : ''}>
+      ${st === 'now' ? `<circle cx="${x}" cy="${y}" r="11" class="pin-ring"/>` : ''}<circle cx="${x}" cy="${y}" r="7.5" class="pin-dot"/>
+      <text x="${x}" y="${y + 3.2}" class="pin-n" text-anchor="middle">${st === 'done' ? '✓' : ci + 1}</text></g>`;
   }).join('');
-  const route = CITIES.map(C => C.pin.join(',')).join(' ');
+  const now = Math.min(S.city.i, CITIES.length - 1), [nx, ny] = pts[now];
+  const label = `<text x="${nx + (nx > 220 ? -14 : 14)}" y="${ny - 10}" class="pin-label" text-anchor="${nx > 220 ? 'end' : 'start'}">${esc(tr(...CITIES[now].name))}</text>`;
+  const chips = CITIES.map((C, ci) => {
+    const st = cityState(ci), p = cityProgress(ci);
+    return `<button class="city-chip ${st}" ${st === 'locked' ? 'disabled' : `data-act="build-view" data-id="${st === 'now' ? -1 : ci}"`}>
+      <span class="cc-n">${st === 'done' ? '✓' : st === 'locked' ? '🔒' : ci + 1}</span><b>${tr(...C.name)}</b>
+      <small>${st === 'now' ? `${p.done}/${p.total}` : C.lms.length + ' ' + tr('places', 'ప్రదేశాలు')}</small></button>`;
+  }).join('');
   SlotFX.press();
   modal(`<h3>${ico('worldmap')} ${tr('India map', 'భారత దేశ మ్యాప్')}</h3>
-    <p class="sub">${tr('Build every tile of a city to travel to the next one. Tap a city you have finished to visit it.', 'ఒక నగరంలో అన్ని పనులు పూర్తి చేస్తే తర్వాతి నగరం తెరుచుకుంటుంది. పూర్తయిన నగరాన్ని నొక్కితే చూడవచ్చు.')}</p>
-    <svg class="india-map" viewBox="0 0 320 340"><defs><linearGradient id="indG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fe08a"/><stop offset="1" stop-color="#3f9a3a"/></linearGradient></defs>
-      <path d="${INDIA_PATH}" fill="url(#indG)" stroke="#fff6c8" stroke-width="3" stroke-linejoin="round"/>
-      <polyline points="${route}" class="route"/>${pins}</svg>
+    <p class="sub">${tr('Finish every tile of a city to travel to the next one. Tap a finished city to visit it again.', 'ఒక నగరంలో అన్ని పనులు పూర్తి చేస్తే తర్వాతి నగరానికి వెళ్తాం. పూర్తయిన నగరాన్ని నొక్కితే మళ్ళీ చూడవచ్చు.')}</p>
+    <svg class="india-map" viewBox="0 0 310 330"><defs><linearGradient id="indG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fe08a"/><stop offset="1" stop-color="#3f9a3a"/></linearGradient></defs>
+      <path d="${INDIA_PATH}" fill="url(#indG)" stroke="#fff6c8" stroke-width="2.5" stroke-linejoin="round"/>
+      <polyline points="${pts.slice(0, Math.min(CITIES.length, S.city.i + 2)).map(p => p.join(',')).join(' ')}" class="route"/>${pins}${label}</svg>
+    <div class="city-chips">${chips}</div>
     <div class="modal-actions"><button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button></div>`);
 }
+// Landmark list of the shown city; each row opens its learning card
 function openBuildParts() {
   const ci = viewCity(), C = CITIES[ci];
   const rows = C.lms.map((id, li) => {
-    const L = LANDMARKS[id], n = lmPartsBuilt(ci, li);
-    return `<div class="part-row ${n >= 5 ? 'done' : n > 0 ? 'next' : ''}"><span class="pr-n">${n >= 5 ? '✓' : li + 1}</span>
-      <b>${ico(L.icon)} ${tr(...L.name)}</b><small>${n >= 5 ? tr('Built · +10%', 'పూర్తి · +10%') : `${n}/5 ${tr('parts', 'భాగాలు')}`}</small></div>`;
+    const L = LANDMARKS[id], n = lmPartsBuilt(ci, li), q = S.city.quiz[id];
+    return `<button class="part-row learn-row ${n >= 5 ? 'done' : n > 0 ? 'next' : ''}" data-act="lm-info" data-id="${id}"><span class="pr-n">${n >= 5 ? '✓' : li + 1}</span>
+      <b>${ico(L.icon)} ${tr(...L.name)}</b><small>${q === 1 ? '🧠 ' : ''}${n >= 5 ? tr('Built', 'పూర్తి') : `${n}/5`} ${ico('book')}</small></button>`;
   }).join('');
   SlotFX.press();
-  modal(`<h3>${ico('construction')} ${tr(`${C.name[0]} landmarks`, `${C.name[1]} కట్టడాలు`)}</h3>
-    <p class="sub">${tr('Each finished landmark: gems, energy, a gold pack and +10% on all prizes for good.', 'పూర్తయిన ప్రతి కట్టడం: జెమ్స్, ఎనర్జీ, గోల్డ్ ప్యాక్, శాశ్వతంగా అన్ని బహుమతులు +10%.')}</p>
-    <div class="parts-list">${rows}</div><div class="modal-actions"><button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button></div>`);
+  modal(`<h3>${ico('book')} ${tr(`Learn about ${C.name[0]}`, `${C.name[1]} గురించి నేర్చుకో`)}</h3>
+    <p class="sub city-fact">${tr(...C.fact)}</p>
+    <div class="parts-list">${rows}</div>
+    <p class="sub">${tr('Each finished landmark gives gems, energy, a gold pack and +10% on all prizes. Answer its quiz for +10 gems!', 'పూర్తయిన ప్రతి కట్టడం: జెమ్స్, ఎనర్జీ, గోల్డ్ ప్యాక్, అన్ని బహుమతులు +10%. క్విజ్ సరిగ్గా చెబితే +10 జెమ్స్!')}</p>
+    <div class="modal-actions"><button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button></div>`);
+}
+const lmYear = L => Array.isArray(L.y) ? tr(...L.y) : L.y;
+function lmCity(id) { return CITIES.find(C => C.lms.includes(id)); }
+function factHtml(L) { return `<div class="fact-card"><b>${ico('book')} ${tr('Did you know?', 'మీకు తెలుసా?')}</b><p>${tr(...L.fact)}</p><small>${tr('Built', 'నిర్మాణం')}: ${lmYear(L)} · ${tr(...lmCity(L.id).name)}</small></div>`; }
+// Three answers in a fixed shuffled order; the right one is quiz[1][0]
+function quizHtml(id) {
+  const L = LANDMARKS[id], [q, opts] = L.quiz, done = S.city.quiz[id];
+  const rot = [...id].reduce((s, ch) => s + ch.charCodeAt(0), 0) % 3, order = [0, 1, 2].map(k => (k + rot) % 3);
+  return `<div class="quiz" id="quiz-${id}"><b>${ico('question')} ${tr('Quiz', 'క్విజ్')}: ${tr(...q)}</b>
+    <div class="quiz-opts">${order.map(k => `<button class="btn quiz-opt ${done != null ? (k === 0 ? 'right' : '') : ''}" data-act="quiz" data-id="${id}:${k}" ${done != null ? 'disabled' : ''}>${tr(...opts[k])}</button>`).join('')}</div>
+    <small class="quiz-note">${done == null ? tr('Right answer: +10 gems', 'సరైన జవాబు: +10 జెమ్స్') : done ? tr('✓ You got this one right!', '✓ దీనికి సరైన జవాబు చెప్పారు!') : tr('Already answered', 'ఇప్పటికే జవాబు ఇచ్చారు')}</small></div>`;
+}
+function answerQuiz(el, arg) {
+  const [id, k] = arg.split(':'), L = LANDMARKS[id];
+  if (!L || S.city.quiz[id] != null) return;
+  const right = +k === 0;
+  S.city.quiz[id] = right ? 1 : 0;
+  const box = $('quiz-' + id);
+  if (box) {
+    box.querySelectorAll('.quiz-opt').forEach(b => { b.disabled = true; const kk = +b.dataset.id.split(':')[1]; if (kk === 0) b.classList.add('right'); else if (kk === +k) b.classList.add('wrong'); });
+    box.querySelector('.quiz-note').textContent = right ? tr('Correct! +10 gems', 'సరైన జవాబు! +10 జెమ్స్') : tr(`The answer is: ${L.quiz[1][0][0]}`, `సరైన జవాబు: ${L.quiz[1][0][1]}`);
+  }
+  if (right) { S.gems += 10; flyTo('gems', el, 'gem', 4); SlotFX.big(); updateHeader(); }
+  else SlotFX.land('hit');
+  save();
+}
+function lmInfo(id) {
+  const L = LANDMARKS[id];
+  if (!L) return;
+  SlotFX.press();
+  modal(`<div class="lm-info-head">${ico(L.icon, 'big-ico')}<div><h3>${tr(...L.name)}</h3><small>${tr(...lmCity(id).name)}</small></div></div>
+    ${factHtml(L)}${quizHtml(id)}
+    <div class="modal-actions"><button class="btn gold" data-act="close">${tr('OK', 'సరే')}</button></div>`);
+}
+// Shown when the player arrives in a city (or taps the city title)
+function cityIntro(ci) {
+  const C = CITIES[ci];
+  if (!C) return;
+  modal(`<div class="lm-done"><div class="lm-rays"></div>${ico('worldmap', 'big-ico')}</div>
+    <h3>${tr(`Welcome to ${C.name[0]}!`, `${C.name[1]} కి స్వాగతం!`)}</h3>
+    <p class="sub city-fact">${tr(...C.fact)}</p>
+    <div class="intro-lms">${C.lms.map(id => `<button class="intro-lm" data-act="lm-info" data-id="${id}">${ico(LANDMARKS[id].icon)}<span>${tr(...LANDMARKS[id].name)}</span></button>`).join('')}</div>
+    <p class="sub">${tr('Tap the glowing + tiles to build. Tap a place above to learn about it.', 'మెరిసే + టైల్స్ నొక్కి కట్టండి. పైన ఒక ప్రదేశాన్ని నొక్కి దాని గురించి తెలుసుకోండి.')}</p>
+    <div class="modal-actions"><button class="btn gold" data-act="close">${tr('Let’s build!', 'కడదాం!')}</button></div>`);
 }
 function buildPart() {
   if (allCitiesDone()) return;
@@ -2982,26 +3526,28 @@ function buildPart() {
   else SlotFX.land('pop');
   if (t.type === 'part') { S.slot.energy += 5; giveAlbumPack('basic', 1, true); flyTo('pack', from, 'pack', 1); }
   sfx('buy');
-  // Finished landmark?
-  let lmDone = null;
-  if (t.type === 'part' && t.k === 4) lmDone = { li: t.li, L: LANDMARKS[CITIES[ci].lms[t.li]] };
+  const lmId = CITIES[ci].lms[t.li];
+  const lmDone = t.type === 'part' && t.k === 4 ? lmId : null;
   const cityFinished = plan.tasks.every(x => S.city.done[x.i]);
   B3.sel = -1; save();
   const keep = B3.T;
   renderTab();
   if (keep) { B3.shownKey = ''; drawCity(ci, t.i); }
   updateHeader();
-  if (lmDone) setTimeout(() => landmarkCelebration(lmDone.L, cityFinished), 1100);
+  if (lmDone) setTimeout(() => landmarkCelebration(lmDone, cityFinished), 1100);
   else if (cityFinished) setTimeout(cityCelebration, 900);
+  // The first stone of a landmark: tell the player what they are building
+  else if (t.type === 'part' && t.k === 0) setTimeout(() => { if ($('modal').classList.contains('hidden')) lmInfo(lmId); }, 1000);
 }
-function landmarkCelebration(L, thenCity) {
-  const n = landmarksDone(), gems = 20 * n, bonus = bonusCash(3600 * n);
+function landmarkCelebration(id, thenCity) {
+  const L = LANDMARKS[id], n = landmarksDone(), gems = 20 * n, bonus = bonusCash(3600 * n);
   S.gems += gems; S.slot.energy += 25; earn(bonus); giveAlbumPack('gold', 1, true); save();
   SlotFX.jackpot(); confetti($('buildView'), 240);
   const tile = (icon, big, small, k) => `<div class="lm-tile" style="animation-delay:${0.25 + k * 0.15}s">${ico(icon)}<b>${big}</b><small>${small}</small></div>`;
   modal(`<div class="lm-done"><div class="lm-rays"></div>${ico(L.icon, 'big-ico')}</div>
     <h3>${tr(`${L.name[0]} is complete!`, `${L.name[1]} పూర్తయింది!`)}</h3>
     <div class="lm-tiles">${tile('coin', fmtInt(bonus), tr('coins', 'కాయిన్లు'), 0)}${tile('gem', gems, tr('gems', 'జెమ్స్'), 1)}${tile('bolt', 25, tr('energy', 'ఎనర్జీ'), 2)}${tile('pack', 1, tr('gold pack', 'గోల్డ్ ప్యాక్'), 3)}${tile('chart', '+' + LANDMARK_BONUS * 100 + '%', tr('all prizes', 'అన్ని బహుమతులు'), 4)}</div>
+    ${factHtml(L)}${quizHtml(id)}
     <div class="modal-actions"><button class="btn gold lm-next" data-act="lm-next" data-id="${thenCity ? 'city' : ''}">${tr('Collect!', 'తీసుకో!')}</button></div>`);
 }
 function cityCelebration() {
@@ -3856,6 +4402,7 @@ function renderStats() {
       [tr('Bosses beaten', 'ఓడించిన బాస్‌లు'), fmtInt(S.stats.bosses || 0)],
       [tr('Raids', 'దాడులు'), fmtInt(S.stats.raids || 0)],
       [tr('Landmarks built', 'కట్టిన ల్యాండ్‌మార్కులు'), landmarksDone() + ' / ' + Object.keys(LANDMARKS).length],
+      [tr('Quiz answers right', 'సరైన క్విజ్ జవాబులు'), Object.values(S.city.quiz).filter(v => v === 1).length + ' / ' + Object.keys(LANDMARKS).length],
       [tr('Cities built', 'కట్టిన నగరాలు'), Math.min(S.city.i, CITIES.length) + ' / ' + CITIES.length],
       [tr('Stickers', 'స్టిక్కర్లు'), Object.keys(S.album.have).length + ' / ' + ALL_STICKERS.length],
       [tr('VIP', 'VIP'), tr(...vipTier().name)],
@@ -4131,6 +4678,9 @@ document.addEventListener('click', e => {
     }
     case 'build-map': openBuildMap(); break;
     case 'build-parts': openBuildParts(); break;
+    case 'lm-info': lmInfo(id); break;
+    case 'quiz': answerQuiz(el, id); break;
+    case 'city-intro': SlotFX.press(); cityIntro(+id); break;
     case 'build-view': S.city.view = +id >= 0 ? +id : null; B3.zoomFrom = performance.now(); closeModal(); renderTab(); break;
     case 'ad': watchAd(); break;
     case 'ad-go': { const f = pendingShowAd; pendingShowAd = null; closeModal(); if (f) f(); break; }
