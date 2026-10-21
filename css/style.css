@@ -988,3 +988,34 @@ body.lowfx .loader, body.lowfx .bar.fast .bar-fill, body.lowfx .tut-hand { anima
 .raid-anim { display: grid; place-items: center; height: 110px; }
 .swing { animation: swing .45s ease-in-out infinite alternate !important; transform-origin: 80% 80%; }
 @keyframes swing { from { transform: rotate(-35deg); } to { transform: rotate(25deg); } }
+
+/* ---------- VIP + league ---------- */
+.rank-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; align-items: start; }
+.vip-card { display: flex; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 18px; background: linear-gradient(180deg, #ffe07a, #ffb43d); color: #4a2a00; border: 2px solid #fff0b0; box-shadow: 0 6px 0 #a06000; }
+.vip-badge { display: flex; flex-direction: column; align-items: center; min-width: 74px; padding: 6px; border-radius: 12px; background: linear-gradient(180deg, #4a8a3a, #2a5a20); color: #fff; border: 2px solid #c8ff8a; }
+.vip-badge .i3d { width: 34px; height: 34px; }
+.vip-badge b { font-size: 12px; white-space: nowrap; }
+.vip-info { flex: 1; min-width: 0; }
+.vip-perks { display: flex; gap: 8px; flex-wrap: wrap; font-weight: 700; font-size: 14px; }
+.vip-perks span { padding: 2px 8px; border-radius: 8px; background: rgba(255, 255, 255, .45); }
+.vip-bar { position: relative; height: 16px; margin-top: 8px; border-radius: 8px; background: rgba(0, 0, 0, .25); overflow: hidden; }
+.vip-bar div { height: 100%; background: linear-gradient(90deg, #8a55ef, #c88aff); }
+.vip-bar b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; color: #fff; text-shadow: 0 1px 2px #000; white-space: nowrap; }
+.league-card { padding: 10px 12px; border-radius: 18px; background: linear-gradient(180deg, #2a3a6a, #1a2448); border: 2px solid #6a8ad8; box-shadow: 0 6px 0 #0c1228; }
+.league-card summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 4px 10px; }
+.league-card summary::-webkit-details-marker { display: none; }
+.league-card summary .i3d { width: 38px; height: 38px; grid-row: span 2; }
+.league-card summary b { color: #cfe0ff; }
+.lg-rank { font-size: 22px; font-weight: 800; color: var(--gold); grid-row: span 2; }
+.lg-rank i { font-style: normal; font-size: 14px; margin-left: 2px; }
+.lg-rank i.up { color: #7dff9a; } .lg-rank i.down { color: #ff7a7a; }
+.league-card summary small { color: #9fb4e8; font-size: 12px; }
+.league-card .sub { font-size: 12px; margin: 10px 0 6px; }
+.lg-list { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.lg-list li { display: grid; grid-template-columns: 28px 1fr auto; gap: 8px; padding: 5px 6px; border-radius: 8px; font-size: 13px; }
+.lg-list li span { color: var(--muted); font-weight: 700; }
+.lg-list li em { font-style: normal; color: #cfe0ff; }
+.lg-list li.up span { color: #7dff9a; }
+.lg-list li.down span { color: #ff7a7a; }
+.lg-list li.me { background: rgba(255, 200, 61, .2); outline: 1px solid var(--gold); }
+@media (max-width: 760px) { .rank-row { grid-template-columns: 1fr; } }

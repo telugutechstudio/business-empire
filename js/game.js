@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '3.8';
+const GAME_VERSION = '3.9';
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
 let S = null; // game state, initialised below
@@ -295,9 +295,10 @@ function defaultState() {
     tour: { week: '', base: 0, posted: false, pending: '', rewarded: {} },
     stocks: {},
     scratch: { day: '', card: null },
-    slot: { energy: 30, at: 0, bet: 1, coins: 0, piggy: 0, gift: { at: 0, chest: 0 }, cal: { last: '', streak: 0 }, boss: { lvl: 1, hp: 300 }, col: { week: '', n: 0, got: 0, item: 0 } },
+    slot: { energy: 30, at: 0, bet: 1, coins: 0, piggy: 0, vip: 0, gift: { at: 0, chest: 0 }, cal: { last: '', streak: 0 }, boss: { lvl: 1, hp: 300 }, col: { week: '', n: 0, got: 0, item: 0 } },
     build: { done: 0, stage: 0, view: null },
     album: { have: {}, packs: { basic: 2, gold: 0 }, stars: 0, sets: {} },
+    league: { week: '', tier: 0, pts: 0, lastRank: 0 },
     raid: { shields: 1, tokens: 0, helpDay: '', log: [], online: false },
     stats: { clicks: 0, briefcases: 0, prestiges: 0, upgradesBought: 0, playTime: 0, bestRun: 0, missionsDone: 0, spins: 0, dailyClaims: 0, shares: 0 },
     boosts: { hype: 0, hypeCd: 0, rush: 0, golden: 0 },
@@ -346,7 +347,8 @@ function mergeState(saved) {
   out.album = Object.assign({ have: {}, stars: 0, sets: {} }, saved.album || {});
   out.album.packs = Object.assign({ basic: saved.album ? 0 : 2, gold: 0 }, out.album.packs || {});
   out.build = Object.assign({ done: 0, stage: 0, view: null }, saved.build || {});
-  out.slot = Object.assign({ energy: 30, at: 0, bet: 1, coins: 0, piggy: 0 }, saved.slot || {});
+  out.slot = Object.assign({ energy: 30, at: 0, bet: 1, coins: 0, piggy: 0, vip: 0 }, saved.slot || {});
+  out.league = Object.assign({ week: '', tier: 0, pts: 0, lastRank: 0 }, saved.league || {});
   out.slot.gift = Object.assign({ at: 0, chest: 0 }, out.slot.gift || {});
   out.slot.cal = Object.assign({ last: '', streak: 0 }, out.slot.cal || {});
   out.slot.boss = Object.assign({ lvl: 1, hp: 300 }, out.slot.boss || {});
@@ -1711,11 +1713,11 @@ let slotBusy = false, slotAuto = false;
 function slotRegen() {
   const sl = S.slot, now = Date.now();
   if (!sl.at) sl.at = now;
-  if (sl.energy >= SLOT_MAX) { sl.at = now; return; }
+  if (sl.energy >= slotMax()) { sl.at = now; return; }
   const n = Math.floor((now - sl.at) / SLOT_REGEN);
-  if (n > 0) { sl.energy = Math.min(SLOT_MAX, sl.energy + n); sl.at = sl.energy >= SLOT_MAX ? now : sl.at + n * SLOT_REGEN; }
+  if (n > 0) { sl.energy = Math.min(slotMax(), sl.energy + n); sl.at = sl.energy >= slotMax() ? now : sl.at + n * SLOT_REGEN; }
 }
-function slotNextIn() { return S.slot.energy >= SLOT_MAX ? 0 : Math.max(0, (S.slot.at + SLOT_REGEN - Date.now()) / 1000); }
+function slotNextIn() { return S.slot.energy >= slotMax() ? 0 : Math.max(0, (S.slot.at + SLOT_REGEN - Date.now()) / 1000); }
 function slotPick() {
   const total = SLOT_SYMS.reduce((t, x) => t + x.w, 0);
   let r = Math.random() * total;
@@ -1772,9 +1774,10 @@ function renderSlots() {
   const piggyPct = Math.min(100, sl.piggy / PIGGY_CAP * 100);
   return header('slot', tr('Spin Game', 'స్పిన్ గేమ్'), tr('Spend energy to spin. Coins build Landmarks, ⚔️ hits the boss, and cash and gems help your businesses.', 'ఎనర్జీతో స్పిన్ చేయండి. కాయిన్లతో ల్యాండ్‌మార్కులు కడతారు, ⚔️ బాస్‌ని కొడుతుంది, క్యాష్, జెమ్స్ మీ వ్యాపారాలకు.')) +
     `<div class="slot-top">
-      <div class="slot-stat">${ico('battery')}<b id="slotEnergy">${sl.energy}</b><small>/ ${SLOT_MAX}</small><em id="slotTimer"></em></div>
+      <div class="slot-stat">${ico('battery')}<b id="slotEnergy">${sl.energy}</b><small>/ ${slotMax()}</small><em id="slotTimer"></em></div>
       <div class="slot-stat coins">${ico('coin')}<b id="slotCoins">${fmtInt(sl.coins)}</b><small>${tr('coins', 'కాయిన్లు')}</small></div>
     </div>
+    <div class="rank-row">${vipCardHtml()}${leagueCardHtml()}</div>
     <div class="event-row">${bossCardHtml()}${colCardHtml()}</div>
     <div class="slot-machine">
       <div class="slot-lights"></div>
@@ -1810,27 +1813,29 @@ function giftCardHtml() {
   return `<div class="gift-card ${ready ? 'ready' : ''}" id="giftCard">
     <div class="gc-head">${ico('gift')}<b>${tr('Free gift', 'ఫ్రీ గిఫ్ట్')}</b></div>
     <div class="gc-chest"><div class="gc-segs">${segs}</div>${ico('briefcase')}</div>
-    <button class="btn ${ready ? 'gold' : 'ghost'} gc-btn" data-act="gift-claim" id="giftBtn" ${ready ? '' : 'disabled'}>${ready ? `${tr('Claim', 'తీసుకో')} +${GIFT_ENERGY} ⚡` : fmtClock(giftIn())}</button>
+    <button class="btn ${ready ? 'gold' : 'ghost'} gc-btn" data-act="gift-claim" id="giftBtn" ${ready ? '' : 'disabled'}>${ready ? `${tr('Claim', 'తీసుకో')} +${giftEnergy()} ⚡` : fmtClock(giftIn())}</button>
   </div>`;
 }
 function calCardHtml() {
   const ready = calReady(), next = calDay(), done = ready ? next - 1 : S.slot.cal.streak % 7 || 7;
-  const cells = CAL_ENERGY.map((e, k) => {
+  const cells = CAL_ENERGY.map((_, k) => {
+    const e = calEnergy(k + 1);
     const d = k + 1, cls = d <= done ? 'got' : ready && d === next ? 'today' : '';
     return `<div class="cal-cell ${cls}"><small>${tr('Day', 'రోజు')} ${d}</small><b>${e}⚡</b>${d === 7 ? `<em>+${CAL_GEMS_DAY7}💎</em>` : ''}${d <= done ? '<i>✓</i>' : ''}</div>`;
   }).join('');
   return `<div class="cal-card" id="calCard">
     <div class="gc-head">${ico('calendar')}<b>${tr('Spin calendar', 'స్పిన్ క్యాలెండర్')}</b><small>${tr('Come back every day for more energy', 'రోజూ వస్తే ఇంకా ఎక్కువ ఎనర్జీ')}</small></div>
     <div class="cal-row">${cells}</div>
-    ${ready ? `<button class="btn gold" data-act="cal-claim">${tr(`Claim day ${next}`, `రోజు ${next} తీసుకో`)}: +${CAL_ENERGY[next - 1]} ⚡</button>` : `<p class="sub">${tr('Claimed today. See you tomorrow!', 'ఈ రోజు తీసుకున్నారు. రేపు కలుద్దాం!')}</p>`}
+    ${ready ? `<button class="btn gold" data-act="cal-claim">${tr(`Claim day ${next}`, `రోజు ${next} తీసుకో`)}: +${calEnergy(next)} ⚡</button>` : `<p class="sub">${tr('Claimed today. See you tomorrow!', 'ఈ రోజు తీసుకున్నారు. రేపు కలుద్దాం!')}</p>`}
   </div>`;
 }
 function claimGift() {
   if (!giftReady()) return;
   const g = S.slot.gift;
   g.at = Date.now() + GIFT_EVERY;
-  S.slot.energy += GIFT_ENERGY; g.chest++;
-  let msg = tr(`🎁 +${GIFT_ENERGY} energy!`, `🎁 +${GIFT_ENERGY} ఎనర్జీ!`);
+  const ge = giftEnergy();
+  S.slot.energy += ge; g.chest++;
+  let msg = tr(`🎁 +${ge} energy!`, `🎁 +${ge} ఎనర్జీ!`);
   if (g.chest >= CHEST_SIZE) {
     g.chest = 0;
     const coins = 50000, gems = 10;
@@ -1843,7 +1848,7 @@ function claimGift() {
 }
 function claimCalendar() {
   if (!calReady()) return;
-  const C = S.slot.cal, d = calDay(), e = CAL_ENERGY[d - 1];
+  const C = S.slot.cal, d = calDay(), e = calEnergy(d);
   C.streak = d === 1 ? 1 : C.streak + 1; C.last = dayKey();
   S.slot.energy += e;
   let msg = tr(`🗓️ Day ${d}: +${e} energy!`, `🗓️ రోజు ${d}: +${e} ఎనర్జీ!`);
@@ -1892,6 +1897,7 @@ function slotBattle(line, bet) {
     const B = bossOf(b.lvl), r = bossReward(b.lvl);
     S.slot.coins += r.coins; S.gems += r.gems; S.slot.energy += r.energy;
     S.stats.bosses = (S.stats.bosses || 0) + 1;
+    addLeague(50);
     giveAlbumPack('gold', 1, true);
     msg = tr(`🏆 ${B.name[0]} defeated! +${fmtInt(r.coins)} coins, +${r.gems} 💎, +${r.energy} ⚡, +1 📦`, `🏆 ${B.name[1]} ఓడిపోయాడు! +${fmtInt(r.coins)} కాయిన్లు, +${r.gems} 💎, +${r.energy} ⚡, +1 📦`);
     b.lvl++; b.hp = bossMaxHp(b.lvl);
@@ -2026,6 +2032,7 @@ async function raidGo(i) {
   }
   await new Promise(r => setTimeout(r, 900));
   S.stats.raids = (S.stats.raids || 0) + 1;
+  if (!res.blocked) addLeague(20);
   let html;
   if (res.blocked) {
     const coins = 3000 * (1 + S.build.done); S.slot.coins += coins;
@@ -2084,12 +2091,111 @@ function slotRaidSymbols(line) {
   }
   return '';
 }
+let leagueOpen = false;
+// ---- VIP levels: every energy you spin earns VIP points; higher levels give lasting perks ----
+const VIP_TIERS = [
+  { name: ['Ordinary I', 'సాధారణ I'], at: 0, max: 0, gift: 0, cal: 0 },
+  { name: ['Ordinary II', 'సాధారణ II'], at: 300, max: 5, gift: 1, cal: 0.1 },
+  { name: ['Silver', 'సిల్వర్'], at: 1500, max: 10, gift: 2, cal: 0.2 },
+  { name: ['Gold', 'గోల్డ్'], at: 5000, max: 15, gift: 3, cal: 0.3 },
+  { name: ['Platinum', 'ప్లాటినం'], at: 12000, max: 20, gift: 4, cal: 0.4 },
+  { name: ['Diamond', 'డైమండ్'], at: 30000, max: 30, gift: 5, cal: 0.5 },
+];
+function vipLevel() { let k = 0; VIP_TIERS.forEach((t, i) => { if (S.slot.vip >= t.at) k = i; }); return k; }
+function vipTier() { return VIP_TIERS[vipLevel()]; }
+function slotMax() { return SLOT_MAX + vipTier().max; }
+function giftEnergy() { return GIFT_ENERGY + vipTier().gift; }
+function calEnergy(d) { return Math.round(CAL_ENERGY[d - 1] * (1 + vipTier().cal)); }
+function addVip(n) {
+  const before = vipLevel();
+  S.slot.vip += n;
+  const now = vipLevel();
+  if (now > before) {
+    const T = VIP_TIERS[now];
+    setTimeout(() => { toast(tr(`👑 VIP up: ${T.name[0]}! Energy max +${T.max}, gifts +${T.gift}, calendar +${T.cal * 100}%`, `👑 VIP పెరిగింది: ${T.name[1]}! ఎనర్జీ మాక్స్ +${T.max}, గిఫ్ట్ +${T.gift}, క్యాలెండర్ +${T.cal * 100}%`), 'gem'); sfx('win'); }, 600);
+    const redraw = () => { if (activeTab !== 'slots') return; if (slotBusy) setTimeout(redraw, 400); else renderTab(); };
+    setTimeout(redraw, 700); // new energy cap and gift amounts show once the reels stop
+  }
+}
+function vipCardHtml() {
+  const k = vipLevel(), T = VIP_TIERS[k], next = VIP_TIERS[k + 1], v = S.slot.vip;
+  const pct = next ? (v - T.at) / (next.at - T.at) * 100 : 100;
+  return `<div class="vip-card" id="vipCard">
+    <div class="vip-badge"><span class="vb-shield">${ico('crown')}</span><b>${tr(...T.name)}</b></div>
+    <div class="vip-info"><div class="vip-perks">
+      <span>⚡ ${tr('max', 'మాక్స్')} +${T.max}</span><span>🎁 +${T.gift}</span><span>🗓️ +${Math.round(T.cal * 100)}%</span></div>
+      <div class="vip-bar"><div style="width:${Math.min(100, pct)}%"></div><b>${next ? `${fmtInt(v)} / ${fmtInt(next.at)} → ${tr(...next.name)}` : tr('Top VIP level!', 'అత్యున్నత VIP!')}</b></div>
+    </div></div>`;
+}
+
+// ---- Weekly league: league points from spins, bosses, raids and building; 19 rivals in your group ----
+const LEAGUES = [
+  { name: ['Bronze', 'బ్రాంజ్'], icon: 'bronze', rate: 1 }, { name: ['Silver', 'సిల్వర్'], icon: 'silver', rate: 1.8 },
+  { name: ['Gold', 'గోల్డ్'], icon: 'gold', rate: 3 }, { name: ['Platinum', 'ప్లాటినం'], icon: 'gem', rate: 5 }, { name: ['Diamond', 'డైమండ్'], icon: 'crown', rate: 8 },
+];
+const LEAGUE_SIZE = 20, LEAGUE_UP = 5, LEAGUE_DOWN = 5;
+const RIVAL_NAMES = ['Arjun', 'Divya', 'Srinu', 'Bhavya', 'Naveen', 'Keerthi', 'Pavan', 'Harika', 'Teja', 'Sravani', 'Vamsi', 'Pooja', 'Chaitu', 'Anusha', 'Rohit', 'Meghana', 'Sai', 'Lavanya', 'Gopi', 'Ramya', 'Kalyan', 'Sneha'];
+function leaguePrize(rank) { return rank === 1 ? { gems: 50, pack: 'gold' } : rank <= 3 ? { gems: 30, pack: 'gold' } : rank <= 10 ? { gems: 15, pack: 'basic' } : { gems: 5 }; }
+function seeded(n) { let x = Math.sin(n * 9301 + 49297) * 233280; return x - Math.floor(x); }
+// Rival scores grow through the week at their own pace, so the table moves while you play
+function leagueRivals(week, tier, frac) {
+  const base = Math.floor(new Date(week).getTime() / 86400000);
+  const used = new Set();
+  return Array.from({ length: LEAGUE_SIZE - 1 }, (_, i) => {
+    let k = Math.floor(seeded(base + i * 7 + tier * 31) * RIVAL_NAMES.length);
+    while (used.has(k)) k = (k + 1) % RIVAL_NAMES.length;
+    used.add(k);
+    const pace = 120 + seeded(base * 3 + i * 13 + tier) * 1400; // points a full week brings
+    const curve = Math.pow(frac, 0.8 + seeded(base + i) * 0.6);
+    return { name: RIVAL_NAMES[k], pts: Math.floor(pace * LEAGUES[tier].rate * curve) };
+  });
+}
+function weekFrac() { return Math.min(1, Math.max(0.02, 1 - tourEndsIn() / (7 * 86400))); }
+function leagueTable(frac = weekFrac()) {
+  const L = S.league;
+  const rows = leagueRivals(L.week, L.tier, frac).concat([{ name: raidName(), pts: L.pts, me: true }]);
+  rows.sort((a, b) => b.pts - a.pts || (a.me ? -1 : 1));
+  return rows;
+}
+function myLeagueRank(rows = leagueTable()) { return rows.findIndex(r => r.me) + 1; }
+function addLeague(n) { leagueWeek(); S.league.pts += n; }
+// New week: pay the old week's rank, move up or down, start again
+function leagueWeek() {
+  const L = S.league, wk = tourWeekKey();
+  if (L.week === wk) return;
+  if (L.week && L.pts > 0) {
+    const rank = myLeagueRank(leagueTable(1)), P = leaguePrize(rank), old = L.tier;
+    S.gems += P.gems; if (P.pack) giveAlbumPack(P.pack, 1, true);
+    if (rank <= LEAGUE_UP && L.tier < LEAGUES.length - 1) L.tier++;
+    else if (rank > LEAGUE_SIZE - LEAGUE_DOWN && L.tier > 0) L.tier--;
+    const moved = L.tier > old ? tr(` Promoted to ${LEAGUES[L.tier].name[0]}!`, ` ${LEAGUES[L.tier].name[1]} లీగ్‌కి ప్రమోషన్!`) : L.tier < old ? tr(` Moved down to ${LEAGUES[L.tier].name[0]}.`, ` ${LEAGUES[L.tier].name[1]} లీగ్‌కి దిగారు.`) : '';
+    queueModal(() => `${ico(LEAGUES[old].icon, 'big-ico')}<h3>${tr('League week over!', 'లీగ్ వారం ముగిసింది!')}</h3>
+      <p>${tr(`You finished <b>#${rank}</b> in ${LEAGUES[old].name[0]} league.`, `${LEAGUES[old].name[1]} లీగ్‌లో <b>#${rank}</b> స్థానం.`)} +${P.gems} 💎${P.pack ? ' +1 📦' : ''}.${moved}</p>
+      <div class="modal-actions"><button class="btn gold" data-act="close">${tr('Great!', 'సూపర్!')}</button></div>`);
+  }
+  L.week = wk; L.pts = 0; L.lastRank = 0;
+  save();
+}
+function leagueCardHtml() {
+  leagueWeek();
+  const L = S.league, rows = leagueTable(), rank = myLeagueRank(rows), Lg = LEAGUES[L.tier];
+  const trend = L.lastRank && rank < L.lastRank ? '<i class="up">▲</i>' : L.lastRank && rank > L.lastRank ? '<i class="down">▼</i>' : '';
+  L.lastRank = rank;
+  const zone = r => r <= LEAGUE_UP ? 'up' : r > LEAGUE_SIZE - LEAGUE_DOWN ? 'down' : '';
+  const list = rows.map((r, i) => `<li class="${r.me ? 'me' : ''} ${zone(i + 1)}"><span>${i + 1}</span><b>${esc(r.name)}</b><em>${fmtInt(r.pts)}</em></li>`).join('');
+  const P = leaguePrize(rank);
+  return `<details class="league-card" id="leagueCard" ${leagueOpen ? 'open' : ''} ontoggle="leagueOpen = this.open"><summary>
+      ${ico(Lg.icon)}<b>${tr(...Lg.name)} ${tr('league', 'లీగ్')}</b>
+      <span class="lg-rank">#${rank}${trend}</span><small>${fmtInt(L.pts)} ${tr('pts', 'పాయింట్లు')} · ${tr('ends in', 'ముగింపు')} ${fmtDur(tourEndsIn())}</small></summary>
+    <p class="sub">${tr(`Top ${LEAGUE_UP} move up, bottom ${LEAGUE_DOWN} move down. Points: 1 per energy spun, boss 50, raid 20, landmark part 30, album set 100. Now: +${P.gems} 💎${P.pack ? ' +📦' : ''}.`, `టాప్ ${LEAGUE_UP} పైకి, చివరి ${LEAGUE_DOWN} కిందకి. పాయింట్లు: ప్రతి ఎనర్జీకి 1, బాస్ 50, దాడి 20, ల్యాండ్‌మార్క్ భాగం 30, ఆల్బమ్ సెట్ 100. ఇప్పుడు: +${P.gems} 💎${P.pack ? ' +📦' : ''}.`)}</p>
+    <ol class="lg-list">${list}</ol></details>`;
+}
 function updateSlotLive() {
   if (activeTab !== 'slots' || !$('slotEnergy')) return;
   slotRegen();
   $('slotEnergy').textContent = S.slot.energy;
   $('slotCoins').textContent = fmtInt(S.slot.coins);
-  $('slotTimer').textContent = S.slot.energy >= SLOT_MAX ? tr('Full', 'నిండింది') : `+1 ${tr('in', 'లో')} ${fmtClock(slotNextIn())}`;
+  $('slotTimer').textContent = S.slot.energy >= slotMax() ? tr('Full', 'నిండింది') : `+1 ${tr('in', 'లో')} ${fmtClock(slotNextIn())}`;
   $('piggyVal').textContent = fmtInt(S.slot.piggy);
   $('piggyBar').style.width = Math.min(100, S.slot.piggy / PIGGY_CAP * 100) + '%';
   const gb = $('giftBtn');
@@ -2114,10 +2220,11 @@ function slotSpin() {
     shake($('slotSpinBtn')); return;
   }
   slotBusy = true;
-  if (sl.energy >= SLOT_MAX) sl.at = Date.now(); // the refill clock starts when you drop below full
+  if (sl.energy >= slotMax()) sl.at = Date.now(); // the refill clock starts when you drop below full
   sl.energy -= bet;
   sl.piggy = Math.min(PIGGY_CAP, sl.piggy + 300 * bet);
   S.stats.slotSpins = (S.stats.slotSpins || 0) + 1;
+  addVip(bet); addLeague(bet);
   const line = [slotPick(), slotPick(), slotPick()];
   if (Math.random() < 0.18) line[1] = line[0]; // two of a kind a little more often, so it feels lively
   sl.last = line;
@@ -2155,6 +2262,8 @@ function slotFinish(line, bet) {
   slotCollect(line, bet, p);
   const rs = slotRaidSymbols(line);
   if (rs) { parts.push(rs); if ($('raidCard')) $('raidCard').outerHTML = raidCardHtml(); }
+  if ($('leagueCard')) $('leagueCard').outerHTML = leagueCardHtml();
+  if ($('vipCard')) $('vipCard').outerHTML = vipCardHtml();
   if (sl.boss.lvl !== lvlBefore) setTimeout(refreshSlotEvents, 900); else updateBossHp();
   if ($('colCard')) $('colCard').outerHTML = colCardHtml();
   const res = $('slotResult');
@@ -2402,7 +2511,7 @@ function buildPart() {
   S.slot.coins -= cost;
   const L = buildCurrent(), part = B.stage;
   B.stage++; B.view = null;
-  const cash = bonusCash(300 * (B.done + 1)); earn(cash); S.slot.energy += 5; giveAlbumPack('basic', 1, true);
+  const cash = bonusCash(300 * (B.done + 1)); earn(cash); S.slot.energy += 5; giveAlbumPack('basic', 1, true); addLeague(30);
   sfx('buy');
   toast(tr(`🏗️ ${L.parts[part][0]} built! +${money(cash)} cash, +5 ⚡, +1 📦`, `🏗️ ${L.parts[part][1]} పూర్తి! +${money(cash)} క్యాష్, +5 ⚡, +1 📦`), 'good');
   let finished = false;
@@ -2486,6 +2595,7 @@ function openPack(kind) {
   ALBUM_SETS.forEach((set, si) => {
     if (!A.sets[set.id] && setCount(si) === set.items.length) {
       A.sets[set.id] = true;
+      addLeague(100);
       const r = setReward(si);
       S.slot.coins += r.coins; S.gems += r.gems; S.slot.energy += r.energy;
       done.push(`${ico(set.icon)} ${tr(`${set.name[0]} complete! +${fmtInt(r.coins)} coins, +${r.gems} 💎, +${r.energy} ⚡, +5% profits`, `${set.name[1]} పూర్తి! +${fmtInt(r.coins)} కాయిన్లు, +${r.gems} 💎, +${r.energy} ⚡, +5% లాభాలు`)}`);
@@ -3349,7 +3459,7 @@ function updateDots() {
   $('dot-daily').classList.toggle('on', canClaimDaily());
   $('dot-spin').classList.toggle('on', spinReady());
   $('dot-scratch').classList.toggle('on', scratchFreeReady());
-  slotRegen(); $('dot-slots').classList.toggle('on', S.slot.energy >= SLOT_MAX || giftReady() || calReady() || S.raid.tokens > 0 || helpLeft());
+  slotRegen(); $('dot-slots').classList.toggle('on', S.slot.energy >= slotMax() || giftReady() || calReady() || S.raid.tokens > 0 || helpLeft());
   $('dot-album').classList.toggle('on', S.album.packs.basic + S.album.packs.gold > 0);
   $('dot-build').classList.toggle('on', !allBuilt() && S.slot.coins >= stageCost(S.build.done, S.build.stage));
   const hasPets = Object.keys(S.pets.owned).length > 0;
@@ -3638,6 +3748,7 @@ function frame(now) {
     if (activeTab === 'pets') updatePetTimer();
     updateSlotLive();
     if (activeTab === 'slots') raidSync(false);
+    leagueWeek();
     if (activeTab === 'stocks' && Math.floor(Date.now() / 60000) !== stockShownMinute) renderTab();
     if (activeTab === 'missions') updateMissionProgress();
     checkTourWeek();
