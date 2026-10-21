@@ -67,7 +67,7 @@
 
 <div id="app">
   <header class="topbar">
-    <button class="brand" data-act="tab" data-tab="worlds" title="Worlds">
+    <button class="brand" data-act="tab" data-tab="slots" title="Spin Game">
       <span class="brand-logo" id="worldIco"></span>
       <span class="brand-name">Business<b>Empire</b><small id="worldName">Earth</small></span>
     </button>
@@ -83,17 +83,11 @@
   </header>
 
   <nav class="side" id="nav">
-    <button class="tab-btn active" data-act="tab" data-tab="business"><span data-ico="office"></span><em data-t="Businesses|వ్యాపారాలు">Businesses</em></button>
-    <button class="tab-btn" data-act="tab" data-tab="slots"><span data-ico="slot"></span><em data-t="Spin Game|స్పిన్ గేమ్">Spin Game</em><i class="dot" id="dot-slots"></i></button>
+    <button class="tab-btn active" data-act="tab" data-tab="slots"><span data-ico="slot"></span><em data-t="Spin Game|స్పిన్ గేమ్">Spin Game</em><i class="dot" id="dot-slots"></i></button>
     <button class="tab-btn" data-act="tab" data-tab="build"><span data-ico="construction"></span><em data-t="Landmarks|ల్యాండ్‌మార్కులు">Landmarks</em><i class="dot" id="dot-build"></i></button>
     <button class="tab-btn" data-act="tab" data-tab="album"><span data-ico="album"></span><em data-t="Album|ఆల్బమ్">Album</em><i class="dot" id="dot-album"></i></button>
     <button class="tab-btn" data-act="tab" data-tab="missions"><span data-ico="clipboard"></span><em data-t="Missions|మిషన్లు">Missions</em><i class="dot" id="dot-missions"></i></button>
-    <button class="tab-btn" data-act="tab" data-tab="managers"><span data-ico="manager"></span><em data-t="Managers|మేనేజర్లు">Managers</em><i class="dot" id="dot-managers"></i></button>
-    <button class="tab-btn" data-act="tab" data-tab="upgrades"><span data-ico="up"></span><em data-t="Upgrades|అప్‌గ్రేడ్‌లు">Upgrades</em><i class="dot" id="dot-upgrades"></i></button>
-    <button class="tab-btn" data-act="tab" data-tab="investors"><span data-ico="necktie"></span><em data-t="Investors|ఇన్వెస్టర్లు">Investors</em><i class="dot" id="dot-investors"></i></button>
     <button class="tab-btn" data-act="tab" data-tab="pets"><span data-ico="paws"></span><em data-t="Pets|పెట్స్">Pets</em><i class="dot" id="dot-pets"></i></button>
-    <button class="tab-btn" data-act="tab" data-tab="stocks"><span data-ico="chart"></span><em data-t="Stocks|స్టాక్స్">Stocks</em></button>
-    <button class="tab-btn" data-act="tab" data-tab="worlds"><span data-ico="earth"></span><em data-t="Worlds|ప్రపంచాలు">Worlds</em><i class="dot" id="dot-worlds"></i></button>
     <button class="tab-btn" data-act="tab" data-tab="leaderboard"><span data-ico="trophy"></span><em data-t="Leaderboard|లీడర్‌బోర్డ్">Leaderboard</em></button>
     <button class="tab-btn" data-act="tab" data-tab="shop"><span data-ico="gem"></span><em data-t="Gem Shop|జెమ్ షాప్">Gem Shop</em></button>
     <button class="tab-btn" data-act="tab" data-tab="awards"><span data-ico="medal"></span><em data-t="Awards|అవార్డులు">Awards</em></button>
@@ -113,7 +107,7 @@
   </div>
 
   <main id="main">
-    <section class="tab active" id="tab-business">
+    <section class="tab" id="tab-business">
       <div class="buymode" id="buymode">
         <span data-t="Buy|కొను">Buy</span>
         <button data-act="buymode" data-mode="1">x1</button>
@@ -124,7 +118,7 @@
       </div>
       <div id="bizList" class="biz-list"></div>
     </section>
-    <section class="tab" id="tab-slots"></section>
+    <section class="tab active" id="tab-slots"></section>
     <section class="tab" id="tab-build"></section>
     <section class="tab" id="tab-album"></section>
     <section class="tab" id="tab-missions"></section>
