@@ -1295,3 +1295,42 @@ body.biz-off .cash-wrap { flex: 0 1 auto; width: auto; max-width: 340px; min-wid
 .city-chip small { color: #c6b8f2; font-size: 10px; }
 #modal .fact-card p { color: #3a2600; }
 .india-map .route { stroke-width: 2; }
+
+/* ---------- Spin page fits one screen: rails stay at the sides, reels size from the screen height ---------- */
+.sg { --cell: clamp(46px, calc((100dvh - 480px) / 3), 96px); }
+.bet-pill .bet-max { font-style: normal; font-size: 10px; font-weight: 700; opacity: .8; margin-top: 2px; }
+@media (max-width: 760px) {
+  .sg { --cell: clamp(44px, calc((100dvh - 450px) / 3), 86px); }
+  .sg-stage { grid-template-columns: 58px minmax(0, 1fr) 58px; gap: 6px; }
+  .sg-rail { flex-direction: column; overflow: visible; gap: 6px; padding: 0; }
+  #railLeft, .sg-center, #railRight { order: 0; }
+  .rail-btn { min-width: 0; flex: none; padding: 5px 2px 4px; }
+  .rail-btn .i3d { width: 26px; height: 26px; }
+  .rail-btn span { font-size: 9px; }
+  .rail-btn em { font-size: 9px; padding: 0 4px; }
+  .slot-machine.pro { padding: 0 6px 6px; border-width: 4px; }
+  .slot-machine.pro .reels { gap: 4px; padding: 4px; }
+  .reels-frame { padding: 4px; }
+  .marquee { width: 88%; }
+  .marquee span { font-size: 15px; letter-spacing: 1px; }
+  .sg-controls { gap: 6px; }
+  .bet-pill { min-width: 60px; padding: 5px 8px; }
+  .sg-cost b { font-size: 16px; }
+}
+@media (max-height: 820px) {
+  .spin-round { width: 96px; height: 96px; border-width: 5px; }
+  .spin-round b { font-size: 22px; }
+  .sg-controls { margin-top: 8px; }
+  .sg-top { margin-bottom: 6px; }
+  .slot-machine.pro .slot-result { margin-top: 4px; min-height: 20px; font-size: 14px; }
+}
+
+/* ---------- Album: claim finished sets, new album seasons ---------- */
+.set-claim { display: flex; align-items: center; gap: 10px; margin: 10px 0; padding: 10px 12px; border-radius: 14px; text-align: left; background: linear-gradient(180deg, #fff3c0, #ffd25a); color: #3a2600; box-shadow: 0 4px 0 #a06000; animation: tileIn .45s cubic-bezier(.2, 1.5, .4, 1) both; }
+.set-claim > .i3d { width: 44px; height: 44px; flex: none; }
+.set-claim div { flex: 1; display: flex; flex-direction: column; } .set-claim small .i3d { width: 14px; height: 14px; vertical-align: -2px; }
+.set-claim .btn { animation: spinIdle 2.2s ease-in-out infinite; }
+.album-set.ready { border-color: var(--gold) !important; box-shadow: 0 0 18px rgba(255, 210, 90, .55); }
+.as-claim { width: 100%; animation: spinIdle 2.2s ease-in-out infinite; } .as-claim .i3d { width: 18px; height: 18px; vertical-align: -4px; }
+.season-banner { display: flex; align-items: center; gap: 12px; margin: 0 0 12px; padding: 12px 16px; border-radius: 16px; background: linear-gradient(90deg, #ffd25a, #ff9a3d); color: #3a2000; }
+.season-banner .i3d { width: 40px; height: 40px; } .season-banner b { flex: 1; font-size: 18px; }

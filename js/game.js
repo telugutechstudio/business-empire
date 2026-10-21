@@ -4,7 +4,7 @@
    ===================================================================== */
 
 const SAVE_KEY = 'tycoonEmpire.save.v1';
-const GAME_VERSION = '4.7';
+const GAME_VERSION = '4.8';
 const BIZ_OFF = true; // businesses, managers, upgrades, investors, stocks and worlds are switched off
 const LB_URL = '/api/leaderboard';
 const CLOUD_URL = '/api/cloud';
@@ -394,8 +394,9 @@ function fmt(n) {
   if (v >= 999.995) { e++; v /= 1000; if (e >= SUF.length) return n.toExponential(2).replace('e+', 'e'); }
   return v.toFixed(v < 100 ? 2 : 1) + ' ' + SUF[e];
 }
-function money(n) { return fmt(n); }
-function fmtInt(n) { return n < 1e6 ? Math.floor(n).toLocaleString('en-US') : fmt(n); }
+function fullNum(n) { return Math.floor(n).toLocaleString('en-IN'); }
+function money(n) { return BIZ_OFF && Math.abs(n) < 1e18 ? (n < 0 ? '-' : '') + fullNum(Math.abs(n)) : fmt(n); }
+function fmtInt(n) { return BIZ_OFF || n < 1e6 ? fullNum(n) : fmt(n); }
 function fmtClock(s) {
   if (!isFinite(s)) return '--';
   if (s < 1) return s.toFixed(2) + 's';
@@ -523,7 +524,7 @@ function investorsAvailable() {
   const total = Math.floor(150 * Math.sqrt(S.lifetime / 1e13));
   return Math.max(0, total - S.investorsTotal);
 }
-function bonusCash(secs) { return BIZ_OFF ? Math.max(500, Math.round(secs * 10 * coinMult())) : Math.max(500, incomePerSec(false, false) * secs); }
+function bonusCash(secs) { return BIZ_OFF ? Math.max(100, Math.round(secs * 1.5 * cityScale() * spinMult())) : Math.max(500, incomePerSec(false, false) * secs); }
 
 /* ---------------------------- ACTIONS ------------------------------- */
 function runBiz(i) {
@@ -1752,7 +1753,14 @@ function revealScratch() {
 // from the clock (one step per minute), so no server is needed. Shares are kept per world.
 /* ---------------------------- SPIN GAME (slot machine) ------------- */
 // Energy refills over time; each spin costs energy times the bet and pays coins, cash, gems or energy.
-const SLOT_MAX = 50, SLOT_REGEN = 6 * 60 * 1000, SLOT_BETS = [1, 2, 3, 5, 10], PIGGY_GEMS = 10, PIGGY_CAP = 250000;
+const SLOT_MAX = 50, SLOT_REGEN = 6 * 60 * 1000, SLOT_BETS = [1, 2, 3, 4, 5, 10, 20, 30, 50, 100, 200, 400, 800], PIGGY_GEMS = 10;
+const BET_NEED = 4; // a bet unlocks once you hold 4× its energy cost
+function piggyCap() { return Math.round(40000 * cityScale() / 100) * 100; }
+function availBets() { return SLOT_BETS.filter(b => b === 1 || S.slot.energy >= b * BET_NEED); }
+function clampBet() { const a = availBets(); if (!a.includes(S.slot.bet)) S.slot.bet = a.filter(b => b <= S.slot.bet).pop() || 1; }
+const PRIZE = { coin3: 8000, cherry3: 4000, bag3: 6000, coin2: 1000, cherry2: 600, bag2: 800, other2: 250, none: 150 };
+function prizeUnit() { return cityScale() * spinMult(); }
+function prizeOf(k, bet = 1) { return Math.round(PRIZE[k] * bet * prizeUnit() / 10) * 10; }
 const SLOT_SYMS = [
   { k: 'coin', w: 30 }, { k: 'cherry', w: 22 }, { k: 'moneybag', w: 16 }, { k: 'bolt', w: 12 }, { k: 'pig', w: 8 }, { k: 'gem', w: 6 }, { k: 'swords', w: 14 }, { k: 'hammer', w: 9 }, { k: 'shield', w: 9 },
 ];
@@ -1778,38 +1786,38 @@ function slotPrize(line, bet) {
   const [top, n] = Object.entries(cnt).sort((a, b) => b[1] - a[1])[0];
   const p = { coins: 0, cash: 0, gems: 0, energy: 0, piggy: false, big: n === 3, small: n < 2 };
   if (n === 3) {
-    if (top === 'coin') p.coins = 20000 * bet;
-    if (top === 'cherry') p.coins = 10000 * bet;
-    if (top === 'moneybag') p.cash = bonusCash(900 * bet);
-    if (top === 'bolt') p.energy = 10 * bet;
+    if (top === 'coin') p.coins = prizeOf('coin3', bet);
+    if (top === 'cherry') p.coins = prizeOf('cherry3', bet);
+    if (top === 'moneybag') p.cash = prizeOf('bag3', bet);
+    if (top === 'bolt') p.energy = 8 * bet;
     if (top === 'pig') p.piggy = true;
-    if (top === 'gem') p.gems = 3 * bet;
+    if (top === 'gem') p.gems = 2 * bet;
   } else if (n === 2) {
-    if (top === 'coin') p.coins = 3000 * bet;
-    if (top === 'cherry') p.coins = 1500 * bet;
-    if (top === 'moneybag') p.cash = bonusCash(90 * bet);
+    if (top === 'coin') p.coins = prizeOf('coin2', bet);
+    if (top === 'cherry') p.coins = prizeOf('cherry2', bet);
+    if (top === 'moneybag') p.cash = prizeOf('bag2', bet);
     if (top === 'bolt') p.energy = bet;
-    if (top === 'pig' || top === 'gem') p.coins = 1000 * bet;
+    if (top === 'pig' || top === 'gem') p.coins = prizeOf('other2', bet);
     if (top === 'swords') p.small = false;
-    if (top === 'hammer' || top === 'shield') p.coins = 1000 * bet;
-  } else p.coins = 500 * bet; // a little something every spin
+    if (top === 'hammer' || top === 'shield') p.coins = prizeOf('other2', bet);
+  } else p.coins = prizeOf('none', bet); // a little something every spin
   return p;
 }
 function slotPaytableHtml() {
   const rows = [
-    ['coin', tr('20,000 coins', '20,000 కాయిన్లు'), tr('3,000 coins', '3,000 కాయిన్లు')],
-    ['cherry', tr('10,000 coins', '10,000 కాయిన్లు'), tr('1,500 coins', '1,500 కాయిన్లు')],
-    ['moneybag', tr('15 min of income', '15 నిమిషాల ఆదాయం'), tr('1.5 min of income', '1.5 నిమిషాల ఆదాయం')],
-    ['bolt', tr('+10 energy', '+10 ఎనర్జీ'), tr('energy back', 'ఎనర్జీ తిరిగి')],
-    ['pig', tr('Piggy bank opens free!', 'పిగ్గీ బ్యాంక్ ఫ్రీగా తెరుచుకుంటుంది!'), tr('1,000 coins', '1,000 కాయిన్లు')],
-    ['gem', tr('3 gems', '3 జెమ్స్'), tr('1,000 coins', '1,000 కాయిన్లు')],
-    ['hammer', tr('Raid another village!', 'ఇంకో ఊరిపై దాడి!'), tr('1,000 coins', '1,000 కాయిన్లు')],
-    ['shield', tr('+1 shield (max 3)', '+1 షీల్డ్ (3 వరకు)'), tr('1,000 coins', '1,000 కాయిన్లు')],
+    ['coin', fmtInt(prizeOf('coin3')), fmtInt(prizeOf('coin2'))],
+    ['cherry', fmtInt(prizeOf('cherry3')), fmtInt(prizeOf('cherry2'))],
+    ['moneybag', fmtInt(prizeOf('bag3')), fmtInt(prizeOf('bag2'))],
+    ['bolt', tr('+8 energy', '+8 ఎనర్జీ'), tr('energy back', 'ఎనర్జీ తిరిగి')],
+    ['pig', tr('Piggy bank opens free!', 'పిగ్గీ బ్యాంక్ ఫ్రీగా తెరుచుకుంటుంది!'), fmtInt(prizeOf('other2'))],
+    ['gem', tr('2 gems', '2 జెమ్స్'), fmtInt(prizeOf('other2'))],
+    ['hammer', tr('Raid another village!', 'ఇంకో ఊరిపై దాడి!'), fmtInt(prizeOf('other2'))],
+    ['shield', tr('+1 shield (max 3)', '+1 షీల్డ్ (3 వరకు)'), fmtInt(prizeOf('other2'))],
     ['swords', tr('Critical hit: 100 × bet damage', 'క్రిటికల్ హిట్: 100 × బెట్ దెబ్బ'), tr('Each ⚔️ hits the boss for 10 × bet', 'ప్రతి ⚔️ బాస్‌కి 10 × బెట్ దెబ్బ')],
   ];
   return `<div class="paytable"><div class="pt-head"><span>${tr('Symbol', 'గుర్తు')}</span><span>×3</span><span>×2</span></div>` +
     rows.map(([k, a, b]) => `<div class="pt-row"><span>${ico(k)}${ico(k)}${ico(k)}</span><span>${a}</span><span>${b}</span></div>`).join('') +
-    `<p class="sub">${tr('Every prize is multiplied by your bet. Any other spin still pays 500 coins × bet.', 'ప్రతి బహుమతి మీ బెట్‌తో గుణించబడుతుంది. మిగతా ప్రతి స్పిన్‌కి 500 కాయిన్లు × బెట్.')}</p></div>`;
+    `<p class="sub">${tr(`Coins for bet ×1 in ${CITIES[Math.min(S.city.i, CITIES.length - 1)].name[0]}. Every prize is multiplied by your bet, and prizes grow in each new city. Any other spin pays ${fmtInt(prizeOf('none'))} × bet.`, `${CITIES[Math.min(S.city.i, CITIES.length - 1)].name[1]} లో బెట్ ×1 కి కాయిన్లు. ప్రతి బహుమతి బెట్‌తో గుణించబడుతుంది, కొత్త నగరంలో బహుమతులు పెరుగుతాయి. మిగతా స్పిన్‌కి ${fmtInt(prizeOf('none'))} × బెట్.`)}</p></div>`;
 }
 function reelHtml(k, i) {
   return `<div class="reel" id="reel${i}"><div class="strip" id="strip${i}">${[slotPick(), k, slotPick()].map(x => `<div class="sym">${ico(x)}</div>`).join('')}</div></div>`;
@@ -1852,9 +1860,9 @@ function claimGift() {
   let msg = tr(`🎁 +${ge} energy!`, `🎁 +${ge} ఎనర్జీ!`);
   if (g.chest >= CHEST_SIZE) {
     g.chest = 0;
-    const coins = 50000, gems = 10;
-    earn(coins); S.gems += gems; S.slot.energy += 20; giveAlbumPack('basic', 1, true);
-    msg = tr(`🧰 Treasure chest! +${fmtInt(coins)} coins, +${gems} 💎, +20 ⚡, +1 📦`, `🧰 నిధి పెట్టె! +${fmtInt(coins)} కాయిన్లు, +${gems} 💎, +20 ⚡, +1 📦`);
+    const coins = Math.round(5000 * cityScale() / 100) * 100, gems = 5;
+    earn(coins); S.gems += gems; S.slot.energy += 10; giveAlbumPack('basic', 1, true);
+    msg = tr(`🧰 Treasure chest! +${fmtInt(coins)} coins, +${gems} 💎, +10 ⚡, +1 📦`, `🧰 నిధి పెట్టె! +${fmtInt(coins)} కాయిన్లు, +${gems} 💎, +10 ⚡, +1 📦`);
     confetti($('giftCard'), 120); sfx('win');
   } else sfx('cash');
   toast(msg, 'good');
@@ -1880,7 +1888,7 @@ const BOSSES = [
 ];
 function bossMaxHp(lvl) { return Math.round(300 * Math.pow(1.6, lvl - 1) / 10) * 10; }
 function bossOf(lvl) { return BOSSES[(lvl - 1) % BOSSES.length]; }
-function bossReward(lvl) { return { coins: 30000 * lvl, gems: 4 + lvl, energy: 15 }; }
+function bossReward(lvl) { return { coins: Math.round(4000 * lvl * cityScale() / 100) * 100, gems: 2 + Math.ceil(lvl / 2), energy: 8 }; }
 function bossCardHtml() {
   const b = S.slot.boss, B = bossOf(b.lvl), max = bossMaxHp(b.lvl), r = bossReward(b.lvl);
   return `<div class="boss-card" id="bossCard">
@@ -1927,7 +1935,7 @@ const COL_ITEMS = [
   { icon: 'diya', name: ['Festival of lights', 'దీపాల పండుగ'] },
 ];
 const COL_STEPS = [
-  { at: 100, energy: 10 }, { at: 300, coins: 25000 }, { at: 600, gems: 5 }, { at: 1000, energy: 30 }, { at: 1500, coins: 120000, gems: 15 },
+  { at: 100, energy: 10 }, { at: 300, coins: 8000 }, { at: 600, gems: 5 }, { at: 1000, energy: 15 }, { at: 1500, coins: 40000, gems: 10 },
 ];
 function colWeek() {
   const C = S.slot.col, wk = tourWeekKey();
@@ -2006,7 +2014,7 @@ async function raidSync(force) {
 function botTargets() {
   const names = BOT_NAMES.slice().sort(() => Math.random() - 0.5).slice(0, 4);
   return names.map((n, k) => ({ id: 'bot-' + k, bot: true, name: tr(`${n}'s village`, `${n} గారి ఊరు`), lm: Math.max(0, landmarksDone() + Math.floor(rand(-1, 2))),
-    coins: Math.floor(Math.max(20000, S.cash * rand(0.4, 1.6)) + 20000 * landmarksDone()), shield: Math.random() < 0.25 }));
+    coins: Math.floor(rand(20000, 60000) * cityScale()), shield: Math.random() < 0.25 }));
 }
 async function loadTargets() {
   raidTargets = null;
@@ -2049,11 +2057,12 @@ async function raidGo(i) {
   if (!res.blocked) addLeague(20);
   let html;
   if (res.blocked) {
-    const coins = 3000 * (1 + landmarksDone()); earn(coins);
+    const coins = Math.round(1500 * cityScale() / 100) * 100; earn(coins);
     raidLog(tr(`🛡️ ${t.name} blocked your raid (+${fmtInt(coins)} for trying)`, `🛡️ ${t.name} మీ దాడిని ఆపారు (ప్రయత్నానికి +${fmtInt(coins)})`));
     html = `${ico('shield', 'big-ico')}<h3>${tr('Blocked!', 'ఆపేశారు!')}</h3><p>${tr(`${esc(t.name)} had a shield. You still get ${fmtInt(coins)} coins for trying.`, `${esc(t.name)} దగ్గర షీల్డ్ ఉంది. ప్రయత్నానికి ${fmtInt(coins)} కాయిన్లు.`)}</p>`;
     sfx('err');
   } else {
+    res.amt = Math.min(res.amt, Math.round(9000 * cityScale())); // a raid never pays more than a good spin streak
     earn(res.amt);
     raidLog(tr(`🔨 You raided ${t.name}: +${fmtInt(res.amt)} coins`, `🔨 ${t.name} మీద దాడి: +${fmtInt(res.amt)} కాయిన్లు`));
     html = `${ico('moneybag', 'big-ico')}<h3>${tr('Great raid!', 'భలే దాడి!')}</h3><div class="stat-big">+${fmtInt(res.amt)} ${ico('coin')}</div>`;
@@ -2265,7 +2274,7 @@ function railsHtml() {
     railBtn('boss', bossOf(b.lvl).icon, tr('Boss', 'బాస్'), `${Math.round(Math.max(0, b.hp) / max * 100)}%`, false, 'railBoss'),
     railBtn('event', it.icon, tr('Event', 'ఈవెంట్'), `${Math.min(100, Math.round(C.n / colMax * 100))}%`, false, 'railEvent'),
     railBtn('village', 'shield', tr('Village', 'ఊరు'), `${S.raid.shields}/${SHIELD_MAX}`, S.raid.tokens > 0 || helpLeft(), 'railVillage'),
-    railBtn('piggy', 'pig', tr('Piggy', 'పిగ్గీ'), `${Math.round(S.slot.piggy / PIGGY_CAP * 100)}%`, S.slot.piggy >= PIGGY_CAP, 'railPiggy'),
+    railBtn('piggy', 'pig', tr('Piggy', 'పిగ్గీ'), `${Math.round(S.slot.piggy / piggyCap() * 100)}%`, S.slot.piggy >= piggyCap(), 'railPiggy'),
   ].join('');
   const right = [
     railBtn('gift', 'gift', tr('Gift', 'గిఫ్ట్'), giftReady() ? tr('Free!', 'ఫ్రీ!') : fmtClock(giftIn()).replace(/^00:/, ''), giftReady()),
@@ -2280,7 +2289,7 @@ function sgOpen(kind) {
   const piggy = () => `<div class="piggy-card">
       <div class="piggy-ico">${ico('pig')}</div>
       <div class="info"><div class="title">${tr('Piggy bank', 'పిగ్గీ బ్యాంక్')} · ${fmtInt(S.slot.piggy)} ${tr('coins', 'కాయిన్లు')}</div>
-        <div class="mbar"><div style="width:${Math.min(100, S.slot.piggy / PIGGY_CAP * 100)}%"></div></div>
+        <div class="mbar"><div style="width:${Math.min(100, S.slot.piggy / piggyCap() * 100)}%"></div></div>
         <div class="desc">${tr('Every spin drops coins in. Break it with gems, or hit 🐷🐷🐷 to open it free.', 'ప్రతి స్పిన్‌కి కాయిన్లు పడతాయి. జెమ్స్‌తో పగలగొట్టండి, లేదా 🐷🐷🐷 వస్తే ఫ్రీ.')}</div></div>
       <button class="btn blue" data-act="piggy-break" data-gems="${PIGGY_GEMS}">💎 ${PIGGY_GEMS}</button></div>`;
   const html = { boss: bossCardHtml, event: colCardHtml, village: raidCardHtml, piggy, gift: giftCardHtml, cal: calCardHtml,
@@ -2294,9 +2303,9 @@ function spinBtnHtml() {
   if (slotAuto) return `<b>${tr('STOP', 'ఆపు')}</b><small>${tr('auto spinning', 'ఆటో స్పిన్')}</small>`;
   return `<b>${tr('SPIN', 'స్పిన్')}</b><small>${tr('hold for auto', 'ఆటో కోసం పట్టుకోండి')}</small>`;
 }
-function betBtnHtml() { return `<small>${tr('BET', 'బెట్')}</small><b>×${S.slot.bet}</b>`; }
+function betBtnHtml() { return `<small>${tr('BET', 'బెట్')}</small><b>×${S.slot.bet}</b><i class="bet-max">${tr('max', 'గరిష్ఠం')} ×${availBets().slice(-1)[0]}</i>`; }
 function renderSlots() {
-  slotRegen();
+  slotRegen(); clampBet();
   const sl = S.slot, last = sl.last || ['coin', 'cherry', 'moneybag'], R = railsHtml(), pct = Math.min(100, sl.energy / slotMax() * 100);
   return `<div class="sg">
     <div class="sg-top">
@@ -2335,8 +2344,10 @@ function updateSlotLive() {
 }
 function slotSetBet() {
   if (slotBusy) return;
-  const i = SLOT_BETS.indexOf(S.slot.bet);
-  S.slot.bet = SLOT_BETS[(i + 1) % SLOT_BETS.length];
+  const a = availBets(), i = a.indexOf(S.slot.bet);
+  S.slot.bet = a[(i + 1) % a.length];
+  const nextLock = SLOT_BETS.find(b => !a.includes(b));
+  if (S.slot.bet === a[a.length - 1] && nextLock) toast(tr(`Bet ×${nextLock} unlocks at ${nextLock * BET_NEED} ⚡`, `బెట్ ×${nextLock} కి ${nextLock * BET_NEED} ⚡ కావాలి`), 'info');
   SlotFX.press();
   $('slotBetBtn').innerHTML = betBtnHtml();
   restartAnim($('slotBetBtn'), 'pop');
@@ -2359,7 +2370,8 @@ function slotTap() {
 }
 function slotSpin() {
   if (slotBusy || activeTab !== 'slots' || !$('strip0')) return;
-  slotRegen();
+  slotRegen(); clampBet();
+  if ($('slotBetBtn')) { $('slotBetBtn').innerHTML = betBtnHtml(); $('slotCost').textContent = `${S.slot.bet} ⚡`; }
   const sl = S.slot, bet = sl.bet;
   if (sl.energy < bet) {
     shake($('slotSpinBtn')); showOutOfEnergy(); return;
@@ -2367,7 +2379,7 @@ function slotSpin() {
   slotBusy = true;
   if (sl.energy >= slotMax()) sl.at = Date.now(); // the refill clock starts when you drop below full
   sl.energy -= bet;
-  sl.piggy = Math.min(PIGGY_CAP, sl.piggy + 300 * bet);
+  sl.piggy = Math.min(piggyCap(), sl.piggy + Math.round(60 * bet * cityScale()));
   S.stats.slotSpins = (S.stats.slotSpins || 0) + 1;
   addVip(bet); addLeague(bet);
   const line = [slotPick(), slotPick(), slotPick()];
@@ -2538,7 +2550,7 @@ function slotFinish(line, bet) {
       showBigWin(`${tr('JACKPOT!', 'జాక్‌పాట్!')}<small>${coinWin ? `+${fmtInt(coinWin)} ${ico('coin')}` : parts.join(' · ')}</small>`, true);
     } else if (!p.small || swords) {
       machine.classList.add('won');
-      if (coinWin >= 8000 * bet) { SlotFX.big(); showBigWin(`${tr('BIG WIN!', 'బిగ్ విన్!')}<small>+${fmtInt(coinWin)} ${ico('coin')}</small>`); } else SlotFX.small();
+      if (coinWin >= prizeOf('cherry3', bet) * 0.9) { SlotFX.big(); showBigWin(`${tr('BIG WIN!', 'బిగ్ విన్!')}<small>+${fmtInt(coinWin)} ${ico('coin')}</small>`); } else SlotFX.small();
     }
   }
   flySpinRewards(line, p, { coins: coinWin, pack: sl.boss.lvl !== lvlBefore });
@@ -2782,7 +2794,7 @@ const INDIA_LL = [[74.4, 34.8], [75.5, 35.8], [77.5, 35.6], [78.6, 34.3], [79.0,
   [76.6, 8.9], [76.0, 10.5], [75.3, 12.3], [74.6, 14.5], [73.7, 16.0], [73.0, 18.5], [72.8, 19.5], [72.7, 21.1], [72.2, 21.7], [72.5, 22.3], [70.9, 20.8], [69.0, 22.3], [70.0, 23.0], [68.4, 23.6],
   [68.8, 24.3], [71.0, 24.4], [70.6, 25.7], [70.0, 26.6], [70.5, 27.9], [72.5, 29.9], [73.9, 30.4], [74.5, 31.0], [74.6, 32.0], [75.0, 32.5], [74.2, 33.0], [73.7, 34.3]];
 for (const k in LANDMARKS) LANDMARKS[k].id = k;
-const LANDMARK_BONUS = 0.1, HEX_R = 1.15;
+const LANDMARK_BONUS = 0.03, HEX_R = 1.15;
 const LM_CENTERS = [[0, 0], [3, -1], [-2, 3], [-3, 0]];
 const NB = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, -1], [-1, 1]];
 const hexPos = (q, r) => ({ x: HEX_R * Math.sqrt(3) * (q + r / 2), z: HEX_R * 1.5 * r });
@@ -2813,9 +2825,11 @@ function cityPlan(ci) {
   return (PLAN[ci] = { tasks, centers });
 }
 function hashKind([q, r], ci) { const h = Math.abs((q * 73856093) ^ (r * 19349663) ^ (ci * 83492791)) % 10; return h < 4 ? 'tree' : h < 7 ? 'house' : h < 8 ? 'rock' : h < 9 ? 'palm' : 'bush'; }
-function cityBase(ci) { return 15000 * Math.pow(2.2, ci); }
-function taskCost(ci, t) { const b = cityBase(ci) * Math.pow(1.6, t.li); return Math.round((t.type === 'part' ? b * (1 + 0.35 * t.k) : b * 0.2) / 100) * 100; }
-function taskReward(ci, t) { return t.gift ? { coins: Math.round(taskCost(ci, t) * 1.5 / 100) * 100, energy: 8 } : null; }
+// Prices and prizes both scale by 1.8× per city
+function cityScale(ci = S.city ? S.city.i : 0) { return Math.pow(1.8, Math.min(ci, CITIES.length - 1)); }
+function spinMult() { return landmarkBonus() * albumBonus() * petBonus('profit'); }
+function taskCost(ci, t) { return Math.round(3000 * Math.pow(1.8, ci + t.i / cityPlan(ci).tasks.length) / 100) * 100; }
+function taskReward(ci, t) { return t.gift ? { coins: Math.round(taskCost(ci, t) * 0.6 / 100) * 100, energy: 3 } : null; }
 function taskName(ci, t) {
   if (t.type === 'part') { const L = LANDMARKS[CITIES[ci].lms[t.li]]; return `${tr(...L.name)}: ${tr(...lmParts(L)[t.k])}`; }
   return { tree: tr('Trees', 'చెట్లు'), house: tr('House', 'ఇల్లు'), rock: tr('Rock garden', 'రాతి తోట'), palm: tr('Palm trees', 'కొబ్బరి చెట్లు'), bush: tr('Garden', 'తోట') }[t.kind];
@@ -3406,7 +3420,7 @@ function renderBuild() {
       bottom = `<div class="task-card">
         <button class="tc-ico" data-act="lm-info" data-id="${lmId}" title="${esc(tr('About this place', 'ఈ ప్రదేశం గురించి'))}">${ico(taskIcon(ci, t))}<span class="tc-learn">${ico('book')}</span></button>
         <div class="tc-info"><small>${tr('Next task', 'తర్వాతి పని')}</small><b>${taskName(ci, t)}</b>
-          ${rw ? `<span class="tc-gift">${ico('gift')} +${fmtInt(rw.coins)} ${ico('coin')} +${rw.energy} ⚡</span>` : t.type === 'part' ? `<span class="tc-gift">+5 ⚡ +1 ${ico('pack')}</span>` : ''}</div>
+          ${rw ? `<span class="tc-gift">${ico('gift')} +${fmtInt(rw.coins)} ${ico('coin')} +${rw.energy} ⚡</span>` : t.type === 'part' ? `<span class="tc-gift">+2 ⚡ +1 ${ico('pack')}</span>` : ''}</div>
         <button class="btn ${ok ? 'gold' : 'ghost'} tc-build" data-act="build-part" ${ok ? '' : 'disabled'}><b>${tr('Build', 'కట్టు')}</b><small>${ico('coin')} ${fmtInt(cost)}</small></button>
         ${ok ? '' : `<button class="btn blue tc-get" data-act="tab" data-tab="slots">${ico('slot')}</button>`}
       </div>`;
@@ -3466,7 +3480,7 @@ function openBuildParts() {
   modal(`<h3>${ico('book')} ${tr(`Learn about ${C.name[0]}`, `${C.name[1]} గురించి నేర్చుకో`)}</h3>
     <p class="sub city-fact">${tr(...C.fact)}</p>
     <div class="parts-list">${rows}</div>
-    <p class="sub">${tr('Each finished landmark gives gems, energy, a gold pack and +10% on all prizes. Answer its quiz for +10 gems!', 'పూర్తయిన ప్రతి కట్టడం: జెమ్స్, ఎనర్జీ, గోల్డ్ ప్యాక్, అన్ని బహుమతులు +10%. క్విజ్ సరిగ్గా చెబితే +10 జెమ్స్!')}</p>
+    <p class="sub">${tr(`Each finished landmark gives coins, gems, energy, a gold pack and +${LANDMARK_BONUS * 100}% on all prizes. Answer its quiz for +10 gems!`, `పూర్తయిన ప్రతి కట్టడం: కాయిన్లు, జెమ్స్, ఎనర్జీ, గోల్డ్ ప్యాక్, అన్ని బహుమతులు +${LANDMARK_BONUS * 100}%. క్విజ్ సరిగ్గా చెబితే +10 జెమ్స్!`)}</p>
     <div class="modal-actions"><button class="btn ghost" data-act="close">${tr('Close', 'మూసివేయి')}</button></div>`);
 }
 const lmYear = L => Array.isArray(L.y) ? tr(...L.y) : L.y;
@@ -3524,7 +3538,7 @@ function buildPart() {
   const rw = taskReward(ci, t);
   if (rw) { earn(rw.coins); S.slot.energy += rw.energy; flyTo('coins', from, 'coin', 6); toast(tr(`🎁 Gift! +${fmtInt(rw.coins)} coins, +${rw.energy} ⚡`, `🎁 బహుమతి! +${fmtInt(rw.coins)} కాయిన్లు, +${rw.energy} ⚡`), 'good'); SlotFX.big(); }
   else SlotFX.land('pop');
-  if (t.type === 'part') { S.slot.energy += 5; giveAlbumPack('basic', 1, true); flyTo('pack', from, 'pack', 1); }
+  if (t.type === 'part') { S.slot.energy += 2; giveAlbumPack('basic', 1, true); flyTo('pack', from, 'pack', 1); }
   sfx('buy');
   const lmId = CITIES[ci].lms[t.li];
   const lmDone = t.type === 'part' && t.k === 4 ? lmId : null;
@@ -3540,23 +3554,24 @@ function buildPart() {
   else if (t.type === 'part' && t.k === 0) setTimeout(() => { if ($('modal').classList.contains('hidden')) lmInfo(lmId); }, 1000);
 }
 function landmarkCelebration(id, thenCity) {
-  const L = LANDMARKS[id], n = landmarksDone(), gems = 20 * n, bonus = bonusCash(3600 * n);
-  S.gems += gems; S.slot.energy += 25; earn(bonus); giveAlbumPack('gold', 1, true); save();
+  const L = LANDMARKS[id], ci = CITIES.findIndex(C => C.lms.includes(id)), li = CITIES[ci].lms.indexOf(id);
+  const last = cityPlan(ci).tasks.find(t => t.type === 'part' && t.li === li && t.k === 4), gems = 10, bonus = Math.round(taskCost(ci, last) * 2 / 100) * 100;
+  S.gems += gems; S.slot.energy += 10; earn(bonus); giveAlbumPack('gold', 1, true); save();
   SlotFX.jackpot(); confetti($('buildView'), 240);
   const tile = (icon, big, small, k) => `<div class="lm-tile" style="animation-delay:${0.25 + k * 0.15}s">${ico(icon)}<b>${big}</b><small>${small}</small></div>`;
   modal(`<div class="lm-done"><div class="lm-rays"></div>${ico(L.icon, 'big-ico')}</div>
     <h3>${tr(`${L.name[0]} is complete!`, `${L.name[1]} పూర్తయింది!`)}</h3>
-    <div class="lm-tiles">${tile('coin', fmtInt(bonus), tr('coins', 'కాయిన్లు'), 0)}${tile('gem', gems, tr('gems', 'జెమ్స్'), 1)}${tile('bolt', 25, tr('energy', 'ఎనర్జీ'), 2)}${tile('pack', 1, tr('gold pack', 'గోల్డ్ ప్యాక్'), 3)}${tile('chart', '+' + LANDMARK_BONUS * 100 + '%', tr('all prizes', 'అన్ని బహుమతులు'), 4)}</div>
+    <div class="lm-tiles">${tile('coin', fmtInt(bonus), tr('coins', 'కాయిన్లు'), 0)}${tile('gem', gems, tr('gems', 'జెమ్స్'), 1)}${tile('bolt', 10, tr('energy', 'ఎనర్జీ'), 2)}${tile('pack', 1, tr('gold pack', 'గోల్డ్ ప్యాక్'), 3)}${tile('chart', '+' + LANDMARK_BONUS * 100 + '%', tr('all prizes', 'అన్ని బహుమతులు'), 4)}</div>
     ${factHtml(L)}${quizHtml(id)}
     <div class="modal-actions"><button class="btn gold lm-next" data-act="lm-next" data-id="${thenCity ? 'city' : ''}">${tr('Collect!', 'తీసుకో!')}</button></div>`);
 }
 function cityCelebration() {
-  const C = CITIES[S.city.i], next = CITIES[S.city.i + 1], gems = 50, energy = 50;
-  S.gems += gems; S.slot.energy += energy; giveAlbumPack('gold', 2, true); save();
+  const C = CITIES[S.city.i], next = CITIES[S.city.i + 1], gems = 25, energy = 20;
+  S.gems += gems; S.slot.energy += energy; giveAlbumPack('gold', 1, true); save();
   SlotFX.jackpot(); confetti($('buildView'), 300);
   modal(`<div class="lm-done"><div class="lm-rays"></div>${ico('worldmap', 'big-ico')}</div>
     <h3>${tr(`${C.name[0]} is complete!`, `${C.name[1]} పూర్తయింది!`)}</h3>
-    <div class="lm-tiles">${[['gem', gems, tr('gems', 'జెమ్స్')], ['bolt', energy, tr('energy', 'ఎనర్జీ')], ['pack', 2, tr('gold packs', 'గోల్డ్ ప్యాక్‌లు')]].map(([i, b, sm], k) => `<div class="lm-tile" style="animation-delay:${0.25 + k * 0.15}s">${ico(i)}<b>${b}</b><small>${sm}</small></div>`).join('')}</div>
+    <div class="lm-tiles">${[['gem', gems, tr('gems', 'జెమ్స్')], ['bolt', energy, tr('energy', 'ఎనర్జీ')], ['pack', 1, tr('gold pack', 'గోల్డ్ ప్యాక్')]].map(([i, b, sm], k) => `<div class="lm-tile" style="animation-delay:${0.25 + k * 0.15}s">${ico(i)}<b>${b}</b><small>${sm}</small></div>`).join('')}</div>
     <p class="sub">${next ? tr(`Next stop: <b>${next.name[0]}</b>`, `తర్వాతి నగరం: <b>${next.name[1]}</b>`) : tr('You built every city! More coming soon.', 'అన్ని నగరాలూ కట్టేశారు! మరిన్ని త్వరలో.')}</p>
     <div class="modal-actions"><button class="btn gold lm-next" data-act="city-next">${next ? tr(`Travel to ${next.name[0]} ✈️`, `${next.name[1]} కి వెళ్ళు ✈️`) : tr('Great!', 'సూపర్!')}</button></div>`);
 }
@@ -3583,33 +3598,75 @@ const ALBUM_SETS = [
     ['moon', 'Moon', 'చంద్రుడు', 1], ['comet', 'Comet', 'తోకచుక్క', 1], ['telescope', 'Telescope', 'టెలిస్కోప్', 1], ['satellite', 'Satellite', 'ఉపగ్రహం', 2], ['mars', 'Saturn', 'శని గ్రహం', 2],
     ['space', 'Rocket', 'రాకెట్', 2], ['alien', 'Alien', 'ఏలియన్', 3], ['ufo', 'UFO', 'యూఎఫ్‌ఓ', 4], ['galaxy', 'Galaxy', 'పాలపుంత', 5]] },
 ];
+// A finished album starts a new season with fresh sticker sets
+const ALBUM_SEASONS = [
+  { name: ['Village to Space', 'పల్లె నుంచి అంతరిక్షం'], sets: ALBUM_SETS },
+  { name: ['India Explorer', 'భారత యాత్ర'], sets: [
+    { id: 'faith', icon: 'htemple', name: ['Temples & Faith', 'ఆలయాలు, విశ్వాసం'], items: [
+      ['diya', 'Diya', 'దీపం', 1], ['bell', 'Temple bell', 'గుడి గంట', 1], ['lotus', 'Lotus', 'కమలం', 1], ['om', 'Om', 'ఓం', 2], ['worship', 'Prayer', 'ప్రార్థన', 2],
+      ['church', 'Church', 'చర్చి', 2], ['khanda', 'Gurudwara', 'గురుద్వారా', 3], ['mosque', 'Mosque', 'మసీదు', 4], ['htemple', 'Gopuram', 'గోపురం', 5]] },
+    { id: 'monuments', icon: 'classical', name: ['Monuments', 'కట్టడాలు'], items: [
+      ['train', 'Railway', 'రైల్వే', 1], ['bridge', 'Bridge', 'వంతెన', 1], ['fountain', 'Fountain', 'ఫౌంటెన్', 1], ['city', 'City', 'నగరం', 2], ['stadium', 'Stadium', 'స్టేడియం', 2],
+      ['lighttower', 'Tower', 'టవర్', 2], ['castle', 'Fort', 'కోట', 3], ['crown', 'Palace', 'ప్యాలెస్', 4], ['classical', 'Monument', 'స్మారకం', 5]] },
+    { id: 'nature', icon: 'mountain', name: ['Nature', 'ప్రకృతి'], items: [
+      ['seedling', 'Sprout', 'మొలక', 1], ['tree', 'Banyan tree', 'మర్రి చెట్టు', 1], ['hibiscus', 'Hibiscus', 'మందార', 1], ['beach', 'Beach', 'బీచ్', 2], ['sunrise', 'Sunrise', 'సూర్యోదయం', 2],
+      ['island', 'Island', 'దీవి', 2], ['desert', 'Thar desert', 'థార్ ఎడారి', 3], ['volcano', 'Volcano', 'అగ్నిపర్వతం', 4], ['mountain', 'Himalayas', 'హిమాలయాలు', 5]] },
+    { id: 'wild', icon: 'elephant', name: ['Wild India', 'అడవి జంతువులు'], items: [
+      ['rabbit', 'Rabbit', 'కుందేలు', 1], ['owl', 'Owl', 'గుడ్లగూబ', 1], ['fox', 'Fox', 'నక్క', 1], ['camel', 'Camel', 'ఒంటె', 2], ['monkey', 'Langur', 'కొండముచ్చు', 2],
+      ['panda', 'Red panda', 'రెడ్ పాండా', 2], ['turtle', 'Sea turtle', 'సముద్ర తాబేలు', 3], ['elephant', 'Tusker', 'దంతాల ఏనుగు', 4], ['tiger', 'Bengal tiger', 'బెంగాల్ పులి', 5]] },
+    { id: 'games', icon: 'trophy', name: ['Fun & Games', 'ఆటలు, సరదాలు'], items: [
+      ['kite', 'Kite', 'గాలిపటం', 1], ['balloon', 'Balloon', 'బెలూన్', 1], ['ticket', 'Ticket', 'టికెట్', 1], ['wheel', 'Giant wheel', 'జెయింట్ వీల్', 2], ['slot', 'Slot machine', 'స్లాట్ మెషిన్', 2],
+      ['medal', 'Medal', 'పతకం', 2], ['party', 'Party', 'పార్టీ', 3], ['fireworks', 'Fireworks', 'బాణసంచా', 4], ['trophy', 'Trophy', 'ట్రోఫీ', 5]] },
+    { id: 'sweets', icon: 'candy', name: ['Tea & Sweets', 'టీ, స్వీట్లు'], items: [
+      ['tea', 'Chai', 'ఛాయ్', 1], ['coffee', 'Filter coffee', 'ఫిల్టర్ కాఫీ', 1], ['mango', 'Mango', 'మామిడి', 1], ['coconut', 'Coconut water', 'కొబ్బరి నీళ్ళు', 2], ['bakery', 'Bun', 'బన్', 2],
+      ['doughnut', 'Jalebi', 'జిలేబీ', 2], ['custard', 'Kheer', 'పాయసం', 3], ['curry', 'Biryani', 'బిర్యానీ', 4], ['candy', 'Laddu', 'లడ్డూ', 5]] },
+  ] },
+];
 const STICKER_W = { 1: 40, 2: 24, 3: 14, 4: 7, 5: 3 }; // how often each star level drops
 const PACKS = { basic: { n: 3, gems: 5, name: ['Basic pack', 'బేసిక్ ప్యాక్'] }, gold: { n: 5, gems: 15, name: ['Gold pack', 'గోల్డ్ ప్యాక్'] } };
-const STAR_TRADE = 30, SET_BONUS = 0.05;
-const ALL_STICKERS = ALBUM_SETS.flatMap((set, si) => set.items.map(([icon, en, te, stars], k) => ({ id: `${set.id}-${k}`, set: si, icon, name: [en, te], stars })));
-function albumBonus() { return 1 + SET_BONUS * Object.keys(S.album ? S.album.sets : {}).length; }
+const STAR_TRADE = 30, SET_BONUS = 0.02;
+function albumSeason() { return S.album.season || 0; }
+function seasonInfo(n = albumSeason()) { return ALBUM_SEASONS[n % ALBUM_SEASONS.length]; }
+// Season 1 keeps its old sticker ids so saves still match; later seasons get their own
+function seasonSets(n = albumSeason()) { const pre = n ? `s${n}:` : ''; return seasonInfo(n).sets.map(set => Object.assign({}, set, { id: pre + set.id })); }
+function allStickers() { return seasonSets().flatMap((set, si) => set.items.map(([icon, en, te, stars], k) => ({ id: `${set.id}-${k}`, set: si, icon, name: [en, te], stars }))); }
+function albumBonus() { return 1 + SET_BONUS * Object.values(S.album ? S.album.sets : {}).filter(v => v === true).length; }
 function stickerHave(id) { return S.album.have[id] || 0; }
-function setCount(si) { return ALBUM_SETS[si].items.filter((_, k) => stickerHave(`${ALBUM_SETS[si].id}-${k}`)).length; }
-function setReward(si) { return { coins: 100000 * (si + 1), gems: 15, energy: 30 }; }
+function setCount(si) { const set = seasonSets()[si]; return set.items.filter((_, k) => stickerHave(`${set.id}-${k}`)).length; }
+function setReward(si) { return { coins: Math.round(6000 * (si + 1) * cityScale() / 100) * 100, gems: 10, energy: 10 }; }
+function seasonReward() { return { coins: Math.round(60000 * cityScale() / 100) * 100, gems: 50, energy: 25, packs: 2 }; }
 function giveAlbumPack(kind, n = 1, quiet) {
   S.album.packs[kind] += n;
   if (!quiet) toast(tr(`📦 +${n} ${PACKS[kind].name[0]}! Open it in the Album.`, `📦 +${n} ${PACKS[kind].name[1]}! ఆల్బమ్‌లో తెరవండి.`), 'good');
 }
 function drawSticker(minStars = 1) {
-  const pool = ALL_STICKERS.filter(s => s.stars >= minStars);
+  const pool = allStickers().filter(s => s.stars >= minStars);
   const total = pool.reduce((t, s) => t + STICKER_W[s.stars], 0);
   let r = Math.random() * total;
   for (const s of pool) { if ((r -= STICKER_W[s.stars]) < 0) return s; }
   return pool[0];
 }
 function starsHtml(n) { return '★'.repeat(n) + '<span class="dim">' + '★'.repeat(5 - n) + '</span>'; }
+// Newly finished sets wait for the player to claim them
+function markFinishedSets() {
+  const fresh = [];
+  seasonSets().forEach((set, si) => { if (!S.album.sets[set.id] && setCount(si) === set.items.length) { S.album.sets[set.id] = 'ready'; fresh.push(si); } });
+  return fresh;
+}
+function setsReady() { return seasonSets().filter(set => S.album.sets[set.id] === 'ready').length; }
+function seasonDone() { return seasonSets().every(set => S.album.sets[set.id] === true); }
+function setClaimHtml(si) {
+  const set = seasonSets()[si], r = setReward(si);
+  return `<div class="set-claim">${ico(set.icon)}<div><b>${tr(`${set.name[0]} complete!`, `${set.name[1]} పూర్తి!`)}</b>
+    <small>${ico('coin')} ${fmtInt(r.coins)} · 💎 ${r.gems} · ⚡ ${r.energy} · +${SET_BONUS * 100}% ${tr('prizes', 'బహుమతులు')}</small></div>
+    <button class="btn gold" data-act="set-claim" data-id="${set.id}">${tr('Claim', 'తీసుకో')}</button></div>`;
+}
 function openPack(kind) {
   const A = S.album;
   if (A.packs[kind] <= 0) return;
   A.packs[kind]--;
   const P = PACKS[kind], got = [];
   for (let i = 0; i < P.n; i++) got.push(drawSticker(kind === 'gold' && i === P.n - 1 ? 4 : 1));
-  const done = [];
   const cards = got.map((s, i) => {
     const isNew = !A.have[s.id];
     A.have[s.id] = (A.have[s.id] || 0) + 1;
@@ -3617,24 +3674,52 @@ function openPack(kind) {
     return `<div class="pk-card s${s.stars} ${isNew ? 'new' : ''}" style="animation-delay:${i * 0.25}s">
       ${isNew ? `<em>${tr('NEW!', 'కొత్తది!')}</em>` : `<em class="dup">+${s.stars}⭐</em>`}${ico(s.icon)}<b>${tr(...s.name)}</b><small>${starsHtml(s.stars)}</small></div>`;
   }).join('');
-  // Finished sets pay out once
-  ALBUM_SETS.forEach((set, si) => {
-    if (!A.sets[set.id] && setCount(si) === set.items.length) {
-      A.sets[set.id] = true;
-      addLeague(100);
-      const r = setReward(si);
-      earn(r.coins); S.gems += r.gems; S.slot.energy += r.energy;
-      done.push(`${ico(set.icon)} ${tr(`${set.name[0]} complete! +${fmtInt(r.coins)} coins, +${r.gems} 💎, +${r.energy} ⚡, +5% profits`, `${set.name[1]} పూర్తి! +${fmtInt(r.coins)} కాయిన్లు, +${r.gems} 💎, +${r.energy} ⚡, +5% లాభాలు`)}`);
-    }
-  });
+  const fresh = markFinishedSets();
   S.stats.packs = (S.stats.packs || 0) + 1;
   save();
   sfx('case');
   modal(`<h3>${ico('pack')} ${tr(...P.name)}</h3><div class="pk-row">${cards}</div>
-    ${done.map(d => `<p class="pk-done">${d}</p>`).join('')}
-    <div class="modal-actions">${A.packs[kind] > 0 ? `<button class="btn gold" data-act="pack-open" data-id="${kind}">${tr('Open another', 'ఇంకోటి తెరువు')} (${A.packs[kind]})</button>` : ''}
+    ${fresh.map(setClaimHtml).join('')}
+    <div class="modal-actions">${A.packs[kind] > 0 && !fresh.length ? `<button class="btn gold" data-act="pack-open" data-id="${kind}">${tr('Open another', 'ఇంకోటి తెరువు')} (${A.packs[kind]})</button>` : ''}
     <button class="btn ghost" data-act="close">${tr('Done', 'సరే')}</button></div>`);
-  if (done.length) setTimeout(() => { confetti($('modalBody'), 200); sfx('win'); }, 900);
+  if (fresh.length) setTimeout(() => { confetti($('modalBody'), 200); SlotFX.jackpot(); }, 900);
+  if (activeTab === 'album') renderTab();
+}
+function claimSet(id, el) {
+  const sets = seasonSets(), si = sets.findIndex(s => s.id === id);
+  if (si < 0 || S.album.sets[id] !== 'ready') return;
+  const r = setReward(si);
+  S.album.sets[id] = true; addLeague(100);
+  earn(r.coins); S.gems += r.gems; S.slot.energy += r.energy;
+  const from = el && visibleEl(el) ? el : $('modalBody');
+  flyTo('coins', from, 'coin', 8); flyTo('gems', from, 'gem', 4, 120); flyTo('energy', from, 'bolt', 3, 240);
+  SlotFX.big(); confetti(from, 120);
+  toast(tr(`🏆 ${sets[si].name[0]}: +${fmtInt(r.coins)} coins, +${r.gems} 💎, +${r.energy} ⚡`, `🏆 ${sets[si].name[1]}: +${fmtInt(r.coins)} కాయిన్లు, +${r.gems} 💎, +${r.energy} ⚡`), 'good');
+  save(); updateHeader();
+  const row = el && el.closest('.set-claim');
+  if (row) row.outerHTML = `<p class="pk-done">✅ ${tr(`${sets[si].name[0]} prize collected!`, `${sets[si].name[1]} బహుమతి తీసుకున్నారు!`)}</p>`;
+  if (activeTab === 'album') renderTab();
+  if (seasonDone()) setTimeout(showSeasonDone, 900);
+}
+function showSeasonDone() {
+  const r = seasonReward(), next = seasonInfo(albumSeason() + 1);
+  SlotFX.jackpot(); confetti($('modalBody') || document.body, 260);
+  const tile = (icon, big, small, k) => `<div class="lm-tile" style="animation-delay:${0.25 + k * 0.15}s">${ico(icon)}<b>${big}</b><small>${small}</small></div>`;
+  modal(`<div class="lm-done"><div class="lm-rays"></div>${ico('album', 'big-ico')}</div>
+    <h3>${tr(`Album "${seasonInfo().name[0]}" complete!`, `"${seasonInfo().name[1]}" ఆల్బమ్ పూర్తి!`)}</h3>
+    <div class="lm-tiles">${tile('coin', fmtInt(r.coins), tr('coins', 'కాయిన్లు'), 0)}${tile('gem', r.gems, tr('gems', 'జెమ్స్'), 1)}${tile('bolt', r.energy, tr('energy', 'ఎనర్జీ'), 2)}${tile('pack', r.packs, tr('gold packs', 'గోల్డ్ ప్యాక్‌లు'), 3)}</div>
+    <p class="sub">${tr(`A new album starts: <b>${next.name[0]}</b> with ${next.sets.length * 9} new stickers!`, `కొత్త ఆల్బమ్ మొదలు: <b>${next.name[1]}</b>, ${next.sets.length * 9} కొత్త స్టిక్కర్లు!`)}</p>
+    <div class="modal-actions"><button class="btn gold lm-next" data-act="season-claim">${tr('Claim & start new album', 'తీసుకుని కొత్త ఆల్బమ్ మొదలుపెట్టు')}</button></div>`);
+}
+function claimSeason(el) {
+  if (!seasonDone()) return;
+  const r = seasonReward();
+  earn(r.coins); S.gems += r.gems; S.slot.energy += r.energy; S.album.packs.gold += r.packs;
+  const from = el && visibleEl(el) ? el : $('modalBody');
+  flyTo('coins', from, 'coin', 10); flyTo('gems', from, 'gem', 5, 120); flyTo('pack', from, 'pack', 2, 240);
+  S.album.season = albumSeason() + 1;
+  save(); closeModal(); updateHeader(); SlotFX.whoosh();
+  toast(tr(`📔 New album: ${seasonInfo().name[0]}!`, `📔 కొత్త ఆల్బమ్: ${seasonInfo().name[1]}!`), 'good');
   if (activeTab === 'album') renderTab();
 }
 function buyPack(kind) {
@@ -3649,22 +3734,27 @@ function tradeStars() {
   openPack('basic');
 }
 function renderAlbum() {
-  const A = S.album, owned = ALL_STICKERS.filter(s => stickerHave(s.id)).length;
+  const A = S.album, all = allStickers(), owned = all.filter(s => stickerHave(s.id)).length;
+  markFinishedSets();
   const packBtn = kind => `<div class="pack-box ${kind}">${ico('pack')}<div><b>${tr(...PACKS[kind].name)}</b><small>${PACKS[kind].n} ${tr('stickers', 'స్టిక్కర్లు')}${kind === 'gold' ? tr(', one 4★ or better', ', ఒకటి 4★ పైన') : ''}</small></div>
     ${A.packs[kind] > 0 ? `<button class="btn gold" data-act="pack-open" data-id="${kind}">${tr('Open', 'తెరువు')} (${A.packs[kind]})</button>` : `<button class="btn blue" data-act="pack-buy" data-id="${kind}" data-gems="${PACKS[kind].gems}">💎 ${PACKS[kind].gems}</button>`}</div>`;
-  const sets = ALBUM_SETS.map((set, si) => {
-    const n = setCount(si), r = setReward(si), complete = !!A.sets[set.id];
+  const sets = seasonSets().map((set, si) => {
+    const n = setCount(si), r = setReward(si), st = A.sets[set.id];
     const slots = set.items.map(([icon, en, te, stars], k) => {
       const c = stickerHave(`${set.id}-${k}`);
       return `<div class="stk ${c ? 's' + stars : 'missing'}">${ico(icon)}<b>${c ? tr(en, te) : '?'}</b><small>${starsHtml(stars)}</small>${c > 1 ? `<i>×${c}</i>` : ''}</div>`;
     }).join('');
-    return `<div class="album-set ${complete ? 'complete' : ''}"><div class="as-head">${ico(set.icon)}<b>${tr(...set.name)}</b><span>${n}/9</span></div>
-      <div class="as-grid">${slots}</div>
-      <div class="as-prize">${complete ? '✅ ' + tr('Complete', 'పూర్తి') : `${tr('Prize', 'బహుమతి')}: ${ico('coin')} ${fmtInt(r.coins)} · 💎 ${r.gems} · ⚡ ${r.energy} · +5% ${tr('profits', 'లాభాలు')}`}</div></div>`;
+    const prize = st === true ? '✅ ' + tr('Prize collected', 'బహుమతి తీసుకున్నారు')
+      : st === 'ready' ? `<button class="btn gold as-claim" data-act="set-claim" data-id="${set.id}">${ico('gift')} ${tr('Claim prize', 'బహుమతి తీసుకో')}: ${fmtInt(r.coins)} ${ico('coin')} · 💎 ${r.gems} · ⚡ ${r.energy}</button>`
+      : `${tr('Prize', 'బహుమతి')}: ${ico('coin')} ${fmtInt(r.coins)} · 💎 ${r.gems} · ⚡ ${r.energy} · +${SET_BONUS * 100}%`;
+    return `<div class="album-set ${st === true ? 'complete' : st === 'ready' ? 'ready' : ''}"><div class="as-head">${ico(set.icon)}<b>${tr(...set.name)}</b><span>${n}/9</span></div>
+      <div class="as-grid">${slots}</div><div class="as-prize">${prize}</div></div>`;
   }).join('');
-  return header('album', tr('Sticker Album', 'స్టిక్కర్ ఆల్బమ్'),
-    tr(`Collect all ${ALL_STICKERS.length} stickers. Packs come from bosses, free-gift chests, landmarks and events. Each finished set gives <b>+5% profits</b>.`, `మొత్తం ${ALL_STICKERS.length} స్టిక్కర్లు సేకరించండి. బాస్‌లు, ఫ్రీ గిఫ్ట్ పెట్టెలు, ల్యాండ్‌మార్కులు, ఈవెంట్ల నుంచి ప్యాక్‌లు వస్తాయి. పూర్తయిన ప్రతి సెట్ <b>+5% లాభాలు</b>.`)) +
-    `<div class="album-top"><div class="slot-stat">${ico('album')}<b>${owned}</b><small>/ ${ALL_STICKERS.length}</small></div>
+  const done = seasonDone();
+  return header('album', tr(`Sticker Album · ${seasonInfo().name[0]}`, `స్టిక్కర్ ఆల్బమ్ · ${seasonInfo().name[1]}`),
+    tr(`Album ${albumSeason() + 1}: collect all ${all.length} stickers. Finish a set, then tap <b>Claim</b> for its prize. Finish the album to unlock a brand new one!`, `ఆల్బమ్ ${albumSeason() + 1}: మొత్తం ${all.length} స్టిక్కర్లు సేకరించండి. సెట్ పూర్తయ్యాక <b>తీసుకో</b> నొక్కి బహుమతి పొందండి. ఆల్బమ్ పూర్తయితే కొత్తది వస్తుంది!`)) +
+    (done ? `<div class="season-banner">${ico('trophy')}<b>${tr('Album complete!', 'ఆల్బమ్ పూర్తి!')}</b><button class="btn gold" data-act="season-open">${tr('Claim & start new album', 'తీసుకుని కొత్త ఆల్బమ్')}</button></div>` : '') +
+    `<div class="album-top"><div class="slot-stat">${ico('album')}<b>${owned}</b><small>/ ${all.length}</small></div>
       <div class="slot-stat stars">⭐<b>${A.stars}</b><small>${tr('stars from duplicates', 'డూప్లికేట్ల స్టార్లు')}</small>
         <button class="btn ghost" data-act="star-trade" ${A.stars < STAR_TRADE ? 'disabled' : ''}>${STAR_TRADE}⭐ → ${ico('pack')}</button></div></div>
     <div class="pack-row">${packBtn('basic')}${packBtn('gold')}</div>
@@ -4404,7 +4494,7 @@ function renderStats() {
       [tr('Landmarks built', 'కట్టిన ల్యాండ్‌మార్కులు'), landmarksDone() + ' / ' + Object.keys(LANDMARKS).length],
       [tr('Quiz answers right', 'సరైన క్విజ్ జవాబులు'), Object.values(S.city.quiz).filter(v => v === 1).length + ' / ' + Object.keys(LANDMARKS).length],
       [tr('Cities built', 'కట్టిన నగరాలు'), Math.min(S.city.i, CITIES.length) + ' / ' + CITIES.length],
-      [tr('Stickers', 'స్టిక్కర్లు'), Object.keys(S.album.have).length + ' / ' + ALL_STICKERS.length],
+      [tr('Stickers', 'స్టిక్కర్లు'), allStickers().filter(x => stickerHave(x.id)).length + ' / ' + allStickers().length],
       [tr('VIP', 'VIP'), tr(...vipTier().name)],
       [tr('Lucky spins', 'లక్కీ స్పిన్‌లు'), fmtInt(S.stats.spins || 0)],
       [tr('Awards', 'అవార్డులు'), Object.keys(S.achievements).length + ' / ' + ACHIEVEMENTS.length],
@@ -4512,7 +4602,7 @@ function updateDots() {
   $('dot-spin').classList.toggle('on', spinReady());
   $('dot-scratch').classList.toggle('on', scratchFreeReady());
   slotRegen(); $('dot-slots').classList.toggle('on', S.slot.energy >= slotMax() || giftReady() || calReady() || S.raid.tokens > 0 || helpLeft());
-  $('dot-album').classList.toggle('on', S.album.packs.basic + S.album.packs.gold > 0);
+  $('dot-album').classList.toggle('on', S.album.packs.basic + S.album.packs.gold > 0 || setsReady() > 0 || seasonDone());
   $('dot-build').classList.toggle('on', !allCitiesDone() && S.cash >= nextTaskCost());
   const hasPets = Object.keys(S.pets.owned).length > 0;
   $('dot-pets').classList.toggle('on', hasPets ? (petsHungry() && petFeedReady()) : PETS.some(p => p.cost.cash ? S.cash >= p.cost.cash : false));
@@ -4656,6 +4746,9 @@ document.addEventListener('click', e => {
     case 'help-open': openHelp(); break;
     case 'help-go': helpGo(+id); break;
     case 'pack-open': openPack(id); break;
+    case 'set-claim': claimSet(id, el); break;
+    case 'season-open': showSeasonDone(); break;
+    case 'season-claim': claimSeason(el); break;
     case 'pack-buy': buyPack(id); break;
     case 'star-trade': tradeStars(); break;
     case 'cal-claim': claimCalendar(); break;
